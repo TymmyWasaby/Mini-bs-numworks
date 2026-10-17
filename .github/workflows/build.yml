@@ -22,8 +22,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi imagemagick
 
-      - name: Generate valid 55x55 icon
-        run: convert -size 55x55 xc:'#3B2A63' -fill '#FFC928' -draw "circle 27,27 27,8" -fill '#8A4BE0' -draw "circle 27,28 27,14" -fill white -draw "circle 21,24 21,22" -fill white -draw "circle 33,24 33,22" -fill black -draw "circle 21,25 21,24" -fill black -draw "circle 33,25 33,24" -fill black -draw "rectangle 23,32 31,33" src/icon.png && identify src/icon.png
+      - name: Generate valid 55x56 icon
+        run: convert -size 55x56 xc:'#3B2A63' -fill '#FFC928' -draw "circle 27,27 27,8" -fill '#8A4BE0' -draw "circle 27,28 27,14" -fill white -draw "circle 21,24 21,22" -fill white -draw "circle 33,24 33,22" -fill black -draw "circle 21,25 21,24" -fill black -draw "circle 33,25 33,24" -fill black -draw "rectangle 23,32 31,33" src/icon.png && identify src/icon.png
 
       - name: Build app
         run: make clean build

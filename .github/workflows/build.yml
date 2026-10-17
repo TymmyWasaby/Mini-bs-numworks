@@ -23,8 +23,13 @@ jobs:
           npx --yes -- nwlink@0.0.16 --version || true
           echo "=== EADK flags ==="
           npx --yes -- nwlink@0.0.16 eadk-cflags
-          echo "=== EADK flags exit code ==="
-          echo $?
+                    echo "=== EADK flags ==="
+          if npx --yes -- nwlink@0.0.16 eadk-cflags; then
+            echo "EADK flags: OK"
+          else
+            echo "ERREUR : nwlink eadk-cflags a échoué"
+            exit 1
+          fi
 
       - name: Build app
         run: make clean build

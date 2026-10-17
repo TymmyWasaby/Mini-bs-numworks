@@ -17,19 +17,19 @@ jobs:
         uses: numworks/setup-arm-toolchain@latest
 
       
+      
       - name: Debug EADK flags
         run: |
-          echo "=== nwlink version ==="
-          npx --yes -- nwlink@0.0.16 --version || true
-          echo "=== EADK flags ==="
-          npx --yes -- nwlink@0.0.16 eadk-cflags
-                    echo "=== EADK flags ==="
-          if npx --yes -- nwlink@0.0.16 eadk-cflags; then
-            echo "EADK flags: OK"
-          else
-            echo "ERREUR : nwlink eadk-cflags a échoué"
-            exit 1
-          fi
+          node --version
+          npm --version
+          npm view nwlink@0.0.16 version
+          npx --yes nwlink@0.0.16 eadk-cflags > /tmp/eadk-flags.txt 2> /tmp/nwlink-error.txt || true
+          echo "=== STDOUT ==="
+          cat /tmp/eadk-flags.txt
+          echo "=== STDERR ==="
+          head -c 5000 /tmp/nwlink-error.txt
+          echo
+
 
       - name: Build app
         run: make clean build

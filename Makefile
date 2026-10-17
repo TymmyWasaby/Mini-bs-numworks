@@ -6,7 +6,7 @@ NWLINK = npx --yes -- nwlink@0.0.19
 
 CPPFLAGS = -Isrc -std=c++11 -fno-exceptions -fdata-sections -ffunction-sections
 CPPFLAGS += -Os -Wall -Wextra
-CPPFLAGS += $(shell $(NWLINK) eadk-cflags)
+CPPFLAGS += $(shell $(NWLINK) eadk-cflags-device)
 LDFLAGS = -Wl,--relocatable -nostartfiles --specs=nano.specs
 LDFLAGS += -Wl,-e,main -Wl,-u,eadk_app_name -Wl,-u,eadk_app_icon -Wl,-u,eadk_api_level
 LDFLAGS += -Wl,--gc-sections

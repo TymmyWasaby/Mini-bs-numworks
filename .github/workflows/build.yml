@@ -12,6 +12,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node 20 (nwlink incompatible Node 24)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Setup ARM toolchain
         run: |
           sudo apt-get update

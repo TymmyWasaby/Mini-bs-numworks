@@ -14,8 +14,8 @@ public:
   static constexpr KDColor RGB(uint8_t r, uint8_t g, uint8_t b) {
     return KDColor((uint16_t)(((uint16_t)(r >> 3) << 11) | ((uint16_t)(g >> 2) << 5) | (b >> 3)));
   }
-  uint8_t red() const { return (uint8_t)((((value >> 11) & 31) * 255 + 15) / 31); }
-  uint8_t green() const { return (uint8_t)((((value >> 5) & 63) * 255 + 31) / 63); }
+  uint8_t red() const { return (uint8_t)((((value >> 11) & 31) * 255 + 15) / 31; }
+  uint8_t green() const { return (uint8_t)((((value >> 5) & 63) * 255 + 31) / 63; }
   uint8_t blue() const { return (uint8_t)(((value & 31) * 255 + 15) / 31); }
   operator eadk_color_t() const { return (eadk_color_t)value; }
 private:
@@ -49,12 +49,12 @@ public:
 private:
   eadk_keyboard_state_t state;
 };
-inline State getState() { return State(eadk_keyboard_scan()); }
+inline State getState() { return State(eadk_keyboard_scan());
+}
 }
 namespace Timing {
-inline uint32_t &elapsedMillis() { static uint32_t value = 0; return value; }
-inline uint32_t millis() { return elapsedMillis(); }
-inline void msleep(uint32_t ms) { eadk_timing_msleep(ms); elapsedMillis() += ms; }
+inline uint32_t millis() { return (uint32_t)eadk_timing_millis(); }
+inline void msleep(uint32_t ms) { eadk_timing_msleep(ms); }
 }
 }
 #endif

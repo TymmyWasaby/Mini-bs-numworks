@@ -28,14 +28,14 @@
 //  15 BRAWLERS, niveaux 1 a 11, gadgets, pouvoirs star, hypercharge.
 // ===================================================================
 
-#include "ion.h"
+#include <ion.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 // ------------------------- Ecran / rendu ---------------------------
 #define SW 320
-#define SH 222
+#define SH 240
 #define TILE 14
 #define MAPW 32
 #define MAPH 24
@@ -171,7 +171,7 @@ struct BrawlerDef {
   GadType gad;
   StarType star;
   int superCost;
-  uint32_t colTop, colBot;   // couleurs RGB24 du corps (degrade)
+  uint16_t colTop, colBot;   // couleurs du corps (degrade)
   uint8_t projShape;         // 0 balle, 1 eclat, 2 fusee, 3 grenade
 };
 
@@ -493,7 +493,7 @@ static float nearestEnemyDist(Ent &e, Ent **out) {
   for (int i = 0; i < entCount; i++) {
     Ent &o = ents[i];
     if (!o.alive || o.team == e.team) continue;
-    if (inBush(o.x, o.y) && e.team == o.team) continue;
+    if (inBush(o.x, o.y) && !e.isHuman) continue;
     float dx = o.x - e.x, dy = o.y - e.y, d2 = dx * dx + dy * dy;
     if (d2 < best) { best = d2; *out = &o; }
   }
@@ -1002,7 +1002,7 @@ static void renderMatch() {
   // gadget (pastille cyan BS)
   fRect(150, 3, 18, 18, me.gadgetUses > 0 ? C_CYN : KDColor::RGB24(0x225566));
   drawText(155, 7, "X", C_BLK);
-  drawNum(156, 7, me.gadgetUses, C_WHT);
+  drawNum(163, 7, me.gadgetUses, C_WHT);
   // hypercharge (pastille magenta si debloquee)
   if (me.accIdx >= 0 && acc.b[me.accIdx].hyper) {
     fRect(172, 3, 24, 18, me.hyperT > 0 ? C_MAG : KDColor::RGB24(0x66114A));
@@ -1259,11 +1259,4 @@ void ion_main(int argc, char *argv[]) {
       prevOK = false;
     }
   }
-}
-
-extern const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "Mini BS";
-extern const uint32_t eadk_api_level __attribute__((section(".rodata.eadk_api_level"))) = 0;
-int main(int argc, char *argv[]) {
-  ion_main(argc, argv);
-  return 0;
 }

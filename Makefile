@@ -2,7 +2,7 @@ Q ?= @
 CC = arm-none-eabi-gcc
 CXX = arm-none-eabi-g++
 BUILD_DIR = target
-NWLINK = npx --yes -- nwlink@0.0.19
+NWLINK = npx --yes nwlink@0.0.19
 
 CPPFLAGS = -Isrc -std=c++11 -fno-exceptions -fdata-sections -ffunction-sections
 CPPFLAGS += -Os -Wall -Wextra

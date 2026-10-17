@@ -171,7 +171,7 @@ struct BrawlerDef {
   GadType gad;
   StarType star;
   int superCost;
-  uint16_t colTop, colBot;   // couleurs du corps (degrade)
+  uint32_t colTop, colBot;   // couleurs du corps (degrade)
   uint8_t projShape;         // 0 balle, 1 eclat, 2 fusee, 3 grenade
 };
 

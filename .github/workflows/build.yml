@@ -17,10 +17,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup ARM toolchain
+      - name: Setup ARM toolchain + ImageMagick
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi imagemagick
+
+      - name: Resize icon to 55x55 (required by NumWorks)
+        run: convert src/icon.png -resize "55x55!" src/icon.png
 
       - name: Build app
         run: make clean build

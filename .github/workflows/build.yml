@@ -22,8 +22,8 @@ jobs:
         run: |
           node --version
           npm --version
-          npm view nwlink@0.0.16 version
-          npx --yes nwlink@0.0.16 eadk-cflags > /tmp/eadk-flags.txt 2> /tmp/nwlink-error.txt || true
+          npm view nwlink@0.0.19 version
+          npx --yes nwlink@0.0.19 eadk-cflags
           echo "=== STDOUT ==="
           cat /tmp/eadk-flags.txt
           echo "=== STDERR ==="

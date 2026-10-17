@@ -19,16 +19,21 @@ jobs:
       
       
       - name: Debug EADK flags
+        shell: bash
         run: |
           node --version
           npm --version
           npm view nwlink@0.0.19 version
-          npx --yes nwlink@0.0.19 eadk-cflags
+          set +e
+          npx --yes -- nwlink@0.0.19 eadk-cflags \
+            > /tmp/nwlink-out.txt 2> /tmp/nwlink-err.txt
+          result=$?
+          echo "Exit code: $result"
           echo "=== STDOUT ==="
-          cat /tmp/eadk-flags.txt
-          echo "=== STDERR ==="
-          head -c 5000 /tmp/nwlink-error.txt
-          echo
+          cat /tmp/nwlink-out.txt
+          echo "=== STDERR (fin du journal) ==="
+          tail -c 4000 /tmp/nwlink-err.txt
+          exit "$result"
 
 
       - name: Build app

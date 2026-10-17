@@ -1,0 +1,26 @@
+
+name: Build NumWorks app
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup ARM toolchain
+        uses: numworks/setup-arm-toolchain@latest
+
+      - name: Build app
+        run: make clean build
+
+      - name: Upload NWA
+        uses: actions/upload-artifact@v4
+        with:
+          name: mini-bs-numworks-nwa
+          path: target/mini-bs.nwa

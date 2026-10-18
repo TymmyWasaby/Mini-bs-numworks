@@ -268,6 +268,47 @@ static const char *BRAWLER_BIOS[50] = {
   "CACTUS LEGENDAIRE","CORBEAU ASSASSIN","NINJA INVISIBLE","SPECTRE SOMNOLANT","ALCHIMISTE FEERIE",
   "GENIE DE LAMPE","VAMPIR MOUSTACHE","ROBOT PILOTE","CLOWN IMPREVISIBLE","SURGE ELECTRIQUE"
 };
+// Noms et descriptions des SUPERS (inspires de Brawl Stars)
+static const char *SUPER_NAMES[50] = {
+  "SUPER SHELL","ATTENTION OURS","BALLE DE DESTRUCTION","CHARGE TAURAU","PLUIE DE ROQUETTES",
+  "METEOR PRIMO","ULTIME COCKTAIL","GUERISON ENCOREE","BOUCLIER VEGETAL","SCRAPPY FURIEUX",
+  "GRANDE DYNAMITE","MINE REJETEE","TETE FURIEUSE","PLUIE RICOCHET","DOUBLE BARIL",
+  "MORTIER","FURIE CARROUEL","SEISME TOTAL","TRIPLE FLECHE","SPRAY MASSIF",
+  "TURBO BURNOUT","MITRAILLEUSE MOBILE","MASSUE SEISME","BALLE FURIEUSE","ESSAIM GEANT",
+  "PEUGEOT PEPS","MARTEAU PIRATE","PORTAIL MAGIQUE","TORNADO FURIEUX","RAFALE EXIGEANTE",
+  "REMBLOURAGE","BRAVO BUZZ","POUBELLE FORTE","ASHER RAGE","LILAS LUMINEUX",
+  "SAVATE VOLANTE","BLAST ARDENT","PUSTULE TIRAILLEE","VAGUE POISSON","PERLE ECLAIRANTE",
+  "ZONE EPINEUSE","CRAQUE-CORBEAU","FUMEE FANTOME","SABLE TEMPETE","HUILE BRULANTE",
+  "MAGIE LAMPE","BAIN DE SANG","MEGA ROBOTS","CLOCHE FURIEUSE","SURGE SUPREME"
+};
+static const char *SUPER_DESC[50] = {
+  "RAFALE LARGE QUI DEVASTE","INVOQUE UN OURSON FURIEUX","PLUIE DE BALLES PERCUTANTES",
+  "CHARGE QUI EJECTE LES MURS","TIR ROQUETTES EN CARPETTE","SAUT QUI ECRASE DESSERTI",
+  "PLUIE DE BOUTEILLES","SOIGNE TOUTE L EQUIPE","CARAPACE QUI REDUIT DEGATS","INVOQUE DES MINIS ROBOTS",
+  "BARRAGE DE DYNAMITE","POSE UNE MINE TUEUSE","TIR TRES LONG ET LOURD","BALLES REBONDISSANTES",
+  "DOUBLE TIR DOUBLE DEGATS","TIR EN MORTIER X3","GRAPPIN MOITIE CARAPACE","ONDE CHOC MASSIVE",
+  "TROIS FLECHES PERCENTES","SPRAY QUI RALENTIT","BOOST VITESSE MAX","MUNITIONS INFINIES",
+  "ONDE SEISMIQUE","BALLES AVEUGLANTES","ESSAIM D ABEILLES","PIEGES SUR ROUES",
+  "MARTEAU TOURNOYANT","TELEPORTATION ALLIEE","CYCLONE DEVASTATEUR","RAFALE DE GLACE",
+  "SAC DE SABLE EXPLOSIF","SURF AVEUGLANT","POUBELLE URANIUM","RAT GEANT FURIEUX",
+  "LILAS EN FLEURS","ULTIME SAVATE","MARTEL ARDENT","PUSTULES COLLANTES","VAGUE AQUATIQUE",
+  "PERLE EXPOSANTE","CHAMP DE CACTUS","VOLS A RETOURNEMENT","FUMEE INVISIBLE","TEMPETE DE SABLE",
+  "FLAQUE GLISSANTE","SOIN A DISTANCE","TIR PERCENT LONG","PIEGES SURPRISE","SURVOLTAGE MAXI"
+};
+// Descriptions des gadgets (une par brawler)
+static const char *GADGET_DESC[50] = {
+  "VITESSE +30 PENDANT 3S","SOIGNE 30 POURCENT","TIR +25 POURCENT","GAGNE UN BOUCLIER",
+  "RECHARGE INSTANTANEE","SOIGNE PAR SAUT","SOIGNE LES ALLIES","SOIGNE EN ZONE",
+  "REDUIT DEGATS SUBIS","REPARATION COMPLETE","SAUTE LES MURS","EXPLOSE EN ZONE",
+  "PETRIFIE UN ENNEMI","RECHARGE LES MUNITIONS","DEGAGE LES ENNEMIS","CAISSE DE POUDRE",
+  "INVINCIBLE 1S","REPOUSSE TOUS","REVEILLE UN ALLIE","RALENTIT EN ZONE",
+  "BOOST IMMEDIAT","SOIGNE EN ZONE","FRAPPE TOUS AUTOUR","BOOST VITESSE","PROJECTILE GEANT",
+  "PROTECTION TOTALE","SAUT LONGUE PORTEE","TELEPORTE","RAFALE DE VENT","GELE LES ENNEMIS",
+  "PIEGE EXPLOSIF","SAISIT UN ENNEMI","REPOUSSE AVEUGLE","INVOCHE UN RAT","FLEURS SOIGNANTES",
+  "REPARE UN MUR","BLESSE EN ZONE","COLLE UN ENNEMI","GEANT BOUCLIER","SURGE D EGOUT",
+  "INVOCHE UN CACTUS","RALENTIT LES TIRS","PAS DE TRACES","MAL DE SABLE","GLISSADE LONGUE",
+  "SOIN GROUPE","MARQUE LA CIBLE","REPARATION TOTALE","SURPRISE EXPLOSIVE","DECHARGE TOTALE"
+};
 struct Look {
   uint8_t hair;      // 0..5 : ras, epique, long, oiseau/ninja-faux, champignon, crete
   uint8_t hat;       // 0..7 : aucun, casquette, chapeau melon, casque mineur,
@@ -1911,25 +1952,26 @@ static void brawlerMenu(int myBrawler) {
       oCirc(230, 50, 4, C_YEL, C_BTND); drawNum(245, 46, acc.coins, C_WHT);
 
       if (unlocked) {
+        rRect(10, 134, 96, 26, 5, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
+        drawText(16, 140, "GADGET", a.gadget ? C_BLK : C_GRE);
+        drawText(16, 148, a.gadget ? GADGET_NAMES[sel] : "NON", a.gadget ? C_BLK : C_GRE);
+        rRect(112, 134, 96, 26, 5, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
+        drawText(118, 140, "POUV. STAR", a.starPower ? C_WHT : C_GRE);
+        drawText(118, 148, a.starPower ? STAR_NAMES[sel] : "NON", a.starPower ? C_WHT : C_GRE);
+        rRect(214, 134, 96, 26, 5, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
+        drawText(220, 140, "HYPERCH.", a.hyper ? C_WHT : C_GRE);
+        drawText(220, 148, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
+
+        // super et bio du brawler
         rRect(10, 100, 90, 26, 5, KDColor::RGB24(0x2B3A55));
-        drawText(16, 104, "PV", C_WHT);
-        drawNum(16, 112, (int)(d.baseHP * mul * ((a.starPower && d.star == STAR_HP) ? 1.05f : 1)), C_GREEN);
+        drawText(16, 104, "SUPER", C_YEL);
+        drawText(16, 112, SUPER_NAMES[sel], C_WHT);
         rRect(110, 100, 90, 26, 5, KDColor::RGB24(0x2B3A55));
         drawText(116, 104, "DEG", C_WHT);
         drawNum(116, 112, (int)(d.baseDmg * mul * ((a.starPower && d.star == STAR_DMG) ? 1.1f : 1)), C_ORG);
         rRect(210, 100, 100, 26, 5, KDColor::RGB24(0x2B3A55));
         drawText(216, 104, "PORTEE", C_WHT);
         drawNum(216, 112, d.range, C_CYN);
-
-        rRect(10, 134, 96, 26, 5, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
-        drawText(16, 140, "GADGET", a.gadget ? C_BLK : C_GRE);
-        drawText(16, 148, a.gadget ? "OUI" : "NON", a.gadget ? C_BLK : C_GRE);
-        rRect(112, 134, 96, 26, 5, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
-        drawText(118, 140, "POUV. STAR", a.starPower ? C_WHT : C_GRE);
-        drawText(118, 148, a.starPower ? "OUI" : "NON", a.starPower ? C_WHT : C_GRE);
-        rRect(214, 134, 96, 26, 5, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
-        drawText(220, 140, "HYPERCH.", a.hyper ? C_WHT : C_GRE);
-        drawText(220, 148, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
 
         int cost = upgradeCost(a.level);
         if (a.level < 11) {
@@ -2032,15 +2074,143 @@ static void playMatch(int myBrawler, int selMode) {
   resultScreen(matchResult, myBrawler);
 }
 
+// ------------------------- Mode Entrainement ---------------------------
+// Terrain a cibles : tire sur les cibles qui bougent, mesure ta precision.
+static void trainingMode(int myBrawler) {
+  struct Target { float x, y, vx, hp, maxHP; bool alive; };
+  Target tg[4];
+  for (int i = 0; i < 4; i++) {
+    tg[i].x = 180 + i * 40; tg[i].y = 60 + (i % 2) * 100;
+    tg[i].vx = ((i % 2) ? 1 : -1) * (40 + i * 10);
+    tg[i].maxHP = 4000 + i * 1000; tg[i].hp = tg[i].maxHP;
+    tg[i].alive = true;
+  }
+  const BrawlerDef &d = BRAWLERS[myBrawler];
+  float px_ = 60, py_ = SH / 2;
+  int shots = 0, hits = 0, dmgTotal = 0;
+  float ammo = 3, aim = 0;
+  Ent dummy; memset(&dummy, 0, sizeof(dummy));
+  // projectiles simplifies du mode entrainement
+  struct TProj { bool active; float x, y, vx, vy, travelled, range, dmg; };
+  TProj tp[16];
+  for (int i = 0; i < 16; i++) tp[i].active = false;
+  prevOK = prevBack = false; keyBack = false;
+  int trainT = 0;
+  while (true) {
+    pollKeys();
+    if (keyBack && !prevBack) { prevBack = true; return; }
+    float dt = 1.0f / 30.0f;
+    trainT += 33; animT += 33;
+    // deplacement
+    float spd = 130.0f;
+    if (kRight) px_ = fminf(SW - 30, px_ + spd * dt);
+    if (kLeft) px_ = fmaxf(20, px_ - spd * dt);
+    if (kUp) aim = 0;
+    if (kDown) aim = 3.14159f;
+    // visee auto vers la cible la plus proche
+    float best = 1e9, ax = aim, ay = 0;
+    for (int i = 0; i < 4; i++)
+      if (tg[i].alive) {
+        float dx = tg[i].x - px_, dy = tg[i].y - py_, dd = dx * dx + dy * dy;
+        if (dd < best) { best = dd; ax = atan2f(dy, dx); }
+      }
+    aim = ax; ay = ax;
+    if (keyOK && !prevOK && ammo >= 1) {
+      shots++;
+      ammo -= 1;
+      for (int i = 0; i < 16; i++)
+        if (!tp[i].active) {
+          tp[i].active = true; tp[i].x = px_ + 10; tp[i].y = py_;
+          tp[i].vx = cosf(aim) * d.projSpeed; tp[i].vy = sinf(aim) * d.projSpeed;
+          tp[i].travelled = 0; tp[i].range = d.range; tp[i].dmg = d.baseDmg;
+          break;
+        }
+    }
+    prevOK = keyOK;
+    ammo = fminf(3, ammo + dt * 1000.0f / d.reloadMs);
+    // deplacement des cibles + projectiles
+    for (int i = 0; i < 4; i++)
+      if (tg[i].alive) {
+        tg[i].x += tg[i].vx * dt;
+        if (tg[i].x < 120 || tg[i].x > SW - 20) tg[i].vx = -tg[i].vx;
+        if (tg[i].hp <= 0) { tg[i].alive = false; dmgTotal += tg[i].maxHP; }
+      }
+    for (int i = 0; i < 16; i++)
+      if (tp[i].active) {
+        tp[i].x += tp[i].vx * dt; tp[i].y += tp[i].vy * dt;
+        tp[i].travelled += sqrtf(tp[i].vx * tp[i].vx + tp[i].vy * tp[i].vy) * dt;
+        if (tp[i].travelled > tp[i].range) { tp[i].active = false; continue; }
+        for (int j = 0; j < 4; j++)
+          if (tg[j].alive) {
+            float dx = tg[j].x - tp[i].x, dy = tg[j].y - tp[i].y;
+            if (dx * dx + dy * dy < 14 * 14) {
+              tg[j].hp -= tp[i].dmg; hits++; dmgTotal += (int)tp[i].dmg;
+              addPop(tp[i].x, tp[i].y - 12, (int)tp[i].dmg);
+              tp[i].active = false; break;
+            }
+          }
+      }
+    // toutes les cibles respawnent quand tout est detruit
+    bool allDead = true;
+    for (int i = 0; i < 4; i++) if (tg[i].alive) allDead = false;
+    if (allDead)
+      for (int i = 0; i < 4; i++) { tg[i].alive = true; tg[i].hp = tg[i].maxHP; }
+    // ---- rendu ----
+    fRect(0, 0, SW, SH, KDColor::RGB24(0x4E8A5A));
+    for (int ty = 0; ty < SH; ty += TILE)
+      for (int tx = 0; tx < SW; tx += TILE)
+        if (((tx + ty) / TILE) & 1) fRect(tx, ty, TILE, TILE, KDColor::RGB24(0x447A4E));
+    fRect(0, 0, 100, SH, KDColor::RGB24(0x3A3A4A));
+    fRect(100, 0, 3, SH, C_BLK);
+    for (int i = 0; i < 4; i++)
+      if (tg[i].alive) {
+        int bx = (int)tg[i].x, by = (int)tg[i].y;
+        oCirc(bx, by, 12, C_ORG, C_BLK);
+        fCirc(bx, by, 7, C_WHT);
+        fCirc(bx, by, 3, C_RED);
+        // barre de vie de la cible
+        fRect(bx - 12, by - 20, 25, 5, C_BLK);
+        fRect(bx - 11, by - 19, (int)(23 * tg[i].hp / tg[i].maxHP), 3, C_YEL);
+      }
+    for (int i = 0; i < 16; i++)
+      if (tp[i].active) oCirc((int)tp[i].x, (int)tp[i].y, 3, C_YEL, C_BLK);
+    // joueur
+    drawBrawlerSprite((int)px_, (int)py_, 9, myBrawler, (int)(aim * 57.2957795f), false, trainT);
+    // munitions
+    for (int a = 0; a < 3; a++) {
+      int filled = (int)(fmaxf(0, fminf(1, ammo - a)) * 4);
+      fRect((int)px_ - 8 + a * 6, (int)py_ + 12, 5, 2, C_BLK);
+      fRect((int)px_ - 8 + a * 6, (int)py_ + 12, filled, 2, C_ORG);
+    }
+    for (int i = 0; i < MAX_POP; i++)
+      if (pops[i].active) {
+        pops[i].life -= 33; pops[i].y -= 0.7f;
+        if (pops[i].life <= 0) pops[i].active = false;
+        else drawNum((int)pops[i].x, (int)pops[i].y, pops[i].val, C_WHT);
+      }
+    // panneau de stats
+    drawText(8, 6, "ENTRAINEMENT", C_YEL);
+    drawText(8, 22, "TIRS:", C_WHT); drawNum(48, 22, shots, C_WHT);
+    drawText(8, 34, "TOUCHES:", C_WHT); drawNum(64, 34, hits, C_CYN);
+    drawText(8, 46, "PRECISION:", C_WHT);
+    if (shots > 0) drawNum(72, 46, hits * 100 / shots, C_GREEN);
+    else drawText(72, 46, "0", C_GREEN);
+    drawText(8, 58, "DEGATS:", C_WHT); drawNum(60, 58, dmgTotal, C_ORG);
+    drawTextC(SH - 14, "OK TIR   FLECHES BOUGER   BACK QUITTER", C_GRE);
+    blit();
+    Ion::Timing::msleep(20);
+  }
+}
+
 // ------------------------- Point d'entree ------------------------------
 void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;
   initAcc();
   initQuests();
   int myBrawler = 0;
-  const char *mainItems[6] = {"JOUER", "BRAWLERS", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
+  const char *mainItems[7] = {"JOUER", "ENTRAINEMENT", "BRAWLERS", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
   while (true) {
-    int choice = menuPick("BRAWL MICROSTARS", mainItems, 6, 0);
+    int choice = menuPick("BRAWL MICROSTARS", mainItems, 7, 0);
     if (choice < 0) return;
     if (choice == 0) {
       const char *modes[MODE_COUNT];
@@ -2072,12 +2242,14 @@ void ion_main(int argc, char *argv[]) {
       if (keyBack) { prevBack = false; continue; }
       playMatch(myBrawler, selMode);
     } else if (choice == 1) {
-      brawlerMenu(myBrawler);
+      trainingMode(myBrawler);
     } else if (choice == 2) {
-      questScreen();
+      brawlerMenu(myBrawler);
     } else if (choice == 3) {
-      trophyRoadScreen();
+      questScreen();
     } else if (choice == 4) {
+      trophyRoadScreen();
+    } else if (choice == 5) {
       settingsScreen();
     } else {
       for (int y = 0; y < SH; y++)

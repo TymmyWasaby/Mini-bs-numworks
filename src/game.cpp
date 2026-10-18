@@ -17,6 +17,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+// --- Identite de l'app NWA (OBLIGATOIRE pour l'installation) ---
+extern "C" {
+  const char eadk_app_name[] = "mini-bs";
+  const uint32_t eadk_api_level = 0;
+}
+
 #define SW 320
 #define SH 240
 #define TILE 14
@@ -1390,11 +1396,105 @@ static void trophyRoadScreen() {
   }
 }
 
+// ecran de selection de personnage : liste + grand portrait style BS
+static int brawlerPicker(int myBrawler) {
+  int sel = myBrawler;
+  while (true) {
+    for (int y = 0; y < SH; y++)
+      for (int x = 0; x < SW; x++)
+        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    drawTextC(6, "CHOISIS TON BRAWLER", C_YEL);
+    fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
+
+    // liste a gauche (11 visibles)
+    int first = (sel > 5) ? sel - 5 : 0;
+    if (first > 50 - 11) first = fmaxf(0, 50 - 11);
+    for (int i = first; i < 50 && i < first + 11; i++) {
+      int y = 30 + (i - first) * 15;
+      bool un = isUnlocked(i);
+      if (i == sel) rRect(6, y - 3, 130, 13, 5, C_YEL);
+      // mini-portrait
+      drawBrawlerSprite(16, y + 3, 5, i, 90, false);
+      drawText(26, y, BRAWLERS[i].name, i == sel ? C_BLK : (un ? C_WHT : C_GRE));
+      if (!un) drawText(26 + textW(BRAWLERS[i].name) + 2, y, "?", C_GRE);
+    }
+
+    // grand portrait a droite avec cadre de rarete
+    const BrawlerDef &d = BRAWLERS[sel];
+    bool un = isUnlocked(sel);
+    rRect(150, 30, 164, 150, 10, un ? KDColor::RGB24(RAR_COL[d.rar]) : C_DGREY);
+    int bob = (animT / 400) % 2;
+    if (un) {
+      drawBrawlerSprite(232, 80 - bob, 30, sel, 90, false);
+      shadow(232, 116, 22, 5);
+      drawTextC(136, d.name, C_YEL);
+      drawTextC(150, RAR_NAME[d.rar], KDColor::RGB24(RAR_COL[d.rar]));
+      // trophées du perso
+      fRect(SW / 2 - 20, 166, 10, 5, C_GOLD); fRect(SW / 2 - 18, 171, 6, 2, C_GOLD);
+      drawNum(SW / 2 - 4, 165, acc.b[sel].trophies, C_WHT);
+      // niveau
+      fRect(SW / 2 + 40, 162, 22, 14, C_YEL);
+      drawNum(SW / 2 + 46, 165, acc.b[sel].level, C_BLK);
+    } else {
+      shCircRGB(232, 80 - bob, 30, 0x444444, 0x222222, C_GRE);
+      drawTextC(90, "? ? ?", C_GRE);
+      drawTextC(120, "A DEBLOQUER A", C_WHT);
+      char buf[24];
+      int n = d.unlockTroph, pos = 0;
+      buf[pos++] = 'A'; buf[pos++] = ' '; buf[pos++] = ' ';
+      char tmp[8]; int tn = 0;
+      do { tmp[tn++] = '0' + n % 10; n /= 10; } while (n);
+      while (tn > 0) buf[pos++] = tmp[--tn];
+      buf[pos++] = ' '; buf[pos++] = 'T'; buf[pos++] = 'R'; buf[pos++] = 'O'; buf[pos++] = 'P'; buf[pos++] = 0;
+      drawTextC(136, buf, C_YEL);
+      drawTextC(152, "TROPHEES", C_GRE);
+    }
+    drawTextC(SH - 14, "OK CHOISIR   BACK RETOUR", C_GRE);
+    blit();
+    animT += 100;
+    pollKeys();
+    if (kUp && sel > 0) sel--;
+    if (kDown && sel < 49) sel++;
+    if (keyOK && !prevOK) { prevOK = true; return sel; }
+    if (keyBack && !prevBack) { prevBack = true; return -1; }
+    prevOK = keyOK; prevBack = keyBack;
+    Ion::Timing::msleep(60);
+  }
+}
+
+// ecran des parametres : rappel des touches
+static void settingsScreen() {
+  while (true) {
+    for (int y = 0; y < SH; y++)
+      for (int x = 0; x < SW; x++)
+        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    drawTextC(8, "PARAMETRES", C_YEL);
+    fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
+    drawTextC(32, "TOUCHES DU JEU", C_CYN);
+    const char *acts[6] = {"SE DEPLACER", "ATTAQUE", "SUPER", "GADGET", "HYPERCHARGE", "RETOUR"};
+    const char *keys[6] = {"FLECHES", "OK / EXE", "SHIFT", "X", "-", "BACK"};
+    for (int i = 0; i < 6; i++) {
+      int y = 48 + i * 16;
+      rRect(50, y - 3, 100, 13, 5, KDColor::RGB24(0x2B3A55));
+      drawText(56, y, acts[i], C_WHT);
+      rRect(170, y - 3, 100, 13, 5, C_BTN);
+      drawText(176, y, keys[i], C_BLK);
+    }
+    drawTextC(150, "ACHATS: + NIV  * GADGET  / STAR", C_GRE);
+    rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
+    drawTextC(196, "OK RETOUR", C_BLK);
+    blit();
+    pollKeys();
+    if (keyOK && !prevOK) { prevOK = true; return; }
+    if (keyBack && !prevBack) { prevBack = true; return; }
+    prevOK = keyOK; prevBack = keyBack;
+    Ion::Timing::msleep(60);
+  }
+}
+
 static void brawlerMenu(int myBrawler) {
   while (true) {
-    const char *names[50];
-    for (int i = 0; i < 50; i++) names[i] = BRAWLERS[i].name;
-    int sel = menuPick("CHOISIS TON BRAWLER", names, 50, myBrawler);
+    int sel = brawlerPicker(myBrawler);
     if (sel < 0) return;
     myBrawler = sel;
     while (true) {
@@ -1551,9 +1651,9 @@ void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;
   initAcc();
   int myBrawler = 0;
-  const char *mainItems[4] = {"JOUER", "BRAWLERS", "ROUTE DES TROPHEES", "AIDE"};
+  const char *mainItems[5] = {"JOUER", "BRAWLERS", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
   while (true) {
-    int choice = menuPick("BRAWL MICROSTARS", mainItems, 4, 0);
+    int choice = menuPick("BRAWL MICROSTARS", mainItems, 5, 0);
     if (choice < 0) return;
     if (choice == 0) {
       const char *modes[MODE_COUNT];
@@ -1588,6 +1688,8 @@ void ion_main(int argc, char *argv[]) {
       brawlerMenu(myBrawler);
     } else if (choice == 2) {
       trophyRoadScreen();
+    } else if (choice == 3) {
+      settingsScreen();
     } else {
       for (int y = 0; y < SH; y++)
         for (int x = 0; x < SW; x++)
@@ -1608,4 +1710,5 @@ void ion_main(int argc, char *argv[]) {
       prevOK = false;
     }
   }
+}
 }

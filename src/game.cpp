@@ -230,6 +230,43 @@ static const BrawlerDef BRAWLERS[50] = {
 // ------------- Traits visuels uniques par brawler --------------------
 // Derives deterministes de l'index : chaque brawler a sa coiffure,
 // son chapeau/accessoire et sa couleur d'accent. 50 looks differents.
+// Noms des gadgets et pouvoirs star pour chaque brawler (style BS).
+static const char *GADGET_NAMES[50] = {
+  "BANDANA VELOCE","OURSON SURPRISE","BALLES PERCUTANTES","MURAILLE","ROQUETTES TANDEM",
+  "SUPLEX AERIEN","TISSU REPARATEUR","JINGLE TRISTE","GANTS DURCIS","SCRAPPIES FURIEUX",
+  "SAUTECARABINES","MINE ANTI-CHAR","TETE HURLANTE","PING BALLE AVIDE","BARIL DOUBLE",
+  "SAC DE POUDRE","ROUE SECOURS","SECOUSSES","OISEAU ECLAIRE","SPRAY EMOUVANT",
+  "VROUM TURBO","SOIN INTENSIF","ETONNEMENT","BONBON GOMME","RAYON AFFAME",
+  "PEUGEOT PROTEGE","VOL PORTE-CLE","PORTAIL TORDU","COFFRE PIEGE","RAFALE GLACEE",
+  "FACTURE IMPOSEE","BALLE CHAINOT","BOUCLIER BOB","POUBELLE PLEINE","LILAS CHERO",
+  "COUP SAVATE","FRAPPE ARDENTE","PUSTULE ADHESIVE","GONFLETTE","PERLE DOUCE",
+  "TERRAIN SABLEUX","TOXINE RALENTIE","FUMEE FANTOME","SABLE TROUBLE","HUILE ECLAIRANTE",
+  "LAMPADAIRE","MELANGE CAFE","BOUSSOLE OR","BLAST RONFANT","SURGE ALTERNATIF"
+};
+static const char *STAR_NAMES[50] = {
+  "COQUILLE DURE","AMITIE FEROCE","TIR VELOCE","PEAUX DURES","ROQUETTES LONGUES",
+  "MUAY PRIMO","SIROP EPAIS","GUERISON DAIRY","GANTS FERTILES","SURCHARGE",
+  "DYNAMITE GRANDE","CARAPACE","SAUT LONG","ROULE-BALLON","SAC MAGIQUE",
+  "POT DE POUDRE","CHALEUR FROIDE","SEISME","TROISIEME OEIL","CŒUR TENDRE",
+  "VITESSE ECLAIR","SOIN MATERNEL","FORCE HERCULE","RACQUETTE","RAYON GEL",
+  "PEUGEOT RAPIDE","GRIFFES LESTES","REMISE RONDE","COFFRE OUVERT","GIVRE EPINEUX",
+  "ECONOMIE","GRAND ECLAIR","BOUCLIER MAITRE","POUBELLE FUMANTE","LILAS DORE",
+  "SAVATE FORT","BRASIER","PUSTULE","GONFLE","DOUCE PERLE",
+  "SABLE SLOW","VENIN","FANTOME","TROUBLE","HUILE",
+  "LAMPE","CAFE SERRE","BOUSSOLE","RONFLEMENT","ALTERNANCE"
+};
+static const char *BRAWLER_BIOS[50] = {
+  "FUSIL A POMPE DEPANNEUSE","AMIE DES OURS","DEUX PISTOLETS STAR","BRUTE DE COWBOY","FUSIL ROQUETTES",
+  "LUTTEUR MASQUE","BARMAN ROBOT","MARIACHI DOUX","BOTANISTE BOXEUSE","INGENIEURE SCRAPPY",
+  "DEMINEUR FOU","TETE A CLAQUES","ARCADE AMBULANTE","RICOCHET MAITRE","TONNEAU ROULANT",
+  "PIRATE AU SABLE","MINEUR FOU","OUVRIERE DE CHANTIER","ARCHER SIOUX","INFLUENCEUSE TOXIQUE",
+  "PILOTE DE COURSE","MAMAN SOIGNEUSE","MONSTRE FRANKENSTEIN","BATTEUSE DE BASEBALL","ABEILLE REINE",
+  "GRAND-MERE A DISTANCE","CAPEUR DES TOITS","PATRON AVARE","MAITRE DU VENT","FACTRICE IMPIOYE",
+  "VOLUSE MASQUEE","SAUVEUR DE PLAGE","CENDRILLON COLERE","SPECTRE ECRIVAIN","DIVA DE SCENE",
+  "MAITRE DU KUNG-FU","FOCUS BRULANT","ALIEN ELASTIQUE","GENERAL POISSON","PATISSIERE FEROCE",
+  "CACTUS LEGENDAIRE","CORBEAU ASSASSIN","NINJA INVISIBLE","SPECTRE SOMNOLANT","ALCHIMISTE FEERIE",
+  "GENIE DE LAMPE","VAMPIR MOUSTACHE","ROBOT PILOTE","CLOWN IMPREVISIBLE","SURGE ELECTRIQUE"
+};
 struct Look {
   uint8_t hair;      // 0..5 : ras, epique, long, oiseau/ninja-faux, champignon, crete
   uint8_t hat;       // 0..7 : aucun, casquette, chapeau melon, casque mineur,
@@ -296,6 +333,69 @@ struct BrawlerAccount { int level, trophies; bool gadget, starPower, hyper; };
 struct Account { BrawlerAccount b[50]; int coins; } acc;
 static int unlockedBrawlers = 0;
 
+// ---- Sauvegarde persistante (stockage EADK, survis aux redemarrages) ----
+static const char SAVE_NAME[] = "minibs.sav";
+static void saveAcc() {
+  uint8_t buf[210];
+  int p = 0;
+  for (int i = 0; i < 50; i++) {
+    buf[p++] = (uint8_t)acc.b[i].level;
+    buf[p++] = (uint8_t)(acc.b[i].trophies >> 8);
+    buf[p++] = (uint8_t)(acc.b[i].trophies & 0xFF);
+    buf[p++] = (uint8_t)((acc.b[i].gadget ? 1 : 0) | (acc.b[i].starPower ? 2 : 0) | (acc.b[i].hyper ? 4 : 0));
+  }
+  buf[p++] = (uint8_t)(acc.coins >> 8);
+  buf[p++] = (uint8_t)(acc.coins & 0xFF);
+  // quetes en cours + compteurs
+  for (int i = 0; i < 3; i++) {
+    buf[p++] = (uint8_t)quests[i].type;
+    buf[p++] = (uint8_t)(quests[i].goal >> 8);
+    buf[p++] = (uint8_t)(quests[i].goal & 0xFF);
+    buf[p++] = (uint8_t)(quests[i].prog >> 8);
+    buf[p++] = (uint8_t)(quests[i].prog & 0xFF);
+    buf[p++] = (uint8_t)(quests[i].reward >> 8);
+    buf[p++] = (uint8_t)(quests[i].reward & 0xFF);
+  }
+  buf[p++] = (uint8_t)(killCounter >> 8); buf[p++] = (uint8_t)(killCounter & 0xFF);
+  buf[p++] = (uint8_t)(gemCounter >> 8);  buf[p++] = (uint8_t)(gemCounter & 0xFF);
+  buf[p++] = (uint8_t)(superCounter >> 8);buf[p++] = (uint8_t)(superCounter & 0xFF);
+  buf[p++] = (uint8_t)(winStreak >> 8);   buf[p++] = (uint8_t)(winStreak & 0xFF);
+  Ion::Storage::write(SAVE_NAME, buf, (uint16_t)p);
+}
+static bool loadAcc() {
+  uint8_t buf[240];
+  uint16_t len = Ion::Storage::read(SAVE_NAME, buf, sizeof(buf));
+  if (len != 226) return false; // format inattendu : partie vierge
+  int p = 0;
+  for (int i = 0; i < 50; i++) {
+    acc.b[i].level = buf[p++];
+    int t = (buf[p] << 8) | buf[p + 1]; p += 2;
+    acc.b[i].trophies = t;
+    uint8_t flags = buf[p++];
+    acc.b[i].gadget = (flags & 1) != 0;
+    acc.b[i].starPower = (flags & 2) != 0;
+    acc.b[i].hyper = (flags & 4) != 0;
+    if (acc.b[i].level > 11) acc.b[i].level = 11;
+    if (acc.b[i].trophies < 0 || acc.b[i].trophies > 9999) acc.b[i].trophies = 0;
+  }
+  acc.coins = (buf[p] << 8) | buf[p + 1];
+  if (acc.coins < 0) acc.coins = 0;
+  p += 2;
+  for (int i = 0; i < 3; i++) {
+    quests[i].type = buf[p++];
+    quests[i].goal = (buf[p] << 8) | buf[p + 1]; p += 2;
+    quests[i].prog = (buf[p] << 8) | buf[p + 1]; p += 2;
+    quests[i].reward = (buf[p] << 8) | buf[p + 1]; p += 2;
+    if (quests[i].type > 4) { quests[i].type = 0; quests[i].goal = 1; quests[i].prog = 0; quests[i].reward = 80; }
+  }
+  killCounter = (buf[p] << 8) | buf[p + 1]; p += 2;
+  gemCounter  = (buf[p] << 8) | buf[p + 1]; p += 2;
+  superCounter = (buf[p] << 8) | buf[p + 1]; p += 2;
+  winStreak   = (buf[p] << 8) | buf[p + 1];
+  if (winStreak < 0) winStreak = 0;
+  return true;
+}
+
 static int upgradeCost(int lvl) { return 20 + lvl * 30; }
 static float lvlMul(int lvl) { return 1.0f + (lvl - 1) * 0.05f; }
 
@@ -322,8 +422,17 @@ static void refreshUnlocks(int *newlyUnlocked) {
 static void initAcc() {
   memset(&acc, 0, sizeof(acc));
   acc.coins = 100;
-  int dummy;
-  refreshUnlocks(&dummy);
+  if (loadAcc()) {
+    // compte restaure : on recalcule juste les debloquages derives
+    int newUnlock = -1;
+    refreshUnlocks(&newUnlock);
+    saveAcc();
+    return;
+  }
+  // partie vierge
+  int newUnlock = -1;
+  refreshUnlocks(&newUnlock);
+  saveAcc();
 }
 
 // ------------------------- Modes --------------------------------------
@@ -390,6 +499,33 @@ static int mode, gemCountdown, teamGems[5], teamStars[5];
 static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
 static int shakeT = 0, shakeMag = 0, animT = 0;
 static int matchResult = -2;
+
+// ---- Particules (impacts, poussieres, etincelles) ----
+#define MAX_PART 40
+struct Part { bool active; float x, y, vx, vy; int life; uint8_t kind; };
+static Part parts[MAX_PART];
+static void spawnParts(float x, float y, int kind, int n) {
+  for (int i = 0; i < MAX_PART && n > 0; i++)
+    if (!parts[i].active) {
+      parts[i].active = true; parts[i].x = x; parts[i].y = y;
+      parts[i].vx = (rnd(100) - 50) * 0.6f; parts[i].vy = (rnd(100) - 60) * 0.6f;
+      parts[i].life = 300 + rnd(200); parts[i].kind = kind; n--;
+    }
+}
+// ---- Killfeed (dernieres eliminations) ----
+#define KILLFEED 3
+struct Kill { int alive; int victim, killer; int life; };
+static Kill killfeed[KILLFEED];
+// ---- Compteurs de quetes (declaration anticipee avant usage) ----
+struct Quest { int type; int goal; int prog; int reward; };
+static Quest quests[3];
+static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
+static void addKill(int victim, int killer) {
+  if (killer == humanIdx) killCounter++;
+  for (int i = KILLFEED - 1; i > 0; i--) killfeed[i] = killfeed[i - 1];
+  killfeed[0].alive = 1; killfeed[0].victim = victim; killfeed[0].killer = killer;
+  killfeed[0].life = 4000;
+}
 
 static void addPop(float x, float y, int val) {
   for (int i = 0; i < MAX_POP; i++)
@@ -474,6 +610,8 @@ static void setupMatch(int selMode, int myBrawler) {
   mode = selMode; entCount = 0; humanIdx = -1;
   for (int i = 0; i < MAX_PROJ; i++) projs[i].active = false;
   for (int i = 0; i < MAX_POP; i++) pops[i].active = false;
+  for (int i = 0; i < MAX_PART; i++) parts[i].active = false;
+  for (int i = 0; i < KILLFEED; i++) killfeed[i].alive = 0;
   for (int i = 0; i < 10; i++) gems[i].active = false;
   for (int i = 0; i < MAX_SAFE; i++) { safes[i].hp = 0; safes[i].maxHP = 0; }
   for (int i = 0; i < MAX_ZONE; i++) zones[i].prog = 0;
@@ -573,6 +711,7 @@ static void doSuper(Ent &e, float ang) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   if (e.superCharge < 100) return;
   e.superCharge = 0; e.aimAng = ang;
+  if (e.isHuman) superCounter++;
   float mul = lvlMul(e.accIdx >= 0 ? acc.b[e.accIdx].level : 1);
   if (e.hyperT > 0) mul *= 1.25f;
   shakeT = 200; shakeMag = 3;
@@ -707,6 +846,7 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
   src.superCharge = fminf(100, src.superCharge + (src.hyperT > 0 ? 3.5f : 2.0f));
   addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg);
+  spawnParts(e.x, e.y, 0, 3);
 }
 
 static void updateMatch(float dt) {
@@ -718,6 +858,15 @@ static void updateMatch(float dt) {
 
   for (int i = 0; i < MAX_POP; i++)
     if (pops[i].active) { pops[i].life -= (int)(dt * 1000); pops[i].y -= dt * 22; if (pops[i].life <= 0) pops[i].active = false; }
+  for (int i = 0; i < MAX_PART; i++)
+    if (parts[i].active) {
+      parts[i].life -= (int)(dt * 1000);
+      parts[i].x += parts[i].vx * dt; parts[i].y += parts[i].vy * dt;
+      parts[i].vy += 60 * dt;
+      if (parts[i].life <= 0) parts[i].active = false;
+    }
+  for (int i = 0; i < KILLFEED; i++)
+    if (killfeed[i].alive) { killfeed[i].life -= (int)(dt * 1000); if (killfeed[i].life <= 0) killfeed[i].alive = 0; }
 
   Ent &me = ents[humanIdx];
   pollKeys();
@@ -784,6 +933,9 @@ static void updateMatch(float dt) {
           if (!gems[g].active) { gems[g].active = true; gems[g].x = e.x + rnd(20) - 10; gems[g].y = e.y + rnd(20) - 10; e.gems--; }
       if (e.hasBall) { e.hasBall = false; ballX = e.x; ballY = e.y; }
       shakeT = 200; shakeMag = 3;
+      spawnParts(e.x, e.y, 1, 8);
+      for (int j = 0; j < entCount; j++)
+        if (ents[j].alive && ents[j].team != e.team && fabsf(ents[j].x - e.x) < 140 && fabsf(ents[j].y - e.y) < 140) { addKill((&e - ents), j); break; }
       if (ffa && e.isHuman) matchResult = -1;
       if (mode == MODE_BOUNTY) {
         int killer = 1;
@@ -835,7 +987,9 @@ static void updateMatch(float dt) {
       if (!gems[g].active) continue;
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && fabsf(ents[i].x - gems[g].x) < 12 && fabsf(ents[i].y - gems[g].y) < 12) {
-          gems[g].active = false; ents[i].gems++; break;
+          gems[g].active = false; ents[i].gems++;
+          if (i == humanIdx) gemCounter++;
+          break;
         }
       int actives = 0;
       for (int q = 0; q < 10; q++) actives += gems[q].active;
@@ -1262,6 +1416,47 @@ static void renderMatch() {
     if (pops[i].active)
       drawNum((int)pops[i].x - camX - 6, (int)pops[i].y - camY, pops[i].val, C_WHT);
 
+  // particules
+  for (int i = 0; i < MAX_PART; i++)
+    if (parts[i].active) {
+      int sx = (int)parts[i].x - camX, sy = (int)parts[i].y - camY;
+      if (parts[i].kind == 0) { px(sx, sy, C_WHT); px(sx + 1, sy, C_YEL); }
+      else { px(sx, sy, C_ORG); px(sx - 1, sy + 1, C_RED); px(sx + 1, sy - 1, C_YEL); }
+    }
+
+  // killfeed (coin haut droit, sous le HUD)
+  for (int i = 0; i < KILLFEED; i++)
+    if (killfeed[i].alive) {
+      int y = 28 + i * 12;
+      fRect(SW - 118, y, 118, 10, C_BLK);
+      drawBrawlerSprite(SW - 112, y + 5, 4, killfeed[i].killer, 90, false);
+      drawText(SW - 104, y + 2, "A ELIMINE", C_GRE);
+      drawBrawlerSprite(SW - 44, y + 5, 4, killfeed[i].victim, 90, false);
+    }
+
+  // ---- Minimap (coin bas droit) ----
+  {
+    int mw = 64, mh = 48, mx = SW - mw - 2, my = SH - mh - 14;
+    fRect(mx - 1, my - 1, mw + 2, mh + 2, C_BLK);
+    fRect(mx, my, mw, mh, KDColor::RGB24(0x1E2A38));
+    for (int ty = 0; ty < MAPH; ty += 2)
+      for (int tx = 0; tx < MAPW; tx += 2)
+        if (tileMap[tx][ty] == 1) px(mx + tx * mw / MAPW, my + ty * mh / MAPH, C_GRE);
+    if (mode == MODE_GEM)
+      for (int g = 0; g < 10; g++)
+        if (gems[g].active) px(mx + (int)(gems[g].x * mw / (MAPW * TILE)), my + (int)(gems[g].y * mh / (MAPH * TILE))), C_GEM);
+    if (mode == MODE_BALL) px(mx + (int)(ballX * mw / (MAPW * TILE)), my + (int)(ballY * mh / (MAPH * TILE))), C_WHT);
+    if (mode == MODE_HEIST)
+      for (int s = 0; s < MAX_SAFE; s++)
+        if (safes[s].maxHP > 0) px(mx + (int)(safes[s].x * mw / (MAPW * TILE)), my + (int)(safes[s].y * mh / (MAPH * TILE))), C_GOLD);
+    for (int i = 0; i < entCount; i++)
+      if (ents[i].alive) {
+        KDColor c = (i == humanIdx) ? C_GREEN : (ents[i].team == me.team ? C_BLUE : C_RED);
+        px(mx + (int)(ents[i].x * mw / (MAPW * TILE)), my + (int)(ents[i].y * mh / (MAPH * TILE)), c);
+        if (i == humanIdx) { px(mx + (int)(ents[i].x * mw / (MAPW * TILE)) + 1, my + (int)(ents[i].y * mh / (MAPH * TILE)), c); }
+      }
+  }
+
   // ---- HUD ----
   fRect(0, 0, SW, 24, C_PANEL);
   fRect(0, 22, SW, 2, C_PANEL2);
@@ -1321,6 +1516,106 @@ static void renderMatch() {
   drawText(4, SH - 10, T.themeName, C_GRE);
   drawText(140, SH - 10, "OK ATT SHIFT SUP X GAD - HYP", C_GRE);
   blit();
+}
+
+// ------------------------- Quetes -------------------------------------
+// 3 quetes actives, remplacees quand terminees. Repondees en jeu.
+// (structure Quest et compteurs declares plus haut, pres du killfeed)
+
+static void rollQuest(Quest &q) {
+  int t = rnd(5);
+  q.type = t;
+  switch (t) {
+    case 0: q.goal = 1 + rnd(2); q.reward = 80; break;   // matchs gagnes
+    case 1: q.goal = 3 + rnd(5); q.reward = 60; break;   // eliminations
+    case 2: q.goal = 5 + rnd(6); q.reward = 50; break;   // gemmes
+    case 3: q.goal = 3 + rnd(4); q.reward = 40; break;   // supers
+    default: q.goal = 2 + rnd(2); q.reward = 120; break;  // serie de victoires
+  }
+  q.prog = 0;
+}
+static const char* questDesc(Quest &q, char *buf) {
+  const char *base;
+  switch (q.type) {
+    case 0: base = "GAGNE %d MATCHS"; break;
+    case 1: base = "%d ELIMINATIONS"; break;
+    case 2: base = "RAMASSE %d GEMMES"; break;
+    case 3: base = "UTILISE %d SUPERS"; break;
+    default: base = "%d VICTOIRES DE SUITE"; break;
+  }
+  (void)base;
+  // formatage manuel simple
+  int g = q.goal, pos = 0;
+  const char *prefix[] = {"GAGNE ", "ELIMINE ", "RAMASSE ", "SUPER ", "VICTOIRES "};
+  const char *suffix[] = {" MATCHS", " FOIS", " GEMMES", " FOIS", " DE SUITE"};
+  const char *p = prefix[q.type], *s = suffix[q.type];
+  while (*p) buf[pos++] = *p++;
+  char tmp[8]; int tn = 0;
+  do { tmp[tn++] = '0' + g % 10; g /= 10; } while (g);
+  while (tn > 0) buf[pos++] = tmp[--tn];
+  while (*s) buf[pos++] = *s++;
+  buf[pos] = 0;
+  return buf;
+}
+static void initQuests() {
+  killCounter = gemCounter = superCounter = winStreak = 0;
+  for (int i = 0; i < 3; i++) rollQuest(quests[i]);
+}
+static void questScreen() {
+  while (true) {
+    for (int y = 0; y < SH; y++)
+      for (int x = 0; x < SW; x++)
+        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    drawTextC(8, "QUETES DU JOUR", C_YEL);
+    fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
+    for (int i = 0; i < 3; i++) {
+      Quest &q = quests[i];
+      int y = 44 + i * 52;
+      bool done = q.prog >= q.goal;
+      rRect(30, y, SW - 60, 42, 8, done ? C_GREEN : KDColor::RGB24(0x2B3A55));
+      char buf[32];
+      drawText(40, y + 6, questDesc(q, buf), done ? C_BLK : C_WHT);
+      // barre de progression
+      fRect(40, y + 20, 180, 8, C_BLK);
+      fRect(41, y + 21, (int)(178 * fminf(1.0f, (float)q.prog / q.goal)), 6, done ? C_GOLD : C_CYN);
+      drawNum(232, y + 18, q.prog, C_WHT);
+      drawText(244, y + 18, "SUR", C_GRE);
+      drawNum(268, y + 18, q.goal, C_WHT);
+      // recompense
+      oCirc(46, y + 36, 4, C_YEL, C_BTND);
+      drawNum(54, y + 32, q.reward, done ? C_BLK : C_YEL);
+      if (done) drawText(80, y + 32, "COMPLETEE!", C_BLK);
+    }
+    drawTextC(SH - 14, "OK RETOUR", C_GRE);
+    blit();
+    pollKeys();
+    if (keyOK && !prevOK) { prevOK = true; return; }
+    prevOK = keyOK;
+    Ion::Timing::msleep(80);
+  }
+}
+static void updateQuests(int result) {
+  // appelee a la fin de chaque match
+  if (result == 1) {
+    winStreak++;
+  } else if (result < 0) {
+    winStreak = 0;
+  }
+  for (int i = 0; i < 3; i++) {
+    Quest &q = quests[i];
+    bool wasDone = q.prog >= q.goal;
+    switch (q.type) {
+      case 0: if (result == 1) q.prog++; break;
+      case 1: q.prog = killCounter; break;
+      case 2: q.prog = gemCounter; break;
+      case 3: q.prog = superCounter; break;
+      default: q.prog = (winStreak >= q.goal) ? q.goal : winStreak; break;
+    }
+    if (!wasDone && q.prog >= q.goal) {
+      acc.coins += q.reward;
+      rollQuest(q); // nouvelle quete
+    }
+  }
 }
 
 // ------------------------- Menus --------------------------------------
@@ -1569,13 +1864,13 @@ static void brawlerMenu(int myBrawler) {
       animT += 80;
       if (unlocked) {
         if (a.level < 11 && acc.coins >= cost && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Plus)))
-          { acc.coins -= cost; a.level++; }
+          { acc.coins -= cost; a.level++; saveAcc(); }
         if (!a.gadget && acc.coins >= 100 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Multiply)))
-          { acc.coins -= 100; a.gadget = true; }
+          { acc.coins -= 100; a.gadget = true; saveAcc(); }
         if (a.level >= 3 && !a.starPower && acc.coins >= 150 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Division)))
-          { acc.coins -= 150; a.starPower = true; }
+          { acc.coins -= 150; a.starPower = true; saveAcc(); }
         if (a.level >= 11 && !a.hyper && acc.coins >= 300 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Power)))
-          { acc.coins -= 300; a.hyper = true; }
+          { acc.coins -= 300; a.hyper = true; saveAcc(); }
       }
       if (keyOK || keyBack) { prevOK = keyOK; prevBack = keyBack; break; }
       prevOK = keyOK; prevBack = keyBack;
@@ -1596,6 +1891,8 @@ static void resultScreen(int result, int myBrawler) {
   if (acc.b[myBrawler].trophies < 0) acc.b[myBrawler].trophies = 0;
   int newUnlock = -1;
   refreshUnlocks(&newUnlock);
+  updateQuests(result);
+  saveAcc(); // persistance des trophees / pieces apres chaque match
 
   const char *msg = (result == 1) ? "VICTOIRE!" : (result == 0) ? "EGALITE" : "DEFAITE";
   KDColor col = (result == 1) ? C_YEL : (result == 0) ? C_WHT : C_RED;
@@ -1650,10 +1947,11 @@ static void playMatch(int myBrawler, int selMode) {
 void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;
   initAcc();
+  initQuests();
   int myBrawler = 0;
-  const char *mainItems[5] = {"JOUER", "BRAWLERS", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
+  const char *mainItems[6] = {"JOUER", "BRAWLERS", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
   while (true) {
-    int choice = menuPick("BRAWL MICROSTARS", mainItems, 5, 0);
+    int choice = menuPick("BRAWL MICROSTARS", mainItems, 6, 0);
     if (choice < 0) return;
     if (choice == 0) {
       const char *modes[MODE_COUNT];
@@ -1687,8 +1985,10 @@ void ion_main(int argc, char *argv[]) {
     } else if (choice == 1) {
       brawlerMenu(myBrawler);
     } else if (choice == 2) {
-      trophyRoadScreen();
+      questScreen();
     } else if (choice == 3) {
+      trophyRoadScreen();
+    } else if (choice == 4) {
       settingsScreen();
     } else {
       for (int y = 0; y < SH; y++)
@@ -1710,5 +2010,4 @@ void ion_main(int argc, char *argv[]) {
       prevOK = false;
     }
   }
-}
 }

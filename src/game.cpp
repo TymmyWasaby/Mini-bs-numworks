@@ -13,6 +13,7 @@
 // ===================================================================
 
 #include <ion.h>
+#include <eadk.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -287,16 +288,34 @@ static void brawlerLook(int i, Look &L) {
 }
 
 // dessine le sprite complet d'un brawler (corps + traits uniques)
-static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash) {
+// walk : phase d'animation de marche (0 = immobile)
+static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0) {
   const BrawlerDef &d = BRAWLERS[bIdx];
   Look L; brawlerLook(bIdx, L);
   int rr = r + (L.size == 2 ? 2 : (L.size == 0 ? -1 : 0));
   KDColor acc = KDColor::RGB24(L.accent);
+  // cape derriere les mythiques et legendaires
+  if (d.rar >= 4 && r >= 6) {
+    int flap = (walk / 60) % 2;
+    for (int j = -rr; j < rr; j += 2)
+      fRect(cx - rr - 3 + flap, cy + j, 2, 2, acc);
+  }
+  // jambes animees (petits rectangles alternes sous le corps)
+  if (walk > 0 && r >= 6) {
+    int step = (walk / 40) % 2;
+    KDColor legC = KDColor::RGB24(d.colBot);
+    fRect(cx - 3, cy + rr - 1, 3, 3, legC);
+    fRect(cx + 1, cy + rr - 1 - (step ? 1 : 0), 3, 3, legC);
+    px(cx - 3, cy + rr + 2, C_BLK); px(cx + 1, cy + rr + 1 - (step ? 1 : 0), C_BLK);
+    px(cx - 1, cy + rr + 2, C_BLK); px(cx + 3, cy + rr + 1 - (step ? 1 : 0), C_BLK);
+  }
   // corps degrade
   shCircRGB(cx, cy, rr, flash ? 0xFFFFFF : d.colTop, flash ? 0x9A9A9A : d.colBot, C_BLK);
-  // arme selon type
+  // bras oriente vers la visee
   int gx = (int)(cosf(faceAng * 0.01745f) * (rr + 3)), gy = (int)(sinf(faceAng * 0.01745f) * (rr + 3));
   KDColor wc = KDColor::RGB24(0x6A4A2A);
+  if (r >= 6) fRect(cx + gx / 2 - 1, cy + gy / 2 - 1, 3, 3, KDColor::RGB24(d.colBot));
+  // arme selon type
   if (L.weapon == 1) { fRect(cx + gx - 2, cy + gy - 2, 6, 2, wc); fRect(cx + gx + 3, cy + gy - 1, 2, 3, C_GRE); }
   else if (L.weapon == 2) { fRect(cx + gx - 1, cy + gy - 3, 2, 7, wc); fCirc(cx + gx, cy + gy - 4, 2, C_GRE); }
   else if (L.weapon == 3) { fRect(cx + gx - 1, cy + gy - 3, 2, 7, wc); fRect(cx + gx - 3, cy + gy - 4, 6, 2, C_GRE); }
@@ -306,6 +325,8 @@ static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool
   if (L.eyes == 0) { fRect(cx + ex - 3, cy + ey - 2, 2, 3, C_WHT); fRect(cx + ex + 1, cy + ey - 2, 2, 3, C_WHT); }
   else if (L.eyes == 1) { fRect(cx + ex - 3, cy + ey - 1, 2, 1, C_WHT); fRect(cx + ex + 1, cy + ey - 1, 2, 1, C_WHT); }
   else { fRect(cx + ex - 4, cy + ey - 3, 3, 4, C_WHT); fRect(cx + ex + 1, cy + ey - 3, 3, 4, C_WHT); }
+  // bouche (sourire cartoon sur les grands sprites)
+  if (r >= 8) fRect(cx + ex - 2, cy + ey + 3, 5, 1, C_BLK);
   // coiffure
   switch (L.hair) {
     case 1: fCirc(cx, cy - rr + 1, 3, acc); fCirc(cx - 2, cy - rr, 2, acc); break;   // mohawk
@@ -499,6 +520,7 @@ static int mode, gemCountdown, teamGems[5], teamStars[5];
 static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
 static int shakeT = 0, shakeMag = 0, animT = 0;
 static int matchResult = -2;
+static int startCountdown = 0; // 3-2-1-GO au debut du match
 
 // ---- Particules (impacts, poussieres, etincelles) ----
 #define MAX_PART 40
@@ -557,22 +579,52 @@ static void moveEnt(Ent &e, float dx, float dy) {
 }
 
 // ------------------------- Generation carte --------------------------
+// Rotation quotidienne : le numero du jour (horloge interne de la
+// calculatrice, aucun internet requis) choisit une variante de carte.
+// Chaque mode possede 3 variantes de disposition.
+static int mapDayIndex() {
+  eadk_date_t dt = eadk_timing_date();
+  return (dt.year * 372 + dt.month * 31 + dt.day) % 3;
+}
 static void genMap() {
+  int variant = mapDayIndex();
+  uint16_t savedSeed = seed;
+  seed = (uint16_t)(12345 + variant * 7919 + mode * 104729); // carte fixe du jour
   for (int x = 0; x < MAPW; x++)
     for (int y = 0; y < MAPH; y++) {
       tileMap[x][y] = 0;
       if (x == 0 || y == 0 || x == MAPW - 1 || y == MAPH - 1) tileMap[x][y] = 1;
     }
-  for (int t = 0; t < 95; t++) {
+  // densite et motif selon la variante du jour
+  int density = 95 + variant * 25;        // variante 0 : aeree, 2 : tres bourree
+  for (int t = 0; t < density; t++) {
     int x = 1 + rnd(MAPW / 2), y = 1 + rnd(MAPH - 2);
-    int v = rnd(10) < 4 ? 2 : 1;
+    int v = rnd(10) < (variant == 1 ? 5 : 4) ? 2 : 1;
     if (x < 5 || abs((int)(y - MAPH / 2)) < 2) continue;
+    if (variant == 2 && (x % 3 == 0)) continue;   // couloirs alignes
     tileMap[x][y] = v;
     tileMap[MAPW - 1 - x][MAPH - 1 - y] = v;
+  }
+  // structures symetriques propres a chaque variante
+  if (variant >= 1) {
+    for (int y = 4; y < MAPH - 4; y++) {          // colonnes laterales
+      tileMap[3][y] = 1; tileMap[MAPW - 4][y] = 1;
+    }
+    for (int i = 0; i < 4; i++) {                 // blocs centraux
+      tileMap[MAPW / 2 - 3 + i][3] = 2;
+      tileMap[MAPW / 2 - 3 + i][MAPH - 4] = 2;
+    }
+  }
+  if (variant == 2) {                             // buissons protecteurs aux spawn
+    for (int i = 0; i < 3; i++) {
+      tileMap[5][MAPH / 2 - 3 + i * 3] = 2;
+      tileMap[MAPW - 6][MAPH / 2 - 3 + i * 3] = 2;
+    }
   }
   if (mode == MODE_BALL || mode == MODE_HEIST || mode == MODE_ZONE)
     for (int x = 1; x < MAPW - 1; x++)
       for (int y = MAPH / 2 - 1; y <= MAPH / 2 + 1; y++) tileMap[x][y] = 0;
+  seed = savedSeed; // restaure la graine du match pour l'aléa en jeu
 }
 
 // ------------------------- Spawn -------------------------------------
@@ -618,6 +670,7 @@ static void setupMatch(int selMode, int myBrawler) {
   genMap();
   for (int i = 0; i < 5; i++) { teamGems[i] = 0; teamStars[i] = 0; }
   gemCountdown = -1; matchTimeMs = 0; shakeT = 0; poisonWaveT = 0;
+  startCountdown = 3000;
   float skill = aiSkillFromTrophies();
 
   int pool[50], pn = 0;
@@ -821,8 +874,19 @@ static void updateAI(Ent &e, float dt) {
     float ed = nearestEnemyDist(e, &tgt);
     if (tgt && ed < d.range * (0.9f + 0.3f * sk)) { tx = tgt->x; ty = tgt->y; }
     if (mode == MODE_BALL && e.hasBall) { tx = (e.team == 0) ? MAPW * TILE - 20 : 20; ty = MAPH * TILE / 2; }
-    if ((mode == MODE_SOLO || mode == MODE_DUO) && e.hp < e.maxHP * (0.4f - 0.2f * sk) && tgt && ed < 200) {
+    // IA porteuse du ballon : fonce au but ET shoote sur les defenseurs proches
+    if (mode == MODE_BALL && e.hasBall && tgt && ed < d.range * 0.8f && e.ammo >= 1)
+      doAttack(e, atan2f(tgt->y - e.y, tgt->x - e.x));
+    if ((mode == MODE_SOLO || mode == MODE_DUO || mode == MODE_KO) && e.hp < e.maxHP * (0.4f - 0.2f * sk) && tgt && ed < 200) {
       tx = e.x - (tgt->x - e.x); ty = e.y - (tgt->y - e.y);
+    }
+    // fuir la zone de poison : retour vers le centre si dehors
+    if (mode == MODE_SOLO || mode == MODE_DUO || mode == MODE_KO) {
+      int cx = MAPW * TILE / 2, cy = MAPH * TILE / 2;
+      int ddx = e.x - cx, ddy = e.y - cy;
+      if (ddx * ddx + ddy * ddy > (soloShrink - 40) * (soloShrink - 40)) {
+        tx = cx; ty = cy;
+      }
     }
     e.aiWx = tx; e.aiWy = ty;
     if (tgt && ed < d.range * 0.95f && e.ammo >= 1) {
@@ -831,7 +895,11 @@ static void updateAI(Ent &e, float dt) {
     }
     if (e.superCharge >= 100 && tgt && ed < d.range)
       doSuper(e, atan2f(tgt->y - e.y, tgt->x - e.x));
-    if (e.gadgetUses > 0 && e.hp < e.maxHP * 0.35f) doGadget(e);
+    // gadget defensif si blesse, offensif si l'ennemi est tres proche
+    if (e.gadgetUses > 0) {
+      if (e.hp < e.maxHP * 0.35f) doGadget(e);
+      else if (d.gad == GAD_BLAST && tgt && ed < 70 && sk > 0.3f) doGadget(e);
+    }
   }
   float dx = e.aiWx - e.x, dy = e.aiWy - e.y;
   float len = sqrtf(dx * dx + dy * dy);
@@ -850,6 +918,12 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
 }
 
 static void updateMatch(float dt) {
+  if (startCountdown > -800) {
+    // phase 3-2-1-GO : le temps tourne uniquement pour l'anim
+    startCountdown -= (int)(dt * 1000);
+    animT += (int)(dt * 1000);
+    return;
+  }
   matchTimeMs += (int)(dt * 1000);
   animT += (int)(dt * 1000);
   if (shakeT > 0) shakeT -= (int)(dt * 1000);
@@ -1277,7 +1351,7 @@ static void drawEnt(Ent &e, int sx, int sy) {
   if (e.hyperT > 0) { fRing(sx, sy, 12, C_MAG); fRing(sx, sy, 13 + (animT / 80) % 2, C_PUR); }
   int bob = ((e.walkT / 40) % 2) * (e.dashT > 0 ? 2 : 1);
   int by = sy - bob;
-  drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash);
+  drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash, e.walkT);
   arc(sx, by, 8, 3.34f, 6.08f, 2, tCol);
   int gx = (int)(cosf(e.aimAng) * 9), gy = (int)(sinf(e.aimAng) * 9);
   fCirc(sx + gx, by + gy, 2, C_GRE);
@@ -1511,6 +1585,21 @@ static void renderMatch() {
     drawText(246, 8, "VIVANTS", C_WHT); drawNum(300, 8, na, C_YEL);
   }
 
+  // compte a rebours 3-2-1-GO au lancement du match
+  if (startCountdown > -800) {
+    int n = (startCountdown + 999) / 1000;
+    fRect(SW / 2 - 60, 84, 120, 60, C_BLK);
+    fRect(SW / 2 - 58, 86, 116, 56, C_PANEL);
+    if (n > 0) drawNum(SW / 2 - 4, 100, n, C_YEL);
+    else drawTextC(104, "GO!", C_GREEN);
+  }
+  // ecran de reaparition du joueur
+  if (!me.alive) {
+    fRect(SW / 2 - 90, 90, 180, 40, C_BLK);
+    fRect(SW / 2 - 88, 92, 176, 36, C_PANEL);
+    drawTextC(96, "REAPPARITION", C_WHT);
+    drawNum(SW / 2 - 4, 110, (me.respawnT + 999) / 1000, C_YEL);
+  }
   // bandeau theme de la carte (coin bas gauche)
   fRect(0, SH - 12, SW, 12, KDColor::RGB24(0x111827));
   drawText(4, SH - 10, T.themeName, C_GRE);

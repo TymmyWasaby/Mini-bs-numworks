@@ -49,12 +49,21 @@ public:
 private:
   eadk_keyboard_state_t state;
 };
-inline State getState() { return State(eadk_keyboard_scan());
-}
+inline State getState() { return State(eadk_keyboard_scan()); }
 }
 namespace Timing {
 inline uint32_t millis() { return (uint32_t)eadk_timing_millis(); }
 inline void msleep(uint32_t ms) { eadk_timing_msleep(ms); }
+}
+namespace Storage {
+inline bool write(const char *name, const uint8_t *data, uint16_t len) {
+  return eadk_storage_write_file(name, data, len) == EADK_STORAGE_OK;
+}
+inline uint16_t read(const char *name, uint8_t *data, uint16_t maxLen) {
+  size_t s = maxLen;
+  if (eadk_storage_read_file(name, data, &s) == EADK_STORAGE_OK) return (uint16_t)s;
+  return 0;
+}
 }
 }
 #endif

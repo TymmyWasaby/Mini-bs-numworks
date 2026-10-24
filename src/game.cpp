@@ -295,6 +295,32 @@ static const char *SUPER_DESC[50] = {
   "PERLE EXPOSANTE","CHAMP DE CACTUS","VOLS A RETOURNEMENT","FUMEE INVISIBLE","TEMPETE DE SABLE",
   "FLAQUE GLISSANTE","SOIN A DISTANCE","TIR PERCENT LONG","PIEGES SURPRISE","SURVOLTAGE MAXI"
 };
+// Gadget n2 pour chaque brawler (choix entre les deux, comme dans BS)
+static const char *GADGET2_NAMES[50] = {
+  "REVOLVER PESANT","REGLAGE MECANIQUE","ARGENT MAGIQUE","TASSE CAFE","DEUX ROQUETTES",
+  "METEOR RETOUR","BARIL ROULANT","HARMONICA","CROISSIERE","SURCHARGE SUPREME",
+  "BARRIL CHARGE","CARAPACE RAPEE","ARCADE BONUS","MUNITIONS DOREES","TONNEAU RAPIDE",
+  "MORTIER COURT","TONNERRE CHIRURGICAL","TROU NOIR","TIR PERCENT","RESEAU SOCIAL",
+  "COURSE BOOSTEE","MUNITIONS INFINIES","FRAPPE D ECLAIR","BALLE RAPIDE","ESSAIM PROTEGE",
+  "DISTRACTION","PIEGE OURLI","GRIFFES RETOUR","RAFALE LONGUE","GELEE SECHE",
+  "TIR TRANSVERBE","BALLE SOLIDAIRE","FRIGO FORT","RAT EN COLERE","BOUQUET FINAL",
+  "MARTEAU SEC","BRASIER PROTEGE","PUSTULE GONFLEE","GAGNE UN CHAT","PERLE CHAUDE",
+  "TIR D EPEINE","PLUME MAGIQUE","SILENCE TOTALE","SABLE COLLANT","FLACON RAPIDE",
+  "VŒU PROTEGE","GRAND SOIN","REPARATION LONGUE","CLOCHE PIRATE","SURGE GELE"
+};
+// Pouvoir star n2 pour chaque brawler
+static const char *STAR2_NAMES[50] = {
+  "BANDE PLAISANTE","BONNE ETOILE","DEUXIEME CHARGE","PEAUX TRES DURES","ROQUETTE DOUBLE",
+  "PRIMO PRIME","BOISSON LONGUE","CHANSON DOUCE","ROSA ROBUSTE","PANNEAU SOLIDE",
+  "SAUT DYNAMITE","TETE MAGNETIQUE","ARCADE PUISSANTE","RIC-ORIGINE","ROULE DOUBLE",
+  "PIERRE POKER","FRAPPE PROFONDE","OUVRIERE CHERE","OEIL D AIGLE","CŒUR FORT",
+  "VROUM MAXI","MERE TOUTE PUISSANTE","ETONNEMENT SUPREME","COURSES RAPIDES","DARD PERCENT",
+  "PEUGEOT TURBO","TIR GRELE","PORTAIL MULTIPLE","CYCLONE RAPIDE","GLACE PROFONDE",
+  "REMISE DOUBLE","SAUVETAGE","POUBELLE TRIEE","ASHER ANTIQUE","LILAS MAJEUR",
+  "SAVATE LONGUE","BRISE-OS","PUSTULES DOUBLE","POISSON ADULTE","PERLE MAJEURE",
+  "CHAMPS PROTEGE","CORBEAU CHER","PAS RAPIDE","SOMBRE PERLE","HUILE MAJEURE",
+  "LAMPE MAGIQUE","SOIN FINAL","MEGA PILOTAGE","CLOCHE DOUBLE","SURGE MAJEUR"
+};
 // Descriptions des gadgets (une par brawler)
 static const char *GADGET_DESC[50] = {
   "VITESSE +30 PENDANT 3S","SOIGNE 30 POURCENT","TIR +25 POURCENT","GAGNE UN BOUCLIER",
@@ -330,9 +356,15 @@ static void brawlerLook(int i, Look &L) {
 
 // dessine le sprite complet d'un brawler (corps + traits uniques)
 // walk : phase d'animation de marche (0 = immobile)
-static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0) {
+static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0, int attackT = 0) {
   const BrawlerDef &d = BRAWLERS[bIdx];
   Look L; brawlerLook(bIdx, L);
+  // recul du corps pendant l'attaque (petit kick oppose a la visee)
+  if (attackT > 0) {
+    int kick = (attackT > 120) ? 2 : 1;
+    cx -= (int)(cosf(faceAng * 0.01745f) * kick);
+    cy -= (int)(sinf(faceAng * 0.01745f) * kick);
+  }
   int rr = r + (L.size == 2 ? 2 : (L.size == 0 ? -1 : 0));
   KDColor acc = KDColor::RGB24(L.accent);
   // cape derriere les mythiques et legendaires
@@ -388,23 +420,40 @@ static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool
     case 7: fRect(cx - 5, cy - rr - 3, 10, 3, C_GOLD); px(cx - 3, cy - rr - 5, C_MAG); px(cx, cy - rr - 6, C_MAG); px(cx + 3, cy - rr - 5, C_MAG); break; // couronne
     default: break;
   }
+  // flash de bouche au bout de l'arme pendant l'attaque
+  if (attackT > 0 && r >= 4) {
+    int fx = (int)(cosf(faceAng * 0.01745f) * (rr + 6)), fy = (int)(sinf(faceAng * 0.01745f) * (rr + 6));
+    fCirc(cx + fx, cy + fy, attackT > 120 ? 3 : 2, attackT > 120 ? C_WHT : C_YEL);
+    fCirc(cx + fx, cy + fy, 1, C_ORG);
+    px(cx + fx + 1, cy + fy - 1, C_WHT); px(cx + fx - 1, cy + fy + 1, C_WHT);
+  }
 }
 
 // ------------------------- Compte / progression ----------------------
-struct BrawlerAccount { int level, trophies; bool gadget, starPower, hyper; };
+struct BrawlerAccount { int level, trophies; bool gadget, starPower, hyper; uint8_t gadChoice, starChoice; };
 struct Account { BrawlerAccount b[50]; int coins; } acc;
 static int unlockedBrawlers = 0;
+
+// gadget/star equipe selon le choix du joueur
+static const char* curGadgetName(int i) {
+  return acc.b[i].gadChoice == 1 ? GADGET2_NAMES[i] : GADGET_NAMES[i];
+}
+static const char* curStarName(int i) {
+  return acc.b[i].starChoice == 1 ? STAR2_NAMES[i] : STAR_NAMES[i];
+}
 
 // ---- Sauvegarde persistante (stockage EADK, survis aux redemarrages) ----
 static const char SAVE_NAME[] = "minibs.sav";
 static void saveAcc() {
-  uint8_t buf[210];
+  uint8_t buf[336]; // 50*6 + 2 pieces + 21 quetes + 8 compteurs = 331 octets
   int p = 0;
   for (int i = 0; i < 50; i++) {
     buf[p++] = (uint8_t)acc.b[i].level;
     buf[p++] = (uint8_t)(acc.b[i].trophies >> 8);
     buf[p++] = (uint8_t)(acc.b[i].trophies & 0xFF);
     buf[p++] = (uint8_t)((acc.b[i].gadget ? 1 : 0) | (acc.b[i].starPower ? 2 : 0) | (acc.b[i].hyper ? 4 : 0));
+    buf[p++] = acc.b[i].gadChoice;
+    buf[p++] = acc.b[i].starChoice;
   }
   buf[p++] = (uint8_t)(acc.coins >> 8);
   buf[p++] = (uint8_t)(acc.coins & 0xFF);
@@ -425,9 +474,9 @@ static void saveAcc() {
   Ion::Storage::write(SAVE_NAME, buf, (uint16_t)p);
 }
 static bool loadAcc() {
-  uint8_t buf[240];
+  uint8_t buf[336];
   uint16_t len = Ion::Storage::read(SAVE_NAME, buf, sizeof(buf));
-  if (len != 226) return false; // format inattendu : partie vierge
+  if (len != 231 && len != 331) return false; // format inattendu : partie vierge
   int p = 0;
   for (int i = 0; i < 50; i++) {
     acc.b[i].level = buf[p++];
@@ -437,6 +486,10 @@ static bool loadAcc() {
     acc.b[i].gadget = (flags & 1) != 0;
     acc.b[i].starPower = (flags & 2) != 0;
     acc.b[i].hyper = (flags & 4) != 0;
+    if (len == 331) {
+      acc.b[i].gadChoice = buf[p++] & 1;
+      acc.b[i].starChoice = buf[p++] & 1;
+    } else { acc.b[i].gadChoice = 0; acc.b[i].starChoice = 0; }
     if (acc.b[i].level > 11) acc.b[i].level = 11;
     if (acc.b[i].trophies < 0 || acc.b[i].trophies > 9999) acc.b[i].trophies = 0;
   }
@@ -531,7 +584,7 @@ struct Ent {
   bool hasBall;
   int aiThinkT, aiWx, aiWy;
   float aiSkill;
-  int walkT, lastHitT;
+  int walkT, lastHitT, attackT;
   bool drawDone;
 };
 static Ent ents[MAX_ENT]; static int entCount = 0;
@@ -696,7 +749,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = rnd(500); e.aiWx = x; e.aiWy = y;
   e.aiSkill = aiSkill;
-  e.walkT = 0; e.lastHitT = 0; e.drawDone = false;
+  e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
 }
 
 static void setupMatch(int selMode, int myBrawler) {
@@ -798,13 +851,13 @@ static void doAttack(Ent &e, float ang) {
     float a = ang + ((n > 1) ? (spread * 0.01745f * (i - (n - 1) / 2.0f)) : 0);
     fireProj(e, a, false, mul, 1.0f, 1.0f);
   }
-  e.ammo -= 1; e.regenT = 0;
+  e.ammo -= 1; e.regenT = 0; e.attackT = 200;
 }
 
 static void doSuper(Ent &e, float ang) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   if (e.superCharge < 100) return;
-  e.superCharge = 0; e.aimAng = ang;
+  e.superCharge = 0; e.aimAng = ang; e.attackT = 300;
   if (e.isHuman) superCounter++;
   float mul = lvlMul(e.accIdx >= 0 ? acc.b[e.accIdx].level : 1);
   if (e.hyperT > 0) mul *= 1.25f;
@@ -1025,6 +1078,7 @@ static void updateMatch(float dt) {
     if (e.speedBuffT > 0) e.speedBuffT -= dt;
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
+    if (e.attackT > 0) e.attackT -= (int)(dt * 1000);
     if (e.dashT > 0) {
       e.dashT -= dt;
       moveEnt(e, e.dashDx * dt, e.dashDy * dt);
@@ -1392,7 +1446,7 @@ static void drawEnt(Ent &e, int sx, int sy) {
   if (e.hyperT > 0) { fRing(sx, sy, 12, C_MAG); fRing(sx, sy, 13 + (animT / 80) % 2, C_PUR); }
   int bob = ((e.walkT / 40) % 2) * (e.dashT > 0 ? 2 : 1);
   int by = sy - bob;
-  drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash, e.walkT);
+  drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash, e.walkT, e.attackT);
   arc(sx, by, 8, 3.34f, 6.08f, 2, tCol);
   int gx = (int)(cosf(e.aimAng) * 9), gy = (int)(sinf(e.aimAng) * 9);
   fCirc(sx + gx, by + gy, 2, C_GRE);
@@ -1954,10 +2008,12 @@ static void brawlerMenu(int myBrawler) {
       if (unlocked) {
         rRect(10, 134, 96, 26, 5, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
         drawText(16, 140, "GADGET", a.gadget ? C_BLK : C_GRE);
-        drawText(16, 148, a.gadget ? GADGET_NAMES[sel] : "NON", a.gadget ? C_BLK : C_GRE);
+        drawText(16, 148, a.gadget ? curGadgetName(sel) : "NON", a.gadget ? C_BLK : C_GRE);
+        if (a.gadget) drawNum(92, 148, a.gadChoice + 1, C_BLK);
         rRect(112, 134, 96, 26, 5, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
         drawText(118, 140, "POUV. STAR", a.starPower ? C_WHT : C_GRE);
-        drawText(118, 148, a.starPower ? STAR_NAMES[sel] : "NON", a.starPower ? C_WHT : C_GRE);
+        drawText(118, 148, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
+        if (a.starPower) drawNum(196, 148, a.starChoice + 1, C_WHT);
         rRect(214, 134, 96, 26, 5, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
         drawText(220, 140, "HYPERCH.", a.hyper ? C_WHT : C_GRE);
         drawText(220, 148, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
@@ -1982,7 +2038,9 @@ static void brawlerMenu(int myBrawler) {
           drawText(16, 175, "NIVEAU MAX!", C_BLK);
         }
         if (!a.gadget) { rRect(156, 168, 74, 24, 5, (acc.coins >= 100) ? C_CYN : KDColor::RGB24(0x225566)); drawText(162, 175, "* GADGET", C_BLK); drawNum(202, 175, 100, C_BLK); }
+        else drawTextC(224, "* CHANGE GADGET", C_CYN);
         if (a.level >= 3 && !a.starPower) { rRect(156, 196, 74, 22, 5, (acc.coins >= 150) ? C_PUR : KDColor::RGB24(0x3A1F55)); drawText(162, 202, "/ STAR", C_WHT); drawNum(202, 202, 150, C_WHT); }
+        else if (a.starPower) drawTextC(224, "/ CHANGE STAR", C_PUR);
         if (a.level >= 11 && !a.hyper) { rRect(234, 196, 76, 22, 5, (acc.coins >= 300) ? C_MAG : KDColor::RGB24(0x55114A)); drawText(240, 202, "- HYP", C_WHT); drawNum(272, 202, 300, C_WHT); }
         drawText(240, 175, "OK RETOUR", C_GRE);
       } else {
@@ -1997,9 +2055,13 @@ static void brawlerMenu(int myBrawler) {
         if (a.level < 11 && acc.coins >= cost && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Plus)))
           { acc.coins -= cost; a.level++; saveAcc(); }
         if (!a.gadget && acc.coins >= 100 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Multiply)))
-          { acc.coins -= 100; a.gadget = true; saveAcc(); }
+          { acc.coins -= 100; a.gadget = true; a.gadChoice = 0; saveAcc(); }
+        else if (a.gadget && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Multiply)))
+          { a.gadChoice ^= 1; saveAcc(); }
         if (a.level >= 3 && !a.starPower && acc.coins >= 150 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Division)))
-          { acc.coins -= 150; a.starPower = true; saveAcc(); }
+          { acc.coins -= 150; a.starPower = true; a.starChoice = 0; saveAcc(); }
+        else if (a.starPower && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Division)))
+          { a.starChoice ^= 1; saveAcc(); }
         if (a.level >= 11 && !a.hyper && acc.coins >= 300 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Power)))
           { acc.coins -= 300; a.hyper = true; saveAcc(); }
       }
@@ -2271,4 +2333,10 @@ void ion_main(int argc, char *argv[]) {
       prevOK = false;
     }
   }
+}
+
+// --- Entry point reel : sans main, --gc-sections supprime tout le jeu ---
+extern "C" int main(int argc, char *argv[]) {
+  ion_main(argc, argv);
+  return 0;
 }

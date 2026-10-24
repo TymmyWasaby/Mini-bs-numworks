@@ -34,7 +34,7 @@ jobs:
           echo "--- taille en Ko :"
           du -k target/mini-bs.nwa
           echo "--- symboles main / ion_main (vide = probleme de garbage collector) :"
-          arm-none-eabi-nm target/mini-bs.nwa 2>/dev/null | grep -iE "main|ion_" | head -20 || echo "AUCUN SYMBOLE main !"
+          arm-none-eabi-nm target/mini-bs.nwa 2>/dev/null | grep -iE " main|ion_" | head -20 || echo "AUCUN SYMBOLE main !"
           echo "--- sections :"
           arm-none-eabi-size -A target/mini-bs.nwa || true
 

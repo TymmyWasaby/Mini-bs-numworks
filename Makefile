@@ -1,4 +1,4 @@
-Q.RECIPEPREFIX := >
+.RECIPEPREFIX := |
 
 Q ?= @
 CC = arm-none-eabi-gcc
@@ -20,19 +20,19 @@ all: build
 build: $(BUILD_DIR)/mini-bs.nwa
 
 $(BUILD_DIR)/mini-bs.nwa: $(BUILD_DIR)/game.o $(BUILD_DIR)/icon.o
-> @echo "Linking $@"
-> $(Q) $(CC) $(CPPFLAGS) $(LDFLAGS) $^ -lm -o $@
+| @echo "Linking $@"
+| $(Q) $(CC) $(CPPFLAGS) $(LDFLAGS) $^ -lm -o $@
 
 $(BUILD_DIR)/game.o: src/game.cpp src/ion.h | $(BUILD_DIR)
-> @echo "Compiling $<"
-> $(Q) $(CXX) $(CPPFLAGS) -fno-rtti -c $< -o $@
+| @echo "Compiling $<"
+| $(Q) $(CXX) $(CPPFLAGS) -fno-rtti -c $< -o $@
 
 $(BUILD_DIR)/icon.o: src/icon.png | $(BUILD_DIR)
-> @echo "Embedding icon"
-> $(Q) $(NWLINK) png-icon-o $< $@
+| @echo "Embedding icon"
+| $(Q) $(NWLINK) png-icon-o $< $@
 
 $(BUILD_DIR):
-> $(Q) mkdir -p $(BUILD_DIR)
+| $(Q) mkdir -p $(BUILD_DIR)
 
 clean:
-> rm -rf $(BUILD_DIR)
+| rm -rf $(BUILD_DIR)

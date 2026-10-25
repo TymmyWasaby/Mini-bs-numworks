@@ -47,3 +47,20 @@ enum class Key : uint8_t {
   Left = 0, Up = 1, Down = 2, Right = 3, OK = 4, Back = 5,
   Shift = 12, X = 14, Var = 15, Toolbox = 16, Exp = 18,
   Power = 23, Multiply = 39, Division = 40,
+    Plus = 45, Minus = 46, EXE = 52
+};
+class State {
+public:
+  explicit State(eadk_keyboard_state_t s = 0) : state(s) {}
+  bool keyDown(Key k) const { return eadk_keyboard_key_down(state, (eadk_key_t)k); }
+private:
+  eadk_keyboard_state_t state;
+};
+inline State getState() { return State(eadk_keyboard_scan()); }
+}
+namespace Timing {
+inline uint32_t millis() { return (uint32_t)eadk_timing_millis(); }
+inline uint32_t msleep(uint32_t ms) { return eadk_timing_msleep(ms); }
+}
+}
+#endif

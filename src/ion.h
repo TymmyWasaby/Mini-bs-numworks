@@ -2,7 +2,9 @@
 #define MINI_BS_ION_COMPAT_H
 
 #include <stdint.h>
-#include <eadk.h>
+extern "C" {
+#include <eadk.h> // garde extern "C" : evite que le C++ decore les noms des fonctions EADK
+}
 
 // Compatibility layer for the original Epsilon-internal Ion API used by the game.
 class KDColor {

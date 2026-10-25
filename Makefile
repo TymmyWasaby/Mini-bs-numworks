@@ -19,7 +19,7 @@ LDFLAGS += -Wl,--gc-sections -flinker-output=nolto-rel
 all: build
 build: $(BUILD_DIR)/mini-bs.nwa
 
-$(BUILD_DIR)/mini-bs.nwa: $(BUILD_DIR)/game.o $(BUILD_DIR)/icon.o
+$(BUILD_DIR)/mini-bs.nwa: $(BUILD_DIR)/game.o $(BUILD_DIR)/appid.o $(BUILD_DIR)/icon.o
 | @echo "LD      $@"
 | $(Q) $(CC) $(CPPFLAGS) $(LDFLAGS) $^ -lm -o $@
 | $(Q) arm-none-eabi-strip --strip-unneeded $@
@@ -27,6 +27,10 @@ $(BUILD_DIR)/mini-bs.nwa: $(BUILD_DIR)/game.o $(BUILD_DIR)/icon.o
 $(BUILD_DIR)/game.o: src/game.cpp src/ion.h src/epsilon_app.h src/epsilon_files.h | $(BUILD_DIR)
 | @echo "CC      $<"
 | $(Q) $(CXX) $(CPPFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/appid.o: src/app_id.c | $(BUILD_DIR)
+| @echo "CC      $< (identite NWA, C sans LTO)"
+| $(Q) $(CC) -Isrc -std=c11 -Os -Wall -c $< -o $@
 
 $(BUILD_DIR)/icon.o: src/icon.png | $(BUILD_DIR)
 | @echo "ICON    $<"

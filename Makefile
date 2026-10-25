@@ -30,7 +30,7 @@ $(BUILD_DIR)/game.o: src/game.cpp src/ion.h src/epsilon_app.h src/epsilon_files.
 
 $(BUILD_DIR)/appid.o: src/app_id.c | $(BUILD_DIR)
 | @echo "CC      $< (identite NWA, C sans LTO)"
-| $(Q) $(CC) $(shell $(NWLINK) eadk-cflags-device) -std=c11 -Os -Wall -c $< -o $@
+| $(Q) $(CC) -Isrc -std=c11 -Os -Wall -c $< -o $@
 
 $(BUILD_DIR)/icon.o: src/icon.png | $(BUILD_DIR)
 | @echo "ICON    $<"

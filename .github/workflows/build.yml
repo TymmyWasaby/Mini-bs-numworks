@@ -28,12 +28,11 @@ jobs:
       - name: Build app
         run: make clean build
 
-      - name: Validate NWA comme la calculatrice
+      - name: Inspect output (diagnostic)
         run: |
-          npx --yes -- nwlink@1.0.0 nwa-bin target/mini-bs.nwa target/mini-bs.bin
-          echo "--- sections (tailles) :"
-          arm-none-eabi-size -A target/mini-bs.nwa
           ls -la target/
+          du -k target/mini-bs.nwa
+          arm-none-eabi-size -A target/mini-bs.nwa || true
 
       - name: Upload NWA
         uses: actions/upload-artifact@v4

@@ -13,16 +13,20 @@
 // ===================================================================
 
 #include <ion.h>
-#include <eadk.h>
+extern "C" {
+#include <eadk.h> // eadk.h n'a pas de garde extern "C" : sans ca, le C++ decore
+                  // les noms des fonctions EADK et la calculatrice ne les trouve plus
+}
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "epsilon_files.h" // sauvegarde dans le systeme de fichiers d'Epsilon (methode NumPlay)
 
 // --- Identite de l'app NWA (OBLIGATOIRE pour l'installation) ---
+// Les sections .rodata.eadk_* sont exigees par le chargeur d'Epsilon.
 extern "C" {
-  const char eadk_app_name[] = "mini-bs";
-  const uint32_t eadk_api_level = 0;
+  const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "mini-bs";
+  const uint32_t eadk_api_level __attribute__((section(".rodata.eadk_api_level"))) = 0;
 }
 
 #define SW 320
@@ -637,6 +641,7 @@ static void spawnParts(float x, float y, int kind, int n) {
 #define KILLFEED 3
 struct Kill { int alive; int victim, killer; int life; };
 static Kill killfeed[KILLFEED];
+// (Quest, quests et les compteurs sont declares plus haut, avec saveAcc/loadAcc)
 static void addKill(int victim, int killer) {
   if (killer == humanIdx) killCounter++;
   for (int i = KILLFEED - 1; i > 0; i--) killfeed[i] = killfeed[i - 1];

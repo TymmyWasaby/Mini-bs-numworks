@@ -637,10 +637,6 @@ static void spawnParts(float x, float y, int kind, int n) {
 #define KILLFEED 3
 struct Kill { int alive; int victim, killer; int life; };
 static Kill killfeed[KILLFEED];
-// ---- Compteurs de quetes (declaration anticipee avant usage) ----
-struct Quest { int type; int goal; int prog; int reward; };
-static Quest quests[3];
-static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
 static void addKill(int victim, int killer) {
   if (killer == humanIdx) killCounter++;
   for (int i = KILLFEED - 1; i > 0; i--) killfeed[i] = killfeed[i - 1];

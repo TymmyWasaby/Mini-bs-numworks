@@ -4,31 +4,32 @@ Q ?= @
 CC = arm-none-eabi-gcc
 CXX = arm-none-eabi-g++
 BUILD_DIR = target
-NWLINK = npx --yes -- nwlink@0.0.19
+NWLINK = npx --yes -- nwlink@1.0.0
 
-CPPFLAGS = -Isrc -std=c++11 -fno-exceptions -fdata-sections -ffunction-sections
-CPPFLAGS += -Os -Wall -Wextra
+CPPFLAGS = -Isrc -std=c++11 -fno-exceptions -fno-rtti
 CPPFLAGS += $(shell $(NWLINK) eadk-cflags-device)
-CPPFLAGS += -flto -fno-fat-lto-objects -fwhole-program
+CPPFLAGS += -Os -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
+CPPFLAGS += -fno-math-errno -fsingle-precision-constant -fno-tree-loop-distribute-patterns
+CPPFLAGS += -flto -fno-fat-lto-objects -fwhole-program -fvisibility=internal
 LDFLAGS = -Wl,--relocatable -nostartfiles --specs=nano.specs
 LDFLAGS += -Wl,-e,main -Wl,-u,main -Wl,-u,eadk_app_name -Wl,-u,eadk_app_icon -Wl,-u,eadk_api_level
-LDFLAGS += -Wl,--gc-sections
-LDFLAGS += -flinker-output=nolto-rel
+LDFLAGS += -Wl,--gc-sections -flinker-output=nolto-rel
 
 .PHONY: all build clean
 all: build
 build: $(BUILD_DIR)/mini-bs.nwa
 
 $(BUILD_DIR)/mini-bs.nwa: $(BUILD_DIR)/game.o $(BUILD_DIR)/icon.o
-| @echo "Linking $@"
+| @echo "LD      $@"
 | $(Q) $(CC) $(CPPFLAGS) $(LDFLAGS) $^ -lm -o $@
+| $(Q) arm-none-eabi-strip --strip-unneeded $@
 
-$(BUILD_DIR)/game.o: src/game.cpp src/ion.h | $(BUILD_DIR)
-| @echo "Compiling $<"
-| $(Q) $(CXX) $(CPPFLAGS) -fno-rtti -c $< -o $@
+$(BUILD_DIR)/game.o: src/game.cpp src/ion.h src/epsilon_app.h src/epsilon_files.h | $(BUILD_DIR)
+| @echo "CC      $<"
+| $(Q) $(CXX) $(CPPFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/icon.o: src/icon.png | $(BUILD_DIR)
-| @echo "Embedding icon"
+| @echo "ICON    $<"
 | $(Q) $(NWLINK) png-icon-o $< $@
 
 $(BUILD_DIR):

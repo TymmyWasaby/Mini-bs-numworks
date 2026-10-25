@@ -17,6 +17,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "epsilon_files.h" // sauvegarde dans le systeme de fichiers d'Epsilon (methode NumPlay)
 
 // --- Identite de l'app NWA (OBLIGATOIRE pour l'installation) ---
 extern "C" {
@@ -442,7 +443,12 @@ static const char* curStarName(int i) {
   return acc.b[i].starChoice == 1 ? STAR2_NAMES[i] : STAR_NAMES[i];
 }
 
-// ---- Sauvegarde persistante (stockage EADK, survis aux redemarrages) ----
+// ---- Sauvegarde persistante (systeme de fichiers interne d'Epsilon) ----
+// Methode NumPlay : ecriture directe des records via epsilon_files.h.
+// Format : 50*6 (niveau, trophees, flags, choix gadget/star) + pieces + quetes + compteurs = 331 octets.
+struct Quest { int type; int goal; int prog; int reward; };
+static Quest quests[3];
+static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
 static const char SAVE_NAME[] = "minibs.sav";
 static void saveAcc() {
   uint8_t buf[336]; // 50*6 + 2 pieces + 21 quetes + 8 compteurs = 331 octets
@@ -457,7 +463,6 @@ static void saveAcc() {
   }
   buf[p++] = (uint8_t)(acc.coins >> 8);
   buf[p++] = (uint8_t)(acc.coins & 0xFF);
-  // quetes en cours + compteurs
   for (int i = 0; i < 3; i++) {
     buf[p++] = (uint8_t)quests[i].type;
     buf[p++] = (uint8_t)(quests[i].goal >> 8);
@@ -471,12 +476,12 @@ static void saveAcc() {
   buf[p++] = (uint8_t)(gemCounter >> 8);  buf[p++] = (uint8_t)(gemCounter & 0xFF);
   buf[p++] = (uint8_t)(superCounter >> 8);buf[p++] = (uint8_t)(superCounter & 0xFF);
   buf[p++] = (uint8_t)(winStreak >> 8);   buf[p++] = (uint8_t)(winStreak & 0xFF);
-  Ion::Storage::write(SAVE_NAME, buf, (uint16_t)p);
+  ef_write(SAVE_NAME, buf, (uint32_t)p);
 }
 static bool loadAcc() {
-  uint8_t buf[336];
-  uint16_t len = Ion::Storage::read(SAVE_NAME, buf, sizeof(buf));
-  if (len != 231 && len != 331) return false; // format inattendu : partie vierge
+  uint32_t len = 0;
+  const uint8_t *buf = ef_read(SAVE_NAME, &len);
+  if (!buf || (len != 231 && len != 331)) return false; // format inattendu : partie vierge
   int p = 0;
   for (int i = 0; i < 50; i++) {
     acc.b[i].level = buf[p++];
@@ -673,12 +678,12 @@ static void moveEnt(Ent &e, float dx, float dy) {
 }
 
 // ------------------------- Generation carte --------------------------
-// Rotation quotidienne : le numero du jour (horloge interne de la
-// calculatrice, aucun internet requis) choisit une variante de carte.
-// Chaque mode possede 3 variantes de disposition.
+// Rotation des variantes de carte : l'EADK n'expose pas la date, on
+// utilise un compteur de matchs (aucun internet, aucune horloge requise).
+// Chaque mode possede 3 variantes de disposition, elles tournent a chaque partie.
+static int matchCounter = 0;
 static int mapDayIndex() {
-  eadk_date_t dt = eadk_timing_date();
-  return (dt.year * 372 + dt.month * 31 + dt.day) % 3;
+  return matchCounter % 3;
 }
 static void genMap() {
   int variant = mapDayIndex();
@@ -753,7 +758,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
 }
 
 static void setupMatch(int selMode, int myBrawler) {
-  mode = selMode; entCount = 0; humanIdx = -1;
+  mode = selMode; entCount = 0; humanIdx = -1; matchCounter++;
   for (int i = 0; i < MAX_PROJ; i++) projs[i].active = false;
   for (int i = 0; i < MAX_POP; i++) pops[i].active = false;
   for (int i = 0; i < MAX_PART; i++) parts[i].active = false;
@@ -1981,6 +1986,7 @@ static void brawlerMenu(int myBrawler) {
       BrawlerAccount &a = acc.b[sel];
       bool unlocked = isUnlocked(sel);
       float mul = lvlMul(a.level);
+      int cost = upgradeCost(a.level);
       for (int y = 0; y < SH; y++)
         for (int x = 0; x < SW; x++)
           px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
@@ -2029,7 +2035,7 @@ static void brawlerMenu(int myBrawler) {
         drawText(216, 104, "PORTEE", C_WHT);
         drawNum(216, 112, d.range, C_CYN);
 
-        int cost = upgradeCost(a.level);
+        cost = upgradeCost(a.level);
         if (a.level < 11) {
           rRect(10, 168, 140, 24, 5, (acc.coins >= cost) ? C_YEL : KDColor::RGB24(0x5A4A9A));
           drawText(16, 175, "+ NIV SUIVANT", C_BLK); drawNum(110, 175, cost, C_BLK);
@@ -2336,7 +2342,10 @@ void ion_main(int argc, char *argv[]) {
 }
 
 // --- Entry point reel : sans main, --gc-sections supprime tout le jeu ---
+// np_app_begin/end (depuis epsilon_app.h) : maintient Home bloque pendant
+// le jeu et rend la memoire proprement a Epsilon en sortant.
 extern "C" int main(int argc, char *argv[]) {
+  np_app_begin();
   ion_main(argc, argv);
-  return 0;
+  return np_app_end();
 }

@@ -32,46 +32,91 @@ extern "C" {
 #define MAPW 32
 #define MAPH 24
 
-static KDColor frameBuf[SW * SH];
 static uint16_t seed = 12345;
 static int rnd(int n) { seed = (uint16_t)(seed * 25173 + 13849); return (seed >> 4) % (n > 0 ? n : 1); }
 
-static inline void px(int x, int y, KDColor c) {
-  if (x >= 0 && x < SW && y >= 0 && y < SH) frameBuf[y * SW + x] = c;
+// Rendu DIRECT a l'ecran via EADK, sans frame buffer (economise ~150 Ko de RAM,
+// indispensable sur N0110/N0115 ou la RAM des apps externes est limitee).
+// Chaque primitive pousse ses lignes au fur et a mesure, comme NumPlay.
+static void px(int x, int y, KDColor c) {
+  if (x >= 0 && x < SW && y >= 0 && y < SH) Ion::Display::pushRect(KDRect(x, y, 1, 1), &c);
 }
 static void fRect(int x, int y, int w, int h, KDColor c) {
   if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
-  for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) px(i, j, c);
+  if (x < 0) { w += x; x = 0; } if (y < 0) { h += y; y = 0; }
+  if (x + w > SW) w = SW - x; if (y + h > SH) h = SH - y;
+  if (w <= 0 || h <= 0) return;
+  Ion::Display::pushRectUniform(KDRect(x, y, w, h), c);
+}
+// ligne de travail : les primitives a motif remplissent rowBuf puis poussent les runs
+static KDColor rowBuf[SW];
+static bool rowSet[SW];
+static void rowClear(int x0, int x1) {
+  if (x0 < 0) x0 = 0; if (x1 >= SW) x1 = SW - 1;
+  for (int x = x0; x <= x1; x++) rowSet[x] = false;
+}
+static inline void rowPut(int x, KDColor c) { if (x >= 0 && x < SW) { rowBuf[x] = c; rowSet[x] = true; } }
+static void rowFlush(int y, int x0, int x1) {
+  if (y < 0 || y >= SH) return;
+  int x = x0 < 0 ? 0 : x0, xe = x1 >= SW ? SW - 1 : x1;
+  while (x <= xe) {
+    if (!rowSet[x]) { x++; continue; }
+    int s = x;
+    while (x <= xe && rowSet[x]) x++;
+    Ion::Display::pushRect(KDRect(s, y, x - s, 1), rowBuf + s);
+  }
+}
+static void fillSpan(int y, int x0, int x1, KDColor c) {
+  if (y < 0 || y >= SH || x0 > x1) return;
+  if (x0 < 0) x0 = 0; if (x1 >= SW) x1 = SW - 1;
+  for (int x = x0; x <= x1; x++) rowBuf[x] = c;
+  Ion::Display::pushRect(KDRect(x0, y, x1 - x0 + 1, 1), rowBuf + x0);
 }
 static void rRect(int x, int y, int w, int h, int r, KDColor c) {
-  for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) {
-    int dx = (i < r) ? (r - i) : ((i >= w - r) ? (i - (w - r - 1)) : 0);
-    int dy = (j < r) ? (r - j) : ((j >= h - r) ? (j - (h - r - 1)) : 0);
-    if (dx * dx + dy * dy <= r * r) px(x + i, y + j, c);
+  for (int j = 0; j < h; j++) {
+    int ry = y + j;
+    rowClear(x, x + w - 1);
+    for (int i = 0; i < w; i++) {
+      int dx = (i < r) ? (r - i) : ((i >= w - r) ? (i - (w - r - 1)) : 0);
+      int dy = (j < r) ? (r - j) : ((j >= h - r) ? (j - (h - r - 1)) : 0);
+      if (dx * dx + dy * dy <= r * r) rowPut(x + i, c);
+    }
+    rowFlush(ry, x, x + w - 1);
   }
 }
 static void fCirc(int cx, int cy, int r, KDColor c) {
-  for (int j = -r; j <= r; j++) for (int i = -r; i <= r; i++)
-    if (i * i + j * j <= r * r) px(cx + i, cy + j, c);
+  for (int j = -r; j <= r; j++) {
+    int w = (int)sqrtf((float)(r * r - j * j));
+    fillSpan(cy + j, cx - w, cx + w, c);
+  }
 }
 static void oCirc(int cx, int cy, int r, KDColor fill, KDColor outline) {
-  for (int j = -r - 1; j <= r + 1; j++) for (int i = -r - 1; i <= r + 1; i++) {
-    int d2 = i * i + j * j;
-    if (d2 <= r * r) px(cx + i, cy + j, fill);
-    else if (d2 <= (r + 1) * (r + 1)) px(cx + i, cy + j, outline);
+  for (int j = -r - 1; j <= r + 1; j++) {
+    int w2 = (int)sqrtf((float)((r + 1) * (r + 1) - j * j));
+    rowClear(cx - w2, cx + w2);
+    for (int i = -w2; i <= w2; i++) {
+      int d2 = i * i + j * j;
+      rowPut(cx + i, (d2 <= r * r) ? fill : outline);
+    }
+    rowFlush(cy + j, cx - w2, cx + w2);
   }
 }
 static void shCircRGB(int cx, int cy, int r, uint32_t topRGB, uint32_t botRGB, KDColor outline) {
-  for (int j = -r - 1; j <= r + 1; j++) for (int i = -r - 1; i <= r + 1; i++) {
-    int d2 = i * i + j * j;
-    if (d2 <= r * r) {
-      float t = (float)(j + r) / (2.0f * r);
-      KDColor top = KDColor::RGB24(topRGB), bot = KDColor::RGB24(botRGB);
-      px(cx + i, cy + j, KDColor::RGB(
-        (uint8_t)(top.red() + (bot.red() - top.red()) * t),
-        (uint8_t)(top.green() + (bot.green() - top.green()) * t),
-        (uint8_t)(top.blue() + (bot.blue() - top.blue()) * t)));
-    } else if (d2 <= (r + 1) * (r + 1)) px(cx + i, cy + j, outline);
+  KDColor top = KDColor::RGB24(topRGB), bot = KDColor::RGB24(botRGB);
+  for (int j = -r - 1; j <= r + 1; j++) {
+    int w2 = (int)sqrtf((float)((r + 1) * (r + 1) - j * j));
+    float t = (r > 0) ? (float)(j + r) / (2.0f * r) : 0.0f;
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    KDColor rowCol = KDColor::RGB(
+      (uint8_t)(top.red() + (bot.red() - top.red()) * t),
+      (uint8_t)(top.green() + (bot.green() - top.green()) * t),
+      (uint8_t)(top.blue() + (bot.blue() - top.blue()) * t));
+    rowClear(cx - w2, cx + w2);
+    for (int i = -w2; i <= w2; i++) {
+      int d2 = i * i + j * j;
+      rowPut(cx + i, (d2 <= r * r) ? rowCol : outline);
+    }
+    rowFlush(cy + j, cx - w2, cx + w2);
   }
 }
 static void fRing(int cx, int cy, int r, KDColor c) {
@@ -84,11 +129,28 @@ static void arc(int cx, int cy, int r, float a0, float a1, int thick, KDColor c)
       px(cx + (int)(t * cosf(a * 0.01745f)), cy + (int)(t * sinf(a * 0.01745f)), c);
 }
 static void shadow(int cx, int cy, int rx, int ry) {
-  for (int j = -ry; j <= ry; j++) for (int i = -rx; i <= rx; i++)
-    if ((i * i * 100) / (rx * rx + 1) + (j * j * 100) / (ry * ry + 1) <= 100)
-      px(cx + i, cy + j, KDColor::RGB24(0x0A1608));
+  for (int j = -ry; j <= ry; j++) {
+    rowClear(cx - rx, cx + rx);
+    for (int i = -rx; i <= rx; i++)
+      if ((i * i * 100) / (rx * rx + 1) + (j * j * 100) / (ry * ry + 1) <= 100)
+        rowPut(cx + i, KDColor::RGB24(0x0A1608));
+    rowFlush(cy + j, cx - rx, cx + rx);
+  }
 }
-static void blit() { Ion::Display::pushRect(KDRect(0, 0, SW, SH), frameBuf); }
+static void blit() { /* rendu direct : rien a pousser */ }
+// Fond violet du menu, pousse par bandes rapides
+static void bgPanel() {
+  for (int y = 0; y < SH; y++) {
+    int x = 0;
+    while (x < SW) {
+      int band = (x + y * 2) / 40;
+      int xe = (band + 1) * 40 - y * 2 - 1;
+      if (xe >= SW) xe = SW - 1;
+      fillSpan(y, x, xe, (band % 2) ? C_PANEL : C_PANEL2);
+      x = xe + 1;
+    }
+  }
+}
 
 // ------------------------- Palette -----------------------------------
 #define C_BG     KDColor::RGB24(0x1B2A41)
@@ -1750,9 +1812,7 @@ static void initQuests() {
 }
 static void questScreen() {
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     drawTextC(8, "QUETES DU JOUR", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     for (int i = 0; i < 3; i++) {
@@ -1809,9 +1869,7 @@ static void updateQuests(int result) {
 static int menuPick(const char *title, const char **items, int n, int start) {
   int sel = start;
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     drawTextC(6, title, C_YEL);
     fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
     int first = (sel > 5) ? sel - 5 : 0;
@@ -1835,9 +1893,7 @@ static int menuPick(const char *title, const char **items, int n, int start) {
 
 static void trophyRoadScreen() {
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     drawTextC(6, "ROUTE DES TROPHEES", C_YEL);
     fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
     int tt = totalTrophies();
@@ -1882,9 +1938,7 @@ static void trophyRoadScreen() {
 static int brawlerPicker(int myBrawler) {
   int sel = myBrawler;
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     drawTextC(6, "CHOISIS TON BRAWLER", C_YEL);
     fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
 
@@ -1947,9 +2001,7 @@ static int brawlerPicker(int myBrawler) {
 // ecran des parametres : rappel des touches
 static void settingsScreen() {
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     drawTextC(8, "PARAMETRES", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
@@ -1985,9 +2037,7 @@ static void brawlerMenu(int myBrawler) {
       bool unlocked = isUnlocked(sel);
       float mul = lvlMul(a.level);
       int cost = upgradeCost(a.level);
-      for (int y = 0; y < SH; y++)
-        for (int x = 0; x < SW; x++)
-          px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+      bgPanel();
 
       int bob = (animT / 400) % 2;
       rRect(18, 26, 62, 70, 8, unlocked ? KDColor::RGB24(RAR_COL[d.rar]) : C_DGREY);
@@ -2094,9 +2144,7 @@ static void resultScreen(int result, int myBrawler) {
   const char *msg = (result == 1) ? "VICTOIRE!" : (result == 0) ? "EGALITE" : "DEFAITE";
   KDColor col = (result == 1) ? C_YEL : (result == 0) ? C_WHT : C_RED;
   while (true) {
-    for (int y = 0; y < SH; y++)
-      for (int x = 0; x < SW; x++)
-        px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+    bgPanel();
     rRect(SW / 2 - 100, 20, 200, 42, 10, col);
     drawTextC(34, msg, C_BLK);
     oCirc(SW / 2 - 30, 84, 8, C_YEL, C_BTND);
@@ -2284,9 +2332,7 @@ void ion_main(int argc, char *argv[]) {
       int selMode = menuPick("MODE DE JEU", modes, MODE_COUNT, 0);
       if (selMode < 0) continue;
       while (true) {
-        for (int y = 0; y < SH; y++)
-          for (int x = 0; x < SW; x++)
-            px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+        bgPanel();
         drawTextC(20, MODE_NAMES[selMode], C_YEL);
         // apercu du theme de la carte
         const MapTheme &T = THEMES[selMode];
@@ -2318,9 +2364,7 @@ void ion_main(int argc, char *argv[]) {
     } else if (choice == 5) {
       settingsScreen();
     } else {
-      for (int y = 0; y < SH; y++)
-        for (int x = 0; x < SW; x++)
-          px(x, y, (((x + y * 2) / 40) % 2) ? C_PANEL : C_PANEL2);
+      bgPanel();
       drawTextC(8, "AIDE", C_YEL);
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
       const char *lines[8] = {

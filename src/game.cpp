@@ -138,19 +138,6 @@ static void shadow(int cx, int cy, int rx, int ry) {
   }
 }
 static void blit() { /* rendu direct : rien a pousser */ }
-// Fond violet du menu, pousse par bandes rapides
-static void bgPanel() {
-  for (int y = 0; y < SH; y++) {
-    int x = 0;
-    while (x < SW) {
-      int band = (x + y * 2) / 40;
-      int xe = (band + 1) * 40 - y * 2 - 1;
-      if (xe >= SW) xe = SW - 1;
-      fillSpan(y, x, xe, (band % 2) ? C_PANEL : C_PANEL2);
-      x = xe + 1;
-    }
-  }
-}
 
 // ------------------------- Palette -----------------------------------
 #define C_BG     KDColor::RGB24(0x1B2A41)
@@ -183,6 +170,20 @@ static void bgPanel() {
 #define C_GREEN  KDColor::RGB24(0x3DDC55)
 #define C_GOLD   KDColor::RGB24(0xFFD700)
 #define C_DGREY  KDColor::RGB24(0x2A2438)
+
+// Fond violet du menu, pousse par bandes rapides (apres la palette : utilise C_PANEL)
+static void bgPanel() {
+  for (int y = 0; y < SH; y++) {
+    int x = 0;
+    while (x < SW) {
+      int band = (x + y * 2) / 40;
+      int xe = (band + 1) * 40 - y * 2 - 1;
+      if (xe >= SW) xe = SW - 1;
+      fillSpan(y, x, xe, (band % 2) ? C_PANEL : C_PANEL2);
+      x = xe + 1;
+    }
+  }
+}
 
 #define RAR_N 6
 static const uint32_t RAR_COL[RAR_N]  = {0xB9C4C9,0x36D4E8,0x38E05C,0xB44BFF,0xFF2EA6,0xFFC928};

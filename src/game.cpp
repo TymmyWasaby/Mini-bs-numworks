@@ -1613,11 +1613,11 @@ static void renderMatch() {
         if (tileMap[tx][ty] == 1) px(mx + tx * mw / MAPW, my + ty * mh / MAPH, C_GRE);
     if (mode == MODE_GEM)
       for (int g = 0; g < 10; g++)
-        if (gems[g].active) px(mx + (int)(gems[g].x * mw / (MAPW * TILE)), my + (int)(gems[g].y * mh / (MAPH * TILE))), C_GEM);
-    if (mode == MODE_BALL) px(mx + (int)(ballX * mw / (MAPW * TILE)), my + (int)(ballY * mh / (MAPH * TILE))), C_WHT);
+        if (gems[g].active) px(mx + (int)(gems[g].x * mw / (MAPW * TILE)), my + (int)(gems[g].y * mh / (MAPH * TILE)), C_GEM);
+    if (mode == MODE_BALL) px(mx + (int)(ballX * mw / (MAPW * TILE)), my + (int)(ballY * mh / (MAPH * TILE)), C_WHT);
     if (mode == MODE_HEIST)
       for (int s = 0; s < MAX_SAFE; s++)
-        if (safes[s].maxHP > 0) px(mx + (int)(safes[s].x * mw / (MAPW * TILE)), my + (int)(safes[s].y * mh / (MAPH * TILE))), C_GOLD);
+        if (safes[s].maxHP > 0) px(mx + (int)(safes[s].x * mw / (MAPW * TILE)), my + (int)(safes[s].y * mh / (MAPH * TILE)), C_GOLD);
     for (int i = 0; i < entCount; i++)
       if (ents[i].alive) {
         KDColor c = (i == humanIdx) ? C_GREEN : (ents[i].team == me.team ? C_BLUE : C_RED);

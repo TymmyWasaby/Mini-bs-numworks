@@ -47,4 +47,15 @@ enum class Key : uint8_t {
 class State {
 public:
   explicit State(eadk_keyboard_state_t s = 0) : state(s) {}
+  bool keyDown(Key k) const { return eadk_keyboard_key_down(state, (eadk_key_t)k); }
+private:
+  eadk_keyboard_state_t state;
+};
+inline State getState() { return State(eadk_keyboard_scan()); }
+}
+namespace Timing {
+inline uint32_t millis() { return (uint32_t)eadk_timing_millis(); }
+inline void msleep(uint32_t ms) { eadk_timing_msleep(ms); }
+}
+}
 #endif

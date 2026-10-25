@@ -22,12 +22,9 @@ extern "C" {
 #include <string.h>
 #include "epsilon_files.h" // sauvegarde dans le systeme de fichiers d'Epsilon (methode NumPlay)
 
-// --- Identite de l'app NWA (OBLIGATOIRE pour l'installation) ---
-// Les sections .rodata.eadk_* sont exigees par le chargeur d'Epsilon.
-extern "C" {
-  const char eadk_app_name[] __attribute__((section(".rodata.eadk_app_name"))) = "mini-bs";
-  const uint32_t eadk_api_level __attribute__((section(".rodata.eadk_api_level"))) = 0;
-}
+// L'identite NWA (eadk_app_name / eadk_api_level) est dans src/app_id.c :
+// un petit fichier C pur compile sans LTO, car le LTO C++ perd
+// l'attribut de section .rodata.eadk_* exige par le chargeur d'Epsilon.
 
 #define SW 320
 #define SH 240

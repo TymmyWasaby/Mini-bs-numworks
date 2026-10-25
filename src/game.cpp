@@ -2,14 +2,17 @@
 //  BRAWL MICROSTARS v4 — Shooter 2D type Brawl Stars pour NumWorks
 //  App externe Epsilon (.nwa via nwlink / EADK)
 //
-//  CONTROLES :
-//    Fleches : bouger | OK : attaque | Shift : Super (mega attaque)
-//    X : Gadget | - : Hypercharge | Back : quitter
-//    + * / : achats dans le menu BRAWLERS
+//  CONTROLES (V5, comme la calculette de Guénolé) :
+//    Fleches : bouger | var : attaque visee (direction du deplacement)
+//    exp/EXE : autotir (ennemi le plus proche)
+//    OK : armer/annuler le SUPER | X : armer/annuler le GADGET
+//    Shift : hypercharge | Back : quitter
+//    Le tir (var/exp) consomme l'action armee. Porteur de balle : tir = shoot.
+//    + * / - : achats dans le menu BRAWLERS
 //
-//  V4 : SPRITES UNIQUE PAR BRAWLER (coiffure/chapeau/accessoire),
-//       THEMES DE CARTE UNIQUE PAR MODE, rendu enrichi style BS.
-//  8 MODES, 50 BRAWLERS, Route des Trophees, star drops, IA adaptee.
+//  V5 : menu style Brawl Stars, front montants (plus de double-appui),
+//       star drop a ouvrir manuellement, quetes persistantes, IA anti-blocage,
+//       but Brawl Ball seulement entre les poteaux, choix du brawler avant match.
 // ===================================================================
 
 #include <ion.h>
@@ -613,7 +616,8 @@ static void initAcc() {
     saveAcc();
     return;
   }
-  // partie vierge
+  // partie vierge : quetes initiales puis sauvegarde complete
+  initQuests();
   int newUnlock = -1;
   refreshUnlocks(&newUnlock);
   saveAcc();
@@ -652,7 +656,7 @@ struct Ent {
   int gems, goals, stars, kills;
   bool hasBall;
   int aiThinkT, aiWx, aiWy;
-  float aiSkill;
+  float aiSkill, stuckT;
   int walkT, lastHitT, attackT;
   bool drawDone;
 };
@@ -814,7 +818,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.aimAng = e.faceAng = (team == 0) ? 0 : 180;
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = rnd(500); e.aiWx = x; e.aiWy = y;
-  e.aiSkill = aiSkill;
+  e.aiSkill = aiSkill; e.stuckT = 0;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
 }
 
@@ -984,17 +988,35 @@ static void doHypercharge(Ent &e) {
 }
 
 // ------------------------- Clavier ------------------------------------
+// Commandes V5 (cf. photo clavier) :
+//   Fleches : bouger | OK : arme/annule le SUPER | X : arme/annule le GADGET
+//   var : attaque visee (direction du deplacement) | exp ou EXE : autoshoot
+//   Le tir consomme l'action armee (super ou gadget). Shift : hypercharge.
 static bool keyOK, keyBack, prevOK, prevShift, prevX, prevMinus, prevBack;
-static bool kUp, kDown, kLeft, kRight, kShift, kX, kMinus;
+static bool kUp, kDown, kLeft, kRight, kShift, kX, kMinus, kVar, kExp;
+static bool kPlus, kMul, kDiv, kPow;
+static bool prevVar, prevExp;
+static int armedAction = 0; // 0 rien, 1 SUPER arme, 2 GADGET arme
 
 static void pollKeys() {
   Ion::Keyboard::State st = Ion::Keyboard::getState();
   using K = Ion::Keyboard::Key;
   kUp = st.keyDown(K::Up); kDown = st.keyDown(K::Down);
   kLeft = st.keyDown(K::Left); kRight = st.keyDown(K::Right);
-  keyOK = st.keyDown(K::OK) || st.keyDown(K::EXE);
+  keyOK = st.keyDown(K::OK);
   kShift = st.keyDown(K::Shift); kX = st.keyDown(K::X);
+  kVar = st.keyDown(K::Var); kExp = st.keyDown(K::Exp) || st.keyDown(K::EXE);
   kMinus = st.keyDown(K::Minus); keyBack = st.keyDown(K::Back);
+  kPlus = st.keyDown(K::Plus); kMul = st.keyDown(K::Multiply);
+  kDiv = st.keyDown(K::Division); kPow = st.keyDown(K::Power);
+}
+// anti double-appui : attend que les touches d'action soient relachees
+static void waitRelease() {
+  while (true) {
+    pollKeys();
+    if (!keyOK && !keyBack && !kShift && !kX && !kVar && !kExp && !kMinus) return;
+    Ion::Timing::msleep(30);
+  }
 }
 
 // ------------------------- IA ---------------------------------------
@@ -1065,11 +1087,41 @@ static void updateAI(Ent &e, float dt) {
   float len = sqrtf(dx * dx + dy * dy);
   if (len > 10) {
     float sp = 90 + 30 * sk;
+    float ox = e.x, oy = e.y;
     moveEnt(e, dx / len * sp * dt, dy / len * sp * dt);
-  }
+    // anti-blocage : si on n'a presque pas bouge, on contourne par un cote
+    float moved = fabsf(e.x - ox) + fabsf(e.y - oy);
+    if (moved < sp * dt * 0.3f) {
+      e.stuckT += dt;
+      if (e.stuckT > 0.35f) {
+        e.stuckT = 0;
+        float nx = -dy / len, ny = dx / len;
+        int side = rnd(2) ? 1 : -1;
+        e.aiWx = (int)(e.x + nx * side * 80);
+        e.aiWy = (int)(e.y + ny * side * 80);
+        e.aiThinkT = 600;
+      }
+    } else e.stuckT = 0;
+  } else e.stuckT = 0;
 }
 
 // ------------------------- Match --------------------------------------
+// Tir du ballon porte : le "tir" du porteur envoie le ballon (Brawl Ball)
+static void shootBall(Ent &e, float ang) {
+  e.hasBall = false;
+  ballX = e.x + cosf(ang) * 12; ballY = e.y + sinf(ang) * 12;
+  ballVX = cosf(ang) * 300; ballVY = sinf(ang) * 300;
+  e.attackT = 200; shakeT = 120; shakeMag = 2;
+}
+// But marque par le ballon libre : credite l'equipe attaquante et recentre
+static void teamGoal(int team) {
+  int rec = -1;
+  for (int i = 0; i < entCount; i++)
+    if (ents[i].team == team && (rec < 0 || i == humanIdx)) rec = i;
+  if (rec >= 0) ents[rec].goals++;
+  ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0;
+  shakeT = 400; shakeMag = 5;
+}
 static void damageEnt(Ent &e, float dmg, Ent &src) {
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
   src.superCharge = fminf(100, src.superCharge + (src.hyperT > 0 ? 3.5f : 2.0f));
@@ -1114,20 +1166,32 @@ static void updateMatch(float dt) {
     float dx = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
     float dy = (kDown ? 1 : 0) - (kUp ? 1 : 0);
     if (dx || dy) { float l = sqrtf(dx * dx + dy * dy); moveEnt(me, dx / l * spd * dt, dy / l * spd * dt); }
-    if (keyOK && !prevOK) {
-      Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
-      float ang = tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : (dy || dx ? atan2f(dy, dx) : me.aimAng);
-      doAttack(me, ang);
-    }
-    if (kShift && !prevShift) {
-      Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
-      float ang = tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : me.aimAng;
-      doSuper(me, ang);
-    }
-    if (kX && !prevX) doGadget(me);
+    // --- Commandes V5 : OK arme le SUPER, X arme le GADGET,
+    //     var = attaque visee, exp/EXE = autoshoot (consomment l'action armee) ---
+    if (keyOK && !prevOK) armedAction = (armedAction == 1) ? 0 : 1;
+    if (kX && !prevX) armedAction = (armedAction == 2) ? 0 : 2;
     if (kMinus && !prevMinus) doHypercharge(me);
+    bool shotVar = kVar && !prevVar, shotExp = kExp && !prevExp;
+    if (shotVar || shotExp) {
+      Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
+      float ang;
+      if (shotVar && !tgt) ang = (dx || dy) ? atan2f(dy, dx) : me.aimAng;
+      else ang = tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : ((dx || dy) ? atan2f(dy, dx) : me.aimAng);
+      if (mode == MODE_BALL && me.hasBall) {
+        shootBall(me, ang); // on tire le ballon au lieu d'attaquer
+      } else if (armedAction == 1) {
+        if (me.superCharge >= 100) doSuper(me, ang);
+        armedAction = 0;
+      } else if (armedAction == 2) {
+        doGadget(me);
+        armedAction = 0;
+      } else {
+        doAttack(me, ang);
+      }
+    }
   }
   prevOK = keyOK; prevShift = kShift; prevX = kX; prevMinus = kMinus;
+  prevVar = kVar; prevExp = kExp;
 
   for (int i = 0; i < entCount; i++) {
     Ent &e = ents[i];
@@ -1237,7 +1301,13 @@ static void updateMatch(float dt) {
     if (teamGems[0] >= 10 || teamGems[1] >= 10) {
       if (gemCountdown < 0) gemCountdown = 15000;
       gemCountdown -= (int)(dt * 1000);
-      if (gemCountdown <= 0) matchResult = (teamGems[0] >= 10) ? 1 : -1;
+      if (gemCountdown <= 0) {
+        // fin du compte a rebours : l'equipe qui a 10+ gemmes gagne, sinon egalite
+        if (teamGems[0] >= 10 && teamGems[1] >= 10) matchResult = (teamGems[0] >= teamGems[1]) ? 1 : -1;
+        else if (teamGems[0] >= 10) matchResult = 1;
+        else if (teamGems[1] >= 10) matchResult = -1;
+        else matchResult = 0;
+      }
     } else gemCountdown = -1;
   }
 
@@ -1254,16 +1324,31 @@ static void updateMatch(float dt) {
         ballX += ballVX * dt; ballY += ballVY * dt;
         ballVX *= 0.95f; ballVY *= 0.95f;
         if (solidAt(ballX, ballY)) { ballX -= ballVX * dt * 2; ballY -= ballVY * dt * 2; ballVX = ballVY = 0; }
+        // ballon libre qui entre dans un but (entre les poteaux) : but pour l'equipe qui attaque ce cote
+        int goalCY = MAPH * TILE / 2;
+        if (fabsf(ballY - goalCY) < 2.2f * TILE) {
+          if (ballX > MAPW * TILE - 14) { teamGoal(0); }
+          else if (ballX < 14) { teamGoal(1); }
+        } else {
+          if (ballX > MAPW * TILE - 14) { ballX = MAPW * TILE - 14; ballVX = 0; }
+          if (ballX < 14) { ballX = 14; ballVX = 0; }
+        }
       }
     } else {
+      int goalCY = MAPH * TILE / 2;
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].hasBall) {
           ballX = ents[i].x; ballY = ents[i].y;
+          bool inGoalMouth = fabsf(ballY - goalCY) < 2.2f * TILE; // dans les poteaux, pas au-dessus/dessous
           if ((ents[i].team == 0 && ballX > MAPW * TILE - 26) ||
               (ents[i].team == 1 && ballX < 26)) {
-            ents[i].goals++; ents[i].hasBall = false;
-            ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0;
-            shakeT = 400; shakeMag = 5;
+            if (inGoalMouth) {
+              ents[i].goals++; ents[i].hasBall = false;
+              ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0;
+              shakeT = 400; shakeMag = 5;
+            } else { // hors des poteaux : on reste dans le terrain
+              ballX = ents[i].x = (ents[i].team == 0) ? MAPW * TILE - 26 : 26;
+            }
           }
         }
     }
@@ -1357,12 +1442,21 @@ static const uint8_t FONTA[26][5] = {
   {0x11,0x11,0x11,0x0A,0x04},{0x11,0x11,0x15,0x1B,0x11},{0x11,0x0A,0x04,0x0A,0x11},
   {0x11,0x11,0x0F,0x01,0x0E},{0x1F,0x01,0x0E,0x10,0x1F},
 };
+// Rendu d'une ligne de glyphe en runs (ombre + trait), ~10 pushes par caractere
+// au lieu de 30-60 : c'est le plus gros gain de performances du jeu.
+static void drawGlyphRow(int x, int y, uint8_t row, int ncols, KDColor c) {
+  if (!row) return;
+  rowClear(x, x + 6);
+  for (int col = 0; col < ncols; col++)
+    if (row & (0x10 >> col)) rowPut(x + col + 1, C_BLK);
+  rowFlush(y + 1, x, x + 6);
+  rowClear(x, x + 5);
+  for (int col = 0; col < ncols; col++)
+    if (row & (0x10 >> col)) rowPut(x + col, c);
+  rowFlush(y, x, x + 5);
+}
 static void drawDigit(int x, int y, int d, KDColor c) {
-  for (int r = 0; r < 5; r++) {
-    uint8_t row = FONT5[d][r];
-    for (int col = 0; col < 4; col++)
-      if (row & (0x10 >> col)) { px(x + col, y + r, c); px(x + col + 1, y + r + 1, C_BLK); }
-  }
+  for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r, FONT5[d][r], 4, c);
 }
 static void drawNum(int x, int y, int v, KDColor c) {
   if (v < 0) { fRect(x, y + 2, 3, 1, c); drawNum(x + 5, y, -v, c); return; }
@@ -1380,11 +1474,7 @@ static void drawText(int x, int y, const char *s, KDColor c) {
     if (ch == '.') { fRect(x, y + 4, 1, 1, c); x += 4; continue; }
     if (ch == '+') { fRect(x, y + 2, 4, 1, c); fRect(x + 1, y + 1, 1, 3, c); x += 6; continue; }
     if (ch >= 'A' && ch <= 'Z') {
-      for (int r = 0; r < 5; r++) {
-        uint8_t row = FONTA[ch - 'A'][r];
-        for (int col = 0; col < 5; col++)
-          if (row & (0x10 >> col)) { px(x + col, y + r, c); px(x + col + 1, y + r + 1, C_BLK); }
-      }
+      for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r, FONTA[ch - 'A'][r], 5, c);
     } else if (ch >= '0' && ch <= '9') drawDigit(x, y, ch - '0', c);
     x += 6;
   }
@@ -1568,14 +1658,22 @@ static void renderMatch() {
   camY = fmaxf(0, fminf(MAPH * TILE - SH, camY));
   if (shakeT > 0) { camX += rnd(shakeMag * 2) - shakeMag; camY += rnd(shakeMag * 2) - shakeMag; }
 
-  for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < MAPH; ty++)
+  for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < MAPH; ty++) {
+    int sy = ty * TILE - camY;
+    // perf : fond en 2 pushes par ligne de tuiles au lieu de 23
+    fRect(0, sy, SW, TILE, KDColor::RGB24(T.gr1));
+    for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < MAPW; tx++)
+      if ((tx + ty) & 1) {
+        int sx = tx * TILE - camX;
+        fRect(sx, sy, TILE, TILE, KDColor::RGB24(T.gr2));
+      }
     for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < MAPW; tx++) {
-      KDColor c = ((tx + ty) & 1) ? KDColor::RGB24(T.gr2) : KDColor::RGB24(T.gr1);
-      fRect(tx * TILE - camX, ty * TILE - camY, TILE, TILE, c);
-      drawGroundDecor(tx * TILE - camX, ty * TILE - camY, tx, ty);
-      if (tileMap[tx][ty] == 1) drawWallThemed(tx * TILE - camX, ty * TILE - camY);
-      else if (tileMap[tx][ty] == 2) drawBushThemed(tx * TILE - camX, ty * TILE - camY);
+      int sx = tx * TILE - camX;
+      drawGroundDecor(sx, sy, tx, ty);
+      if (tileMap[tx][ty] == 1) drawWallThemed(sx, sy);
+      else if (tileMap[tx][ty] == 2) drawBushThemed(sx, sy);
     }
+  }
 
   if (mode == MODE_BALL)
     for (int ty = MAPH / 2 - 2; ty <= MAPH / 2 + 2; ty++) {
@@ -1674,9 +1772,13 @@ static void renderMatch() {
     int mw = 64, mh = 48, mx = SW - mw - 2, my = SH - mh - 14;
     fRect(mx - 1, my - 1, mw + 2, mh + 2, C_BLK);
     fRect(mx, my, mw, mh, KDColor::RGB24(0x1E2A38));
-    for (int ty = 0; ty < MAPH; ty += 2)
+    // murs en runs (1 push par ligne au lieu de ~200 pushes par pixel)
+    for (int ty = 0; ty < MAPH; ty += 2) {
+      rowClear(mx, mx + mw - 1);
       for (int tx = 0; tx < MAPW; tx += 2)
-        if (tileMap[tx][ty] == 1) px(mx + tx * mw / MAPW, my + ty * mh / MAPH, C_GRE);
+        if (tileMap[tx][ty] == 1) rowPut(mx + tx * mw / MAPW, C_GRE);
+      rowFlush(my + ty * mh / MAPH, mx, mx + mw - 1);
+    }
     if (mode == MODE_GEM)
       for (int g = 0; g < 10; g++)
         if (gems[g].active) px(mx + (int)(gems[g].x * mw / (MAPW * TILE)), my + (int)(gems[g].y * mh / (MAPH * TILE)), C_GEM);
@@ -1709,6 +1811,10 @@ static void renderMatch() {
     fRect(172, 3, 24, 18, me.hyperT > 0 ? C_MAG : KDColor::RGB24(0x66114A));
     drawText(175, 8, "HYP", C_WHT);
   }
+  // indicateur de l'action armee (OK = super, X = gadget) + recharge super
+  if (armedAction == 1) { drawText(96, 7, "SUPER!", C_YEL); }
+  else if (armedAction == 2) { drawText(96, 7, "GADGET", C_CYN); }
+  else if (me.superCharge >= 100) { drawText(96, 7, "OK:SUPER", C_YEL); }
   drawNum(210, 8, fmaxf(0, 150 - matchTimeMs / 1000), C_WHT);
 
   fRect(240, 3, 76, 18, C_BLK);
@@ -1716,7 +1822,11 @@ static void renderMatch() {
     drawNum(250, 8, teamGems[0], C_BLUE);
     drawGem(270, 12, animT);
     drawNum(295, 8, teamGems[1], C_RED);
-    if (gemCountdown > 0) drawNum(226, 8, gemCountdown / 1000, C_YEL);
+    // compte a rebours de victoire bien visible sous le score
+    if (gemCountdown > 0) {
+      drawText(96, 7, "FIN!", C_YEL);
+      drawNum(226, 8, gemCountdown / 1000 + 1, C_YEL);
+    }
   } else if (mode == MODE_BALL) {
     int g0 = 0, g1 = 0;
     for (int i = 0; i < entCount; i++)
@@ -1812,7 +1922,8 @@ static void initQuests() {
   for (int i = 0; i < 3; i++) rollQuest(quests[i]);
 }
 static void questScreen() {
-  while (true) {
+  waitRelease();
+  { // dessin unique (ecran statique, pas de redraw a 60fps)
     bgPanel();
     drawTextC(8, "QUETES DU JOUR", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
@@ -1836,10 +1947,12 @@ static void questScreen() {
     }
     drawTextC(SH - 14, "OK RETOUR", C_GRE);
     blit();
+  }
+  while (true) {
     pollKeys();
     if (keyOK && !prevOK) { prevOK = true; return; }
     prevOK = keyOK;
-    Ion::Timing::msleep(80);
+    Ion::Timing::msleep(60);
   }
 }
 static void updateQuests(int result) {
@@ -1862,33 +1975,43 @@ static void updateQuests(int result) {
     if (!wasDone && q.prog >= q.goal) {
       acc.coins += q.reward;
       rollQuest(q); // nouvelle quete
+      saveAcc(); // les quetes et pieces gagnees persistent
     }
   }
+  saveAcc();
 }
 
 // ------------------------- Menus --------------------------------------
 static int menuPick(const char *title, const char **items, int n, int start) {
   int sel = start;
+  bool pU = false, pD = false;
+  int drawn = -1;
+  waitRelease();
   while (true) {
-    bgPanel();
-    drawTextC(6, title, C_YEL);
-    fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
-    int first = (sel > 5) ? sel - 5 : 0;
-    if (first > n - 11) first = fmaxf(0, n - 11);
-    for (int i = first; i < n && i < first + 11; i++) {
-      int y = 30 + (i - first) * 15;
-      if (i == sel) rRect(20, y - 3, SW - 40, 13, 5, C_YEL);
-      drawText(30, y, items[i], i == sel ? C_BLK : C_WHT);
+    if (drawn != sel) { // redessine seulement quand la selection bouge (perf)
+      bgPanel();
+      drawTextC(6, title, C_YEL);
+      fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
+      int first = (sel > 4) ? sel - 4 : 0;
+      if (first > n - 9) first = fmaxf(0, n - 9);
+      for (int i = first; i < n && i < first + 9; i++) {
+        int y = 28 + (i - first) * 19;
+        if (i == sel) rRect(36, y, SW - 72, 16, 6, C_YEL);
+        else rRect(36, y, SW - 72, 16, 6, C_BTN);
+        drawTextC(y + 5, items[i], i == sel ? C_BLK : C_WHT);
+      }
+      drawTextC(SH - 14, "OK CHOISIR   BACK RETOUR", C_GRE);
+      blit();
+      drawn = sel;
     }
-    drawTextC(SH - 14, "OK CHOISIR   BACK RETOUR", C_GRE);
-    blit();
     pollKeys();
-    if (kUp && sel > 0) sel--;
-    if (kDown && sel < n - 1) sel++;
+    if (kUp && !pU && sel > 0) sel--; // front montant seulement : 1 appui = 1 cran
+    if (kDown && !pD && sel < n - 1) sel++;
+    pU = kUp; pD = kDown;
     if (keyOK && !prevOK) { prevOK = true; return sel; }
     if (keyBack && !prevBack) { prevBack = true; return -1; }
     prevOK = keyOK; prevBack = keyBack;
-    Ion::Timing::msleep(60);
+    Ion::Timing::msleep(50);
   }
 }
 
@@ -1938,6 +2061,8 @@ static void trophyRoadScreen() {
 // ecran de selection de personnage : liste + grand portrait style BS
 static int brawlerPicker(int myBrawler) {
   int sel = myBrawler;
+  bool pU = false, pD = false;
+  waitRelease();
   while (true) {
     bgPanel();
     drawTextC(6, "CHOISIS TON BRAWLER", C_YEL);
@@ -1990,8 +2115,9 @@ static int brawlerPicker(int myBrawler) {
     blit();
     animT += 100;
     pollKeys();
-    if (kUp && sel > 0) sel--;
-    if (kDown && sel < 49) sel++;
+    if (kUp && !pU && sel > 0) sel--; // front montant seulement
+    if (kDown && !pD && sel < 49) sel++;
+    pU = kUp; pD = kDown;
     if (keyOK && !prevOK) { prevOK = true; return sel; }
     if (keyBack && !prevBack) { prevBack = true; return -1; }
     prevOK = keyOK; prevBack = keyBack;
@@ -2001,15 +2127,16 @@ static int brawlerPicker(int myBrawler) {
 
 // ecran des parametres : rappel des touches
 static void settingsScreen() {
-  while (true) {
+  waitRelease();
+  { // dessin unique
     bgPanel();
     drawTextC(8, "PARAMETRES", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
-    const char *acts[6] = {"SE DEPLACER", "ATTAQUE", "SUPER", "GADGET", "HYPERCHARGE", "RETOUR"};
-    const char *keys[6] = {"FLECHES", "OK / EXE", "SHIFT", "X", "-", "BACK"};
-    for (int i = 0; i < 6; i++) {
-      int y = 48 + i * 16;
+    const char *acts[7] = {"SE DEPLACER", "ATTAQUE VISEE", "AUTOTIR", "ARMER SUPER", "ARMER GADGET", "HYPERCHARGE", "RETOUR MENU"};
+    const char *keys[7] = {"FLECHES", "VAR", "EXE", "OK", "X", "SHIFT", "BACK"};
+    for (int i = 0; i < 7; i++) {
+      int y = 44 + i * 16;
       rRect(50, y - 3, 100, 13, 5, KDColor::RGB24(0x2B3A55));
       drawText(56, y, acts[i], C_WHT);
       rRect(170, y - 3, 100, 13, 5, C_BTN);
@@ -2019,6 +2146,8 @@ static void settingsScreen() {
     rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
     drawTextC(196, "OK RETOUR", C_BLK);
     blit();
+  }
+  while (true) {
     pollKeys();
     if (keyOK && !prevOK) { prevOK = true; return; }
     if (keyBack && !prevBack) { prevBack = true; return; }
@@ -2107,17 +2236,22 @@ static void brawlerMenu(int myBrawler) {
       pollKeys();
       animT += 80;
       if (unlocked) {
-        if (a.level < 11 && acc.coins >= cost && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Plus)))
+        // achats par front montant : 1 appui = 1 achat, plus de double comptage
+        static bool pPlus = false, pMul = false, pDiv = false, pPow = false;
+        bool doPlus = kPlus && !pPlus, doMul = kMul && !pMul,
+             doDiv = kDiv && !pDiv, doPow = kPow && !pPow;
+        pPlus = kPlus; pMul = kMul; pDiv = kDiv; pPow = kPow;
+        if (a.level < 11 && acc.coins >= cost && doPlus)
           { acc.coins -= cost; a.level++; saveAcc(); }
-        if (!a.gadget && acc.coins >= 100 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Multiply)))
+        if (!a.gadget && acc.coins >= 100 && doMul)
           { acc.coins -= 100; a.gadget = true; a.gadChoice = 0; saveAcc(); }
-        else if (a.gadget && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Multiply)))
+        else if (a.gadget && doMul)
           { a.gadChoice ^= 1; saveAcc(); }
-        if (a.level >= 3 && !a.starPower && acc.coins >= 150 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Division)))
+        if (a.level >= 3 && !a.starPower && acc.coins >= 150 && doDiv)
           { acc.coins -= 150; a.starPower = true; a.starChoice = 0; saveAcc(); }
-        else if (a.starPower && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Division)))
+        else if (a.starPower && doDiv)
           { a.starChoice ^= 1; saveAcc(); }
-        if (a.level >= 11 && !a.hyper && acc.coins >= 300 && (Ion::Keyboard::getState().keyDown(Ion::Keyboard::Key::Power)))
+        if (a.level >= 11 && !a.hyper && acc.coins >= 300 && doPow)
           { acc.coins -= 300; a.hyper = true; saveAcc(); }
       }
       if (keyOK || keyBack) { prevOK = keyOK; prevBack = keyBack; break; }
@@ -2134,7 +2268,7 @@ static void resultScreen(int result, int myBrawler) {
   else if (result == 0) { coins = 20 + rnd(20); troph = -2; }
   else { coins = 8 + rnd(12); troph = 0; }
   int starDrop = (result == 1 && rnd(100) < 60) ? 20 + rnd(60) : 0;
-  acc.coins += coins + starDrop;
+  acc.coins += coins; // le star drop ne s'ajoute qu'a l'ouverture du coffre
   acc.b[myBrawler].trophies += troph;
   if (acc.b[myBrawler].trophies < 0) acc.b[myBrawler].trophies = 0;
   int newUnlock = -1;
@@ -2144,6 +2278,8 @@ static void resultScreen(int result, int myBrawler) {
 
   const char *msg = (result == 1) ? "VICTOIRE!" : (result == 0) ? "EGALITE" : "DEFAITE";
   KDColor col = (result == 1) ? C_YEL : (result == 0) ? C_WHT : C_RED;
+  bool opened = (starDrop <= 0); // pas de coffre si pas de star drop
+  waitRelease();
   while (true) {
     bgPanel();
     rRect(SW / 2 - 100, 20, 200, 42, 10, col);
@@ -2155,24 +2291,41 @@ static void resultScreen(int result, int myBrawler) {
     drawNum(SW / 2 + 36, 80, troph, troph >= 0 ? C_YEL : C_RED);
     if (starDrop > 0) {
       drawTextC(104, "STAR DROP!", C_MAG);
-      oCirc(SW / 2 - 40, 122, 6, C_MAG, C_WHT);
-      drawText(SW / 2 - 24, 118, "+", C_WHT);
-      drawNum(SW / 2 - 16, 118, starDrop, C_CYN);
-      drawTextC(130, "PIECES BONUS", C_CYN);
+      if (!opened) {
+        // coffre ferme : attend un appui OK
+        rRect(SW / 2 - 16, 114, 32, 24, 4, C_PUR);
+        fRect(SW / 2 - 16, 123, 32, 3, C_MAG);
+        oCirc(SW / 2, 126, 3, C_YEL, C_BLK);
+        drawTextC(146, "APPUIE OK POUR OUVRIR", C_WHT);
+      } else {
+        // coffre ouvert : pieces bonus tombent
+        fRect(SW / 2 - 18, 108, 36, 4, C_WHT);
+        rRect(SW / 2 - 18, 112, 36, 26, 4, C_MAG);
+        drawText(SW / 2 - 16, 120, "+", C_WHT);
+        drawNum(SW / 2 - 8, 120, starDrop, C_CYN);
+        drawTextC(146, "PIECES BONUS!", C_CYN);
+      }
     }
     if (newUnlock >= 0) {
       const BrawlerDef &d = BRAWLERS[newUnlock];
-      rRect(SW / 2 - 110, 148, 220, 34, 8, KDColor::RGB24(RAR_COL[d.rar]));
-      drawTextC(152, "NOUVEAU BRAWLER!", C_BLK);
-      drawTextC(164, d.name, C_WHT);
+      int ubY = (starDrop > 0) ? 158 : 148;
+      rRect(SW / 2 - 110, ubY, 220, 30, 8, KDColor::RGB24(RAR_COL[d.rar]));
+      drawTextC(ubY + 4, "NOUVEAU BRAWLER!", C_BLK);
+      drawTextC(ubY + 16, d.name, C_WHT);
     }
     rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
-    drawTextC(196, "OK CONTINUER", C_BLK);
+    drawTextC(196, opened ? "OK CONTINUER" : "OK OUVRIR", C_BLK);
     blit();
     pollKeys();
-    if (keyOK && !prevOK) { prevOK = true; return; }
+    if (keyOK && !prevOK) {
+      prevOK = true;
+      if (opened) return;
+      acc.coins += starDrop; // recompense ajoutee seulement a l'ouverture
+      saveAcc();
+      opened = true;
+    }
     prevOK = keyOK;
-    Ion::Timing::msleep(80);
+    Ion::Timing::msleep(60);
   }
 }
 
@@ -2320,39 +2473,24 @@ static void trainingMode(int myBrawler) {
 // ------------------------- Point d'entree ------------------------------
 void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;
-  initAcc();
-  initQuests();
+  initAcc(); // charge le compte ET les quetes sauvegardees (initQuests si vierge)
   int myBrawler = 0;
   const char *mainItems[7] = {"JOUER", "ENTRAINEMENT", "BRAWLERS", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
   while (true) {
     int choice = menuPick("BRAWL MICROSTARS", mainItems, 7, 0);
     if (choice < 0) return;
+    waitRelease();
     if (choice == 0) {
       const char *modes[MODE_COUNT];
       for (int i = 0; i < MODE_COUNT; i++) modes[i] = MODE_NAMES[i];
       int selMode = menuPick("MODE DE JEU", modes, MODE_COUNT, 0);
-      if (selMode < 0) continue;
-      while (true) {
-        bgPanel();
-        drawTextC(20, MODE_NAMES[selMode], C_YEL);
-        // apercu du theme de la carte
-        const MapTheme &T = THEMES[selMode];
-        rRect(SW / 2 - 100, 40, 200, 30, 6, KDColor::RGB24(T.gr1));
-        fRect(SW / 2 - 90, 55, 20, 12, KDColor::RGB24(T.wall));
-        fRect(SW / 2 - 60, 55, 20, 12, KDColor::RGB24(T.bush1));
-        drawTextC(44, T.themeName, C_WHT);
-        drawTextC(80, MODE_DESC[selMode], C_WHT);
-        rRect(SW / 2 - 70, 100, 140, 24, 8, C_YEL);
-        drawTextC(106, "OK JOUER", C_BLK);
-        drawTextC(130, "BACK RETOUR", C_GRE);
-        blit();
-        pollKeys();
-        if (keyOK && !prevOK) { prevOK = true; break; }
-        if (keyBack && !prevBack) { prevBack = true; break; }
-        prevOK = keyOK; prevBack = keyBack;
-        Ion::Timing::msleep(60);
-      }
-      if (keyBack) { prevBack = false; continue; }
+      if (selMode < 0) { waitRelease(); continue; }
+      waitRelease();
+      // selection du brawler (V5) : on choisit qui on joue
+      int picked = brawlerPicker(myBrawler);
+      if (picked < 0) { waitRelease(); continue; }
+      myBrawler = picked;
+      waitRelease();
       playMatch(myBrawler, selMode);
     } else if (choice == 1) {
       trainingMode(myBrawler);
@@ -2369,9 +2507,10 @@ void ion_main(int argc, char *argv[]) {
       drawTextC(8, "AIDE", C_YEL);
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
       const char *lines[8] = {
-        "FLECHES: BOUGER", "OK: ATTAQUE (AUTO-VISEE)",
-        "SHIFT: SUPER", "X: GADGET", "-: HYPERCHARGE",
-        "+ * /: ACHATS MENU BRAWLERS", "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
+        "FLECHES: BOUGER", "OK: ARMER LE SUPER",
+        "VAR: TIR VISE", "EXP/EXE: AUTOTIR",
+        "X: ARMER GADGET  SHIFT: HYP", "LE TIR LANCE L'ACTION ARMEE",
+        "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
       };
       for (int i = 0; i < 8; i++) drawTextC(38 + i * 17, lines[i], C_WHT);
       rRect(SW / 2 - 70, 184, 140, 24, 8, C_YEL);

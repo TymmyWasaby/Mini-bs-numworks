@@ -2,13 +2,10 @@
 //  BRAWL MICROSTARS v4 — Shooter 2D type Brawl Stars pour NumWorks
 //  App externe Epsilon (.nwa via nwlink / EADK)
 //
-//  CONTROLES (V5, comme le schema de Guénolé) :
-//    Fleches : bouger | var : attaque visee (direction du deplacement)
-//    menu (toolbox) ou EXE : autotir (ennemi le plus proche)
-//    OK : armer/annuler le SUPER | effacer (retour arr.) : armer/annuler le GADGET
-//    Shift : hypercharge | Back : quitter
-//    Le tir (var/menu) consomme l'action armee. Porteur de balle : tir = shoot.
-//    + * / - : achats dans le menu BRAWLERS
+//  CONTROLES (V5.3) :
+//    Fleches : bouger | OK ou var : attaque vers la direction du perso
+//    RETOUR : ulti (super) | SHIFT : gadget | EFFACER : hypercharge
+//    HOME : quitter le match | + * / - : achats dans le menu BRAWLERS
 //
 //  V5 : menu style Brawl Stars, front montants (plus de double-appui),
 //       star drop a ouvrir manuellement, quetes persistantes, IA anti-blocage,
@@ -805,6 +802,8 @@ static void genMap() {
   if (mode == MODE_BALL || mode == MODE_HEIST || mode == MODE_ZONE)
     for (int x = 1; x < MAPW - 1; x++)
       for (int y = MAPH / 2 - 1; y <= MAPH / 2 + 1; y++) tileMap[x][y] = 0;
+  if (mode == MODE_BALL) // bouches de but ouvertes dans le mur de bord : entre les poteaux uniquement
+    for (int y = MAPH / 2 - 2; y <= MAPH / 2 + 1; y++) { tileMap[0][y] = 0; tileMap[MAPW - 1][y] = 0; }
   seed = savedSeed; // restaure la graine du match pour l'aléa en jeu
 }
 
@@ -984,7 +983,10 @@ static void doSuper(Ent &e, float ang) {
       for (int i = 0; i < 8; i++) fireProj(e, ang + (rnd(30) - 15) * 0.01745f, true, mul, 1.0f, 1.3f);
       break;
     }
-    case SUP_MEGASHOT: { fireProj(e, ang, true, mul * 2.5f, 1.3f, 1.6f); break; }
+    case SUP_MEGASHOT: { // volée perceuse qui defonce les murs (Colt, Brock, Rico...)
+      for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.06f, true, mul * 0.75f, 1.3f, 1.6f);
+      break;
+    }
   }
 }
 
@@ -1016,15 +1018,14 @@ static void doHypercharge(Ent &e) {
 }
 
 // ------------------------- Clavier ------------------------------------
-// Commandes V5 (cf. photo clavier) :
-//   Fleches : bouger | OK : arme/annule le SUPER | X : arme/annule le GADGET
-//   var : attaque visee (direction du deplacement) | exp ou EXE : autoshoot
-//   Le tir consomme l'action armee (super ou gadget). Shift : hypercharge.
-static bool keyOK, keyBack, prevOK, prevShift, prevX, prevMinus, prevBack;
-static bool kUp, kDown, kLeft, kRight, kShift, kX, kMinus, kVar, kExp;
+// Commandes (V5.3, nouveau schema) :
+//   Fleches : bouger | OK ou var : attaque vers la direction du perso
+//   RETOUR (back) : ulti (super) | SHIFT : gadget | EFFACER : hypercharge
+//   HOME : quitter le match. Le maintien de OK/var tire en continu.
+static bool keyOK, keyBack, prevOK, prevShift, prevMinus, prevBack;
+static bool kUp, kDown, kLeft, kRight, kShift, kBacksp, kHome, kMinus, kVar, kExp;
 static bool kPlus, kMul, kDiv, kPow;
-static bool prevVar, prevExp;
-static int armedAction = 0; // 0 rien, 1 SUPER arme, 2 GADGET arme
+static bool prevVar, prevExp, prevBacksp;
 
 static void pollKeys() {
   Ion::Keyboard::State st = Ion::Keyboard::getState();
@@ -1032,13 +1033,12 @@ static void pollKeys() {
   kUp = st.keyDown(K::Up); kDown = st.keyDown(K::Down);
   kLeft = st.keyDown(K::Left); kRight = st.keyDown(K::Right);
   keyOK = st.keyDown(K::OK);
-  kShift = st.keyDown(K::Shift);
-  // gadget : touche EFFACER (retour arriere) comme sur le schema, X garde en alias
-  kX = st.keyDown(K::Backspace) || st.keyDown(K::X);
+  kShift = st.keyDown(K::Shift); // gadget
+  kBacksp = st.keyDown(K::Backspace) || st.keyDown(K::X); // hypercharge (effacer)
+  kHome = st.keyDown(K::Home);
   kVar = st.keyDown(K::Var);
-  // autotir : touche MENU (toolbox, 3 lignes) comme sur le schema, EXE garde en alias
-  kExp = st.keyDown(K::Toolbox) || st.keyDown(K::EXE);
-  kMinus = st.keyDown(K::Minus); keyBack = st.keyDown(K::Back);
+  kExp = st.keyDown(K::Toolbox) || st.keyDown(K::EXE); // alias d'attaque
+  kMinus = st.keyDown(K::Minus); keyBack = st.keyDown(K::Back); // back = ulti en match
   kPlus = st.keyDown(K::Plus); kMul = st.keyDown(K::Multiply);
   kDiv = st.keyDown(K::Division); kPow = st.keyDown(K::Power);
 }
@@ -1046,7 +1046,7 @@ static void pollKeys() {
 static void waitRelease() {
   while (true) {
     pollKeys();
-    if (!keyOK && !keyBack && !kShift && !kX && !kVar && !kExp && !kMinus) return;
+    if (!keyOK && !keyBack && !kShift && !kBacksp && !kVar && !kExp && !kMinus) return;
     Ion::Timing::msleep(30);
   }
 }
@@ -1076,7 +1076,7 @@ static void updateAI(Ent &e, float dt) {
         if (gems[i].active) { tx = gems[i].x; ty = gems[i].y; break; }
     else if (mode == MODE_BALL) {
       // roles Brawl Ball : 0 = buteur, 1 = defenseur, 2 = tueur
-      float goalX = (e.team == 0) ? MAPW * TILE - 20 : 20;   // but adverse
+      float goalX = (e.team == 0) ? MAPW * TILE - 12 : 12;   // but adverse : on y va jusqu'au fond
       float ownX  = (e.team == 0) ? 20 : MAPW * TILE - 20;   // son but
       if (e.hasBall) { tx = goalX; ty = MAPH * TILE / 2; }   // porteur : fonce marquer
       else if (e.aiRole == 1) { // defenseur : reste devant son but, patrouille un peu
@@ -1224,7 +1224,7 @@ static void updateMatch(float dt) {
 
   Ent &me = ents[humanIdx];
   pollKeys();
-  if (keyBack) { matchResult = 0; return; }
+  if (kHome) { matchResult = 0; return; } // HOME quitte le match (RETOUR sert d'ulti)
   if (me.alive) {
     float spd = 110.0f;
     if (me.speedBuffT > 0) spd *= 1.3f;
@@ -1234,40 +1234,33 @@ static void updateMatch(float dt) {
     float dx = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
     float dy = (kDown ? 1 : 0) - (kUp ? 1 : 0);
     if (dx || dy) { float l = sqrtf(dx * dx + dy * dy); moveEnt(me, dx / l * spd * dt, dy / l * spd * dt); }
-    // --- Commandes V5 : OK arme le SUPER, X arme le GADGET,
-    //     var = attaque visee, exp/EXE = autoshoot (consomment l'action armee) ---
-    if (keyOK && !prevOK) armedAction = (armedAction == 1) ? 0 : 1;
-    if (kX && !prevX) armedAction = (armedAction == 2) ? 0 : 2;
-    if (kMinus && !prevMinus) doHypercharge(me);
-    bool shotVar = kVar && !prevVar, shotExp = kExp && !prevExp;
-    // maintien de var/exp = tir continu (respecte le cooldown d'attaque)
-    if (me.attackT <= 0 && me.ammo >= 1) {
-      if (kVar) shotVar = true;
-      else if (kExp) shotExp = true;
-    }
-    if (shotVar || shotExp) {
-      Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
-      float ang;
-      if (shotExp && tgt) ang = atan2f(tgt->y - me.y, tgt->x - me.x); // exp : autotir vise
-      else ang = (dx || dy) ? atan2f(dy, dx) : me.aimAng;             // var : direction du deplacement
+    // --- Commandes V5.3 : OK/var = attaque vers la direction du perso,
+    //     RETOUR = ulti, SHIFT = gadget, EFFACER = hypercharge, HOME = quitter ---
+    if (kBacksp && !prevBacksp) doHypercharge(me);
+    bool shotGad = kShift && !prevShift;
+    bool shotUlti = keyBack && !prevBack;
+    bool shotAtk = (keyOK && !prevOK) || (kVar && !prevVar) || (kExp && !prevExp);
+    // maintien de OK/var/menu = tir continu (respecte le cooldown d'attaque)
+    if (me.attackT <= 0 && me.ammo >= 1 && (keyOK || kVar || kExp)) shotAtk = true;
+    // le tir va vers la direction du perso ; a l'arret, vers l'ennemi le plus proche
+    Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
+    float ang = (dx || dy) ? atan2f(dy, dx)
+              : (tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : me.aimAng);
+    if (shotUlti) { if (me.superCharge >= 100) doSuper(me, ang); }
+    if (shotGad) doGadget(me);
+    if (shotAtk) {
       if (mode == MODE_BALL && me.hasBall) {
         shootBall(me, ang); // on tire le ballon au lieu d'attaquer
-      } else if (armedAction == 1) {
-        if (me.superCharge >= 100) doSuper(me, ang);
-        armedAction = 0;
-      } else if (armedAction == 2) {
-        doGadget(me);
-        armedAction = 0;
       } else {
-        // lanceur : l autotir fait atterrir la zone sur l ennemi le plus proche
-        if (d.atk == ATK_LOB && shotExp && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / d.range);
+        // lanceur : le tir atterrit sur l'ennemi le plus proche si on est a l'arret
+        if (d.atk == ATK_LOB && !(dx || dy) && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / d.range);
         doAttack(me, ang);
         gLobRangeMul = -1.0f;
       }
     }
   }
-  prevOK = keyOK; prevShift = kShift; prevX = kX; prevMinus = kMinus;
-  prevVar = kVar; prevExp = kExp;
+  prevOK = keyOK; prevShift = kShift; prevMinus = kMinus;
+  prevVar = kVar; prevExp = kExp; prevBacksp = kBacksp;
 
   for (int i = 0; i < entCount; i++) {
     Ent &e = ents[i];
@@ -1571,7 +1564,7 @@ static void drawGlyphRow(int x, int y, uint8_t row, int ncols, KDColor c) {
     if (row & (0x10 >> col)) fRect(x + col * 2, y, 2, 2, c);
 }
 static void drawDigit(int x, int y, int d, KDColor c) {
-  for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r * 2, FONT5[d][r], 4, c);
+  for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r * 2, FONT5[d][r], 5, c); // 5 colonnes : chiffre complet
 }
 static void drawNum(int x, int y, int v, KDColor c) {
   if (v < 0) { fRect(x, y + 4, 6, 2, c); drawNum(x + 10, y, -v, c); return; }
@@ -1926,12 +1919,10 @@ static void renderMatch() {
     drawText(190, 3, "FIN!", C_YEL);
     drawNum(244, 3, gemCountdown / 1000 + 1, C_YEL);
   } else if (me.hyperT > 0) { drawText(190, 3, "HYP!", C_MAG); }
-  else if (armedAction == 1) { drawText(190, 3, "SUP!", C_YEL); }
-  else if (armedAction == 2) { drawText(190, 3, "GAD", C_CYN); }
-  else if (me.superCharge >= 100) { drawText(190, 3, "OK:SUP", C_YEL); }
-  // gadget : nombre d'utilisations restantes
+  else if (me.superCharge >= 100) { drawText(190, 3, "ULTI!", C_YEL); } // ulti prete (touche RETOUR)
+  // gadget (SHIFT) : nombre d'utilisations restantes
   fRect(268, 1, 48, 24, me.gadgetUses > 0 ? C_CYN : KDColor::RGB24(0x225566));
-  drawText(274, 3, "X", C_BLK);
+  drawText(274, 3, "SH", C_BLK);
   drawNum(288, 3, me.gadgetUses, C_WHT);
 
   // compte a rebours 3-2-1-GO au lancement du match
@@ -1951,7 +1942,7 @@ static void renderMatch() {
   }
   // bandeau bas : rappel des touches a gauche, score du mode a droite
   fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
-  drawText(4, SH - 12, "OK:SUP EFF:GAD -HYP", C_GRE);
+  drawText(4, SH - 12, "OK:ATK RET:ULTI SH:GAD", C_GRE);
   if (mode == MODE_GEM) {
     drawNum(SW - 72, SH - 12, teamGems[0], C_BLUE);
     drawText(SW - 48, SH - 12, "-", C_WHT);
@@ -2211,18 +2202,18 @@ static int brawlerPicker(int myBrawler) {
     if (un) {
       drawBrawlerSprite(232, 80 - bob, 30, sel, 90, false);
       shadow(232, 116, 22, 5);
-      drawTextC(136, d.name, C_YEL);
-      drawTextC(150, RAR_NAME[d.rar], KDColor::RGB24(RAR_COL[d.rar]));
-      // trophées du perso
-      fRect(SW / 2 - 20, 166, 10, 5, C_GOLD); fRect(SW / 2 - 18, 171, 6, 2, C_GOLD);
-      drawNum(SW / 2 - 4, 165, acc.b[sel].trophies, C_WHT);
+      drawText(150 + (164 - textW(d.name)) / 2, 136, d.name, C_YEL);
+      drawText(150 + (164 - textW(RAR_NAME[d.rar])) / 2, 150, RAR_NAME[d.rar], KDColor::RGB24(RAR_COL[d.rar]));
+      // trophees du perso (centres dans le panneau de droite)
+      fRect(190, 166, 10, 5, C_GOLD); fRect(192, 172, 8, 2, C_GOLD);
+      drawNum(206, 165, acc.b[sel].trophies, C_WHT);
       // niveau
-      fRect(SW / 2 + 40, 160, 28, 16, C_YEL);
-      drawNum(SW / 2 + 48, 163, acc.b[sel].level, C_BLK);
+      fRect(240, 160, 32, 16, C_YEL);
+      drawNum(248, 163, acc.b[sel].level, C_BLK);
     } else {
       shCircRGB(232, 80 - bob, 30, 0x444444, 0x222222, C_GRE);
-      drawTextC(90, "? ? ?", C_GRE);
-      drawTextC(120, "A DEBLOQUER A", C_WHT);
+      drawText(150 + (164 - textW("? ? ?")) / 2, 90, "? ? ?", C_GRE);
+      drawText(150 + (164 - textW("A DEBLOQUER A")) / 2, 120, "A DEBLOQUER A", C_WHT);
       char buf[24];
       int n = d.unlockTroph, pos = 0;
       buf[pos++] = 'A'; buf[pos++] = ' '; buf[pos++] = ' ';
@@ -2230,8 +2221,8 @@ static int brawlerPicker(int myBrawler) {
       do { tmp[tn++] = '0' + n % 10; n /= 10; } while (n);
       while (tn > 0) buf[pos++] = tmp[--tn];
       buf[pos++] = ' '; buf[pos++] = 'T'; buf[pos++] = 'R'; buf[pos++] = 'O'; buf[pos++] = 'P'; buf[pos++] = 0;
-      drawTextC(136, buf, C_YEL);
-      drawTextC(152, "TROPHEES", C_GRE);
+      drawText(150 + (164 - textW(buf)) / 2, 136, buf, C_YEL);
+      drawText(150 + (164 - textW("TROPHEES")) / 2, 152, "TROPHEES", C_GRE);
     }
     drawTextC(SH - 14, "OK CHOISIR   BACK RETOUR", C_GRE);
     blit();
@@ -2255,8 +2246,8 @@ static void settingsScreen() {
     drawTextC(8, "PARAMETRES", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
-    const char *acts[7] = {"SE DEPLACER", "TIR VISE", "AUTOTIR", "ARMER SUPER", "ARMER GADGET", "HYPERCHARGE", "RETOUR MENU"};
-    const char *keys[7] = {"FLECHES", "VAR", "MENU", "OK", "EFFACER", "SHIFT", "BACK"};
+    const char *acts[7] = {"SE DEPLACER", "ATTAQUE", "ULTI", "GADGET", "HYPERCHARGE", "QUITTER", "RETOUR MENU"};
+    const char *keys[7] = {"FLECHES", "OK / VAR", "RETOUR", "SHIFT", "EFFACER", "HOME", "BACK"};
     for (int i = 0; i < 7; i++) {
       int y = 40 + i * 15;
       rRect(16, y - 2, 150, 14, 4, KDColor::RGB24(0x2B3A55));
@@ -2361,10 +2352,10 @@ static void brawlerMenu(int myBrawler) {
       animT += 80;
       if (unlocked) {
         // achats par front montant : 1 appui = 1 achat, plus de double comptage
-        static bool pPlus = false, pMul = false, pDiv = false, pPow = false;
+        static bool pPlus = false, pMul = false, pDiv = false, pMinus = false;
         bool doPlus = kPlus && !pPlus, doMul = kMul && !pMul,
-             doDiv = kDiv && !pDiv, doPow = kPow && !pPow;
-        pPlus = kPlus; pMul = kMul; pDiv = kDiv; pPow = kPow;
+             doDiv = kDiv && !pDiv, doMinus = kMinus && !pMinus;
+        pPlus = kPlus; pMul = kMul; pDiv = kDiv; pMinus = kMinus;
         if (a.level < 11 && acc.coins >= cost && doPlus)
           { acc.coins -= cost; a.level++; saveAcc(); }
         if (!a.gadget && acc.coins >= 100 && doMul)
@@ -2375,7 +2366,7 @@ static void brawlerMenu(int myBrawler) {
           { acc.coins -= 150; a.starPower = true; a.starChoice = 0; saveAcc(); }
         else if (a.starPower && doDiv)
           { a.starChoice ^= 1; saveAcc(); }
-        if (a.level >= 11 && !a.hyper && acc.coins >= 300 && doPow)
+        if (a.level >= 11 && !a.hyper && acc.coins >= 300 && doMinus)
           { acc.coins -= 300; a.hyper = true; saveAcc(); }
       }
       if (keyOK || keyBack) { prevOK = keyOK; prevBack = keyBack; break; }
@@ -2465,7 +2456,7 @@ static void resultScreen(int result, int myBrawler) {
 
 static void playMatch(int myBrawler, int selMode) {
   setupMatch(selMode, myBrawler);
-  prevOK = prevShift = prevX = prevMinus = prevBack = false; keyBack = false; matchResult = -2;
+  prevOK = prevShift = prevMinus = prevBack = prevBacksp = false; keyBack = false; matchResult = -2;
   while (matchResult == -2) {
     int t0 = (int)Ion::Timing::millis();
     updateMatch(1.0f / 30.0f);
@@ -2643,9 +2634,9 @@ void ion_main(int argc, char *argv[]) {
       drawTextC(8, "AIDE", C_YEL);
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
       const char *lines[8] = {
-        "FLECHES: BOUGER", "OK: ARMER SUPER",
-        "VAR: TIR VISE", "MENU: AUTOTIR",
-        "EFFACER: GADGET  SHIFT: HYP", "TIRER LANCE L ACTION",
+        "FLECHES: BOUGER", "OK/VAR: ATTAQUE",
+        "RETOUR: ULTI", "SHIFT: GADGET",
+        "EFFACER: HYPERCHARGE", "HOME: QUITTER",
         "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
       };
       for (int i = 0; i < 8; i++) drawTextC(38 + i * 17, lines[i], C_WHT);

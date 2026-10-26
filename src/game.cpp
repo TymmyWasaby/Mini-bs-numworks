@@ -248,7 +248,7 @@ static const BrawlerDef BRAWLERS[50] = {
   {"Nita",     5400, 1320, 160, 1400, 330, 1,  0, ATK_SHOT,   SUP_BURST,    GAD_HEAL,  STAR_HP,    0,     0, 0xC98A3B, 0x8A5C22, 1},
   {"Colt",     4000,  940, 240, 1600, 420, 6,  8, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   0,     0, 0x3B9AC9, 0x22628A, 1},
   {"Bull",     6600, 1750, 100, 1900, 300, 5, 30, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    1,    60, 0xC9973B, 0x8A6622, 0},
-  {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_LOB,    SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
+  {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
   {"El Primo", 6800, 1400,  90, 1300, 330, 4, 20, ATK_SPREAD, SUP_DASH,     GAD_HEAL,  STAR_HP,    1,   180, 0x3BA05C, 0x22663A, 0},
   {"Barley",   3600, 1160, 240, 1700, 260, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 1,   240, 0x7BC93B, 0x4F8A22, 3},
   {"Poco",     5600, 1100, 200, 1400, 300, 3, 16, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 1,   300, 0xB03BE0, 0x7822A0, 1},
@@ -262,7 +262,7 @@ static const BrawlerDef BRAWLERS[50] = {
   {"Penny",    4600, 1290, 230, 1700, 340, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_HEAL,  STAR_REGEN, 2,  1300, 0xE07B3B, 0xA05222, 0},
   {"Carl",     5500, 1250, 190, 1200, 320, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_HP,    3,  1500, 0x7B9BC9, 0x50688A, 3},
   {"Jacky",    6000, 1300, 110, 1500, 320, 4, 22, ATK_SPREAD, SUP_BURST,    GAD_BLAST, STAR_HP,    3,  1700, 0xE0B03B, 0xA07822, 0},
-  {"Bo",       5000, 1200, 250, 1800, 310, 3,  9, ATK_LOB,    SUP_BARRAGE,  GAD_SPEED, STAR_REGEN, 3,  1900, 0x3B7AC9, 0x224F8A, 2},
+  {"Bo",       5000, 1200, 250, 1800, 310, 3,  9, ATK_SHOT,   SUP_BARRAGE,  GAD_SPEED, STAR_REGEN, 3,  1900, 0x3B7AC9, 0x224F8A, 2},
   {"Emz",      4800, 1180, 200, 1600, 280, 2, 18, ATK_SPREAD, SUP_BURST,    GAD_HEAL,  STAR_REGEN, 3,  2100, 0xE03B8A, 0xA02258, 1},
   {"Stu",      3800, 1080, 220, 1300, 420, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_DMG,   3,  2350, 0xC93BA0, 0x8A2270, 2},
   {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
@@ -671,6 +671,7 @@ struct Proj {
   int team, owner, radius, shape, spin;
 };
 static Proj projs[MAX_PROJ];
+static float gLobRangeMul = -1.0f; // <0 = portee max ; sinon le lob atterrit sur sa cible
 
 struct Pop { bool active; float x, y; int life, val; };
 static Pop pops[MAX_POP];
@@ -913,6 +914,7 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.vx = cosf(ang) * sp; p.vy = sinf(ang) * sp;
     p.dmg = d.baseDmg * dmgMul;
     p.range = d.range * rangeMul;
+    if (p.lob && gLobRangeMul > 0) p.range = p.range * fminf(1.0f, gLobRangeMul); // atterrit sur la cible
     p.travelled = 0; p.team = e.team; p.owner = (&e - ents);
     p.radius = isSuper ? 4 : 2;
     p.shape = d.projShape; p.spin = 0;
@@ -932,7 +934,7 @@ static void doAttack(Ent &e, float ang) {
     float a = ang + ((n > 1) ? (spread * 0.01745f * (i - (n - 1) / 2.0f)) : 0);
     fireProj(e, a, false, mul, 1.0f, 1.0f);
   }
-  e.ammo -= 1; e.regenT = 0; e.attackT = 200;
+  e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
 }
 
 static void doSuper(Ent &e, float ang) {
@@ -1107,10 +1109,16 @@ static void updateAI(Ent &e, float dt) {
     e.aiWx = tx; e.aiWy = ty;
     if (tgt && ed < d.range * 0.95f && e.ammo >= 1) {
       float err = (1.0f - sk) * 12.0f;
+      // lanceur : le projectile atterrit sur la cible, pas au-dela
+      if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
       doAttack(e, atan2f(tgt->y - e.y, tgt->x - e.x) + (rnd(100) / 100.0f - 0.5f) * err * 0.01745f);
+      gLobRangeMul = -1.0f;
     }
-    if (e.superCharge >= 100 && tgt && ed < d.range)
+    if (e.superCharge >= 100 && tgt && ed < d.range) {
+      if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
       doSuper(e, atan2f(tgt->y - e.y, tgt->x - e.x));
+      gLobRangeMul = -1.0f;
+    }
     // gadget defensif si blesse, offensif si l'ennemi est tres proche
     if (e.gadgetUses > 0) {
       if (e.hp < e.maxHP * 0.35f) doGadget(e);
@@ -1225,7 +1233,10 @@ static void updateMatch(float dt) {
         doGadget(me);
         armedAction = 0;
       } else {
+        // lanceur : l autotir fait atterrir la zone sur l ennemi le plus proche
+        if (d.atk == ATK_LOB && shotExp && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / d.range);
         doAttack(me, ang);
+        gLobRangeMul = -1.0f;
       }
     }
   }
@@ -1293,8 +1304,8 @@ static void updateMatch(float dt) {
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
     if (p.travelled > p.range) { p.active = false; continue; }
-    if (!p.lob && solidAt(p.x, p.y)) { p.active = false; continue; }
-    if (p.lob && p.travelled > p.range * 0.6f && solidAt(p.x, p.y)) { p.active = false; continue; }
+    // anti-tunneling : on teste aussi le milieu du pas (projectiles rapides vs murs fins)
+    if (!p.lob && (solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f))) { p.active = false; continue; }
     if (mode == MODE_HEIST)
       for (int s = 0; s < MAX_SAFE; s++) {
         if (safes[s].hp <= 0 || safes[s].team == p.team) continue;
@@ -1307,6 +1318,32 @@ static void updateMatch(float dt) {
         }
       }
     if (!p.active) continue;
+    // les lanceurs (ATK_LOB) : le projectile passe au-dessus des murs et des
+    // ennemis, puis explose en ZONE a l'atterrissage (comme dans Brawl Stars)
+    if (p.lob) {
+      if (p.travelled >= p.range) {
+        int R = p.fromSuper ? 40 : 30;
+        spawnParts(p.x, p.y, 0, 10);
+        shakeT = 100; shakeMag = 2;
+        for (int j = 0; j < entCount; j++) {
+          Ent &t = ents[j];
+          if (!t.alive || t.team == p.team) continue;
+          float ddx = t.x - p.x, ddy = t.y - p.y;
+          if (ddx * ddx + ddy * ddy < R * R) damageEnt(t, p.dmg, ents[p.owner]);
+        }
+        if (mode == MODE_HEIST)
+          for (int s = 0; s < MAX_SAFE; s++) {
+            if (safes[s].hp <= 0 || safes[s].team == p.team) continue;
+            float ddx = safes[s].x - p.x, ddy = safes[s].y - p.y;
+            if (ddx * ddx + ddy * ddy < (R + 12) * (R + 12)) {
+              safes[s].hp -= p.dmg;
+              addPop(safes[s].x, safes[s].y - 14, (int)p.dmg);
+            }
+          }
+        p.active = false;
+      }
+      continue;
+    }
     for (int j = 0; j < entCount; j++) {
       Ent &t = ents[j];
       if (!t.alive || t.team == p.team) continue;
@@ -1492,42 +1529,38 @@ static const uint8_t FONTA[26][5] = {
 };
 // Rendu d'une ligne de glyphe en runs (ombre + trait), ~10 pushes par caractere
 // au lieu de 30-60 : c'est le plus gros gain de performances du jeu.
+// Texte : chaque bit du glyphe 5x5 est dessine en bloc 2x2 => police 10px,
+// beaucoup plus lisible sur l'ecran de la calculatrice.
 static void drawGlyphRow(int x, int y, uint8_t row, int ncols, KDColor c) {
   if (!row) return;
-  rowClear(x, x + 6);
   for (int col = 0; col < ncols; col++)
-    if (row & (0x10 >> col)) rowPut(x + col + 1, C_BLK);
-  rowFlush(y + 1, x, x + 6);
-  rowClear(x, x + 5);
-  for (int col = 0; col < ncols; col++)
-    if (row & (0x10 >> col)) rowPut(x + col, c);
-  rowFlush(y, x, x + 5);
+    if (row & (0x10 >> col)) fRect(x + col * 2, y, 2, 2, c);
 }
 static void drawDigit(int x, int y, int d, KDColor c) {
-  for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r, FONT5[d][r], 4, c);
+  for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r * 2, FONT5[d][r], 4, c);
 }
 static void drawNum(int x, int y, int v, KDColor c) {
-  if (v < 0) { fRect(x, y + 2, 3, 1, c); drawNum(x + 5, y, -v, c); return; }
+  if (v < 0) { fRect(x, y + 4, 6, 2, c); drawNum(x + 10, y, -v, c); return; }
   char buf[8]; int n = 0;
   do { buf[n++] = '0' + v % 10; v /= 10; } while (v);
-  for (int i = n - 1; i >= 0; i--) { drawDigit(x, y, buf[i] - '0', c); x += 6; }
+  for (int i = n - 1; i >= 0; i--) { drawDigit(x, y, buf[i] - '0', c); x += 12; }
 }
 static void drawText(int x, int y, const char *s, KDColor c) {
   while (*s) {
     char ch = *s++;
-    if (ch == ' ') { x += 5; continue; }
-    if (ch == '-') { fRect(x, y + 2, 4, 1, c); x += 5; continue; }
-    if (ch == '!') { fRect(x, y, 1, 5, c); x += 4; continue; }
-    if (ch == ':') { fRect(x, y, 1, 1, c); fRect(x, y + 3, 1, 1, c); x += 4; continue; }
-    if (ch == '.') { fRect(x, y + 4, 1, 1, c); x += 4; continue; }
-    if (ch == '+') { fRect(x, y + 2, 4, 1, c); fRect(x + 1, y + 1, 1, 3, c); x += 6; continue; }
+    if (ch == ' ') { x += 10; continue; }
+    if (ch == '-') { fRect(x, y + 4, 8, 2, c); x += 10; continue; }
+    if (ch == '!') { fRect(x, y, 2, 10, c); x += 8; continue; }
+    if (ch == ':') { fRect(x, y, 2, 2, c); fRect(x, y + 6, 2, 2, c); x += 8; continue; }
+    if (ch == '.') { fRect(x, y + 8, 2, 2, c); x += 8; continue; }
+    if (ch == '+') { fRect(x, y + 4, 8, 2, c); fRect(x + 3, y + 2, 2, 6, c); x += 12; continue; }
     if (ch >= 'A' && ch <= 'Z') {
-      for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r, FONTA[ch - 'A'][r], 5, c);
+      for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r * 2, FONTA[ch - 'A'][r], 5, c);
     } else if (ch >= '0' && ch <= '9') drawDigit(x, y, ch - '0', c);
-    x += 6;
+    x += 12;
   }
 }
-static int textW(const char *s) { int w = 0; for (const char *p = s; *p; p++) w += (*p == ' ') ? 5 : 6; return w; }
+static int textW(const char *s) { int w = 0; for (const char *p = s; *p; p++) w += (*p == ' ') ? 10 : 12; return w; }
 static void drawTextC(int y, const char *s, KDColor c) { drawText((SW - textW(s)) / 2, y, s, c); }
 
 // ------------------------- Rendu du monde (themes) --------------------
@@ -1808,11 +1841,11 @@ static void renderMatch() {
   // killfeed (coin haut droit, sous le HUD)
   for (int i = 0; i < KILLFEED; i++)
     if (killfeed[i].alive) {
-      int y = 28 + i * 12;
-      fRect(SW - 118, y, 118, 10, C_BLK);
-      drawBrawlerSprite(SW - 112, y + 5, 4, killfeed[i].killer, 90, false);
-      drawText(SW - 104, y + 2, "A ELIMINE", C_GRE);
-      drawBrawlerSprite(SW - 44, y + 5, 4, killfeed[i].victim, 90, false);
+      int y = 28 + i * 14;
+      fRect(SW - 118, y, 118, 12, C_BLK);
+      drawBrawlerSprite(SW - 110, y + 6, 4, killfeed[i].killer, 90, false);
+      drawText(SW - 102, y + 1, "A TUE", C_GRE);
+      drawBrawlerSprite(SW - 32, y + 6, 4, killfeed[i].victim, 90, false);
     }
 
   // ---- Minimap (coin bas droit) ----
@@ -1842,87 +1875,86 @@ static void renderMatch() {
       }
   }
 
-  // ---- HUD ----
-  fRect(0, 0, SW, 24, C_PANEL);
-  fRect(0, 22, SW, 2, C_PANEL2);
+  // ---- HUD (texte 10px : tout tient sur une barre de 26px) ----
+  fRect(0, 0, SW, 26, C_PANEL);
+  fRect(0, 24, SW, 2, C_PANEL2);
   const BrawlerDef &d = BRAWLERS[me.brawlerIdx];
-  drawBrawlerSprite(16, 12, 8, me.brawlerIdx, 90, false);
-  drawText(30, 5, d.name, C_WHT);
+  drawBrawlerSprite(14, 13, 8, me.brawlerIdx, 90, false);
+  drawText(28, 3, d.name, C_WHT);
   int lvl = (me.accIdx >= 0) ? acc.b[me.accIdx].level : 1;
-  fRect(30 + textW(d.name) + 2, 3, 14, 12, C_YEL);
-  fRect(30 + textW(d.name) + 2, 12, 14, 3, C_BTND);
-  drawNum(34 + textW(d.name), 5, lvl, C_BLK);
-  fRect(150, 3, 18, 18, me.gadgetUses > 0 ? C_CYN : KDColor::RGB24(0x225566));
-  drawText(155, 7, "X", C_BLK);
-  drawNum(163, 7, me.gadgetUses, C_WHT);
-  if (me.accIdx >= 0 && acc.b[me.accIdx].hyper) {
-    fRect(172, 3, 24, 18, me.hyperT > 0 ? C_MAG : KDColor::RGB24(0x66114A));
-    drawText(175, 8, "HYP", C_WHT);
-  }
-  // indicateur de l'action armee (OK = super, X = gadget) + recharge super
-  if (armedAction == 1) { drawText(96, 7, "SUPER!", C_YEL); }
-  else if (armedAction == 2) { drawText(96, 7, "GADGET", C_CYN); }
-  else if (me.superCharge >= 100) { drawText(96, 7, "OK:SUPER", C_YEL); }
-  drawNum(210, 8, fmaxf(0, 150 - matchTimeMs / 1000), C_WHT);
-
-  fRect(240, 3, 76, 18, C_BLK);
-  if (mode == MODE_GEM) {
-    drawNum(250, 8, teamGems[0], C_BLUE);
-    drawGem(270, 12, animT);
-    drawNum(295, 8, teamGems[1], C_RED);
-    // compte a rebours de victoire bien visible sous le score
-    if (gemCountdown > 0) {
-      drawText(96, 7, "FIN!", C_YEL);
-      drawNum(226, 8, gemCountdown / 1000 + 1, C_YEL);
-    }
-  } else if (mode == MODE_BALL) {
-    int g0 = 0, g1 = 0;
-    for (int i = 0; i < entCount; i++)
-      if (ents[i].team == 0) g0 = fmaxf(g0, ents[i].goals);
-      else g1 = fmaxf(g1, ents[i].goals);
-    drawNum(255, 8, g0, C_BLUE); drawBall(278, 12); drawNum(300, 8, g1, C_RED);
-  } else if (mode == MODE_BOUNTY) {
-    drawNum(252, 8, teamStars[0], C_GOLD);
-    drawText(262, 8, "E", C_WHT);
-    drawNum(298, 8, teamStars[1], C_RED);
-  } else if (mode == MODE_HEIST) {
-    drawNum(246, 8, (int)(safes[0].hp / 1000), C_BLUE);
-    drawText(270, 8, "SAFE", C_GRE);
-    drawNum(300, 8, (int)(safes[1].hp / 1000), C_RED);
-  } else if (mode == MODE_ZONE) {
-    int m = 0;
-    for (int z = 0; z < MAX_ZONE; z++) if (zones[z].prog > 0) m++;
-    drawText(246, 8, "ZONES", C_WHT); drawNum(300, 8, m, C_GREEN);
-  } else if (mode == MODE_KO) {
-    int a0 = 0, a1 = 0;
-    for (int i = 0; i < entCount; i++)
-      if (ents[i].alive) { if (ents[i].team == 0) a0++; else a1++; }
-    drawNum(255, 8, a0, C_BLUE); drawText(272, 8, "VS", C_WHT); drawNum(300, 8, a1, C_RED);
-  } else {
-    int na = 0;
-    for (int i = 0; i < entCount; i++) if (ents[i].alive) na++;
-    drawText(246, 8, "VIVANTS", C_WHT); drawNum(300, 8, na, C_YEL);
-  }
+  fRect(32 + textW(d.name), 1, 24, 20, C_YEL);
+  fRect(32 + textW(d.name), 15, 24, 6, C_BTND);
+  drawNum(36 + textW(d.name), 3, lvl, C_BLK);
+  // chrono du match
+  drawNum(150, 3, fmaxf(0, 150 - matchTimeMs / 1000), C_WHT);
+  // indicateur de l'action armee (OK = super, X = gadget) + hypercharge
+  if (mode == MODE_GEM && gemCountdown > 0) {
+    drawText(190, 3, "FIN!", C_YEL);
+    drawNum(244, 3, gemCountdown / 1000 + 1, C_YEL);
+  } else if (me.hyperT > 0) { drawText(190, 3, "HYP!", C_MAG); }
+  else if (armedAction == 1) { drawText(190, 3, "SUP!", C_YEL); }
+  else if (armedAction == 2) { drawText(190, 3, "GAD", C_CYN); }
+  else if (me.superCharge >= 100) { drawText(190, 3, "OK:SUP", C_YEL); }
+  // gadget : nombre d'utilisations restantes
+  fRect(268, 1, 48, 24, me.gadgetUses > 0 ? C_CYN : KDColor::RGB24(0x225566));
+  drawText(274, 3, "X", C_BLK);
+  drawNum(288, 3, me.gadgetUses, C_WHT);
 
   // compte a rebours 3-2-1-GO au lancement du match
   if (startCountdown > -800) {
     int n = (startCountdown + 999) / 1000;
     fRect(SW / 2 - 60, 84, 120, 60, C_BLK);
     fRect(SW / 2 - 58, 86, 116, 56, C_PANEL);
-    if (n > 0) drawNum(SW / 2 - 4, 100, n, C_YEL);
+    if (n > 0) drawNum(SW / 2 - 12, 104, n, C_YEL);
     else drawTextC(104, "GO!", C_GREEN);
   }
   // ecran de reaparition du joueur
   if (!me.alive) {
-    fRect(SW / 2 - 90, 90, 180, 40, C_BLK);
-    fRect(SW / 2 - 88, 92, 176, 36, C_PANEL);
+    fRect(SW / 2 - 96, 90, 192, 44, C_BLK);
+    fRect(SW / 2 - 94, 92, 188, 40, C_PANEL);
     drawTextC(96, "REAPPARITION", C_WHT);
-    drawNum(SW / 2 - 4, 110, (me.respawnT + 999) / 1000, C_YEL);
+    drawNum(SW / 2 - 12, 114, (me.respawnT + 999) / 1000, C_YEL);
   }
-  // bandeau theme de la carte (coin bas gauche)
-  fRect(0, SH - 12, SW, 12, KDColor::RGB24(0x111827));
-  drawText(4, SH - 10, T.themeName, C_GRE);
-  drawText(140, SH - 10, "OK ATT SHIFT SUP X GAD - HYP", C_GRE);
+  // bandeau bas : rappel des touches a gauche, score du mode a droite
+  fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
+  drawText(4, SH - 12, "OK:SUP X:GAD -HYP", C_GRE);
+  if (mode == MODE_GEM) {
+    drawNum(SW - 72, SH - 12, teamGems[0], C_BLUE);
+    drawText(SW - 48, SH - 12, "-", C_WHT);
+    drawNum(SW - 38, SH - 12, teamGems[1], C_RED);
+  } else if (mode == MODE_BALL) {
+    int g0 = 0, g1 = 0;
+    for (int i = 0; i < entCount; i++)
+      if (ents[i].team == 0) g0 = fmaxf(g0, ents[i].goals);
+      else g1 = fmaxf(g1, ents[i].goals);
+    drawNum(SW - 72, SH - 12, g0, C_BLUE);
+    drawText(SW - 48, SH - 12, "-", C_WHT);
+    drawNum(SW - 38, SH - 12, g1, C_RED);
+  } else if (mode == MODE_BOUNTY) {
+    drawNum(SW - 72, SH - 12, teamStars[0], C_GOLD);
+    drawText(SW - 48, SH - 12, "-", C_WHT);
+    drawNum(SW - 38, SH - 12, teamStars[1], C_RED);
+  } else if (mode == MODE_HEIST) {
+    drawText(SW - 72, SH - 12, "S", C_GRE);
+    drawNum(SW - 60, SH - 12, (int)(safes[0].hp / 1000), C_BLUE);
+  } else if (mode == MODE_ZONE) {
+    int m = 0;
+    for (int z = 0; z < MAX_ZONE; z++) if (zones[z].prog > 0) m++;
+    drawText(SW - 72, SH - 12, "Z", C_WHT);
+    drawNum(SW - 60, SH - 12, m, C_GREEN);
+  } else if (mode == MODE_KO) {
+    int a0 = 0, a1 = 0;
+    for (int i = 0; i < entCount; i++)
+      if (ents[i].alive) { if (ents[i].team == 0) a0++; else a1++; }
+    drawNum(SW - 72, SH - 12, a0, C_BLUE);
+    drawText(SW - 48, SH - 12, "-", C_WHT);
+    drawNum(SW - 38, SH - 12, a1, C_RED);
+  } else {
+    int na = 0;
+    for (int i = 0; i < entCount; i++) if (ents[i].alive) na++;
+    drawText(SW - 72, SH - 12, "V", C_WHT);
+    drawNum(SW - 60, SH - 12, na, C_YEL);
+  }
   blit();
 }
 
@@ -1985,9 +2017,9 @@ static void questScreen() {
       // barre de progression
       fRect(40, y + 20, 180, 8, C_BLK);
       fRect(41, y + 21, (int)(178 * fminf(1.0f, (float)q.prog / q.goal)), 6, done ? C_GOLD : C_CYN);
-      drawNum(232, y + 18, q.prog, C_WHT);
-      drawText(244, y + 18, "SUR", C_GRE);
-      drawNum(268, y + 18, q.goal, C_WHT);
+      drawNum(226, y + 18, q.prog, C_WHT);
+      drawText(254, y + 18, "SUR", C_GRE);
+      drawNum(294, y + 18, q.goal, C_WHT);
       // recompense
       oCirc(46, y + 36, 4, C_YEL, C_BTND);
       drawNum(54, y + 32, q.reward, done ? C_BLK : C_YEL);
@@ -2070,14 +2102,14 @@ static void trophyRoadScreen() {
     fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
     int tt = totalTrophies();
     drawText(20, 30, "TOTAL:", C_WHT);
-    fRect(80, 28, 8, 4, C_GOLD); fRect(81, 32, 6, 2, C_GOLD); fRect(83, 34, 2, 4, C_GOLD);
-    drawNum(96, 30, tt, C_YEL);
-    drawText(20, 44, "BRAWLERS:", C_WHT);
-    drawNum(96, 44, unlockedBrawlers, C_GREEN);
-    drawText(110, 44, "SUR 50", C_GRE);
-    drawText(20, 58, "PIECES:", C_WHT);
-    oCirc(84, 60, 4, C_YEL, C_BTND);
-    drawNum(96, 58, acc.coins, C_YEL);
+    fRect(96, 28, 10, 5, C_GOLD); fRect(98, 34, 8, 2, C_GOLD); fRect(101, 37, 3, 5, C_GOLD);
+    drawNum(114, 30, tt, C_YEL);
+    drawText(20, 48, "BRAWLERS:", C_WHT);
+    drawNum(150, 48, unlockedBrawlers, C_GREEN);
+    drawText(180, 48, "SUR 50", C_GRE);
+    drawText(20, 66, "PIECES:", C_WHT);
+    oCirc(110, 68, 4, C_YEL, C_BTND);
+    drawNum(120, 66, acc.coins, C_YEL);
 
     int next = -1;
     for (int i = 0; i < 50; i++)
@@ -2085,16 +2117,16 @@ static void trophyRoadScreen() {
     drawTextC(76, "PROCHAIN DEBLOCAGE", C_WHT);
     if (next >= 0) {
       const BrawlerDef &d = BRAWLERS[next];
-      rRect(SW / 2 - 110, 88, 220, 60, 8, KDColor::RGB24(RAR_COL[d.rar]));
-      drawBrawlerSprite(SW / 2 - 80, 118, 16, next, 90, false);
-      drawText(SW / 2 - 55, 102, d.name, C_WHT);
-      drawText(SW / 2 - 55, 112, RAR_NAME[d.rar], KDColor::RGB24(RAR_COL[d.rar]));
-      drawText(SW / 2 - 55, 124, "A", C_WHT);
-      drawNum(SW / 2 - 43, 124, d.unlockTroph, C_YEL);
-      drawText(SW / 2 - 55, 134, "TROPHEES", C_GRE);
+      rRect(SW / 2 - 110, 84, 220, 80, 8, KDColor::RGB24(RAR_COL[d.rar]));
+      drawBrawlerSprite(SW / 2 - 80, 122, 16, next, 90, false);
+      drawText(SW / 2 - 55, 92, d.name, C_WHT);
+      drawText(SW / 2 - 55, 106, RAR_NAME[d.rar], KDColor::RGB24(RAR_COL[d.rar]));
+      drawText(SW / 2 - 55, 122, "A", C_WHT);
+      drawNum(SW / 2 - 41, 122, d.unlockTroph, C_YEL);
+      drawText(SW / 2 - 55, 138, "TROPHEES", C_GRE);
       int prog = fminf(1.0f, (float)tt / d.unlockTroph);
-      fRect(SW / 2 - 55, 148, 160, 6, C_BLK);
-      fRect(SW / 2 - 54, 149, (int)(158 * prog), 4, C_GREEN);
+      fRect(SW / 2 - 55, 152, 160, 8, C_BLK);
+      fRect(SW / 2 - 54, 153, (int)(158 * prog), 6, C_GREEN);
     } else {
       drawTextC(110, "TOUT EST DEBLOQUE!", C_GOLD);
     }
@@ -2122,7 +2154,7 @@ static int brawlerPicker(int myBrawler) {
     for (int i = first; i < 50 && i < first + 11; i++) {
       int y = 30 + (i - first) * 15;
       bool un = isUnlocked(i);
-      if (i == sel) rRect(6, y - 3, 130, 13, 5, C_YEL);
+      if (i == sel) rRect(6, y - 3, 130, 14, 5, C_YEL);
       // mini-portrait
       drawBrawlerSprite(16, y + 3, 5, i, 90, false);
       drawText(26, y, BRAWLERS[i].name, i == sel ? C_BLK : (un ? C_WHT : C_GRE));
@@ -2143,8 +2175,8 @@ static int brawlerPicker(int myBrawler) {
       fRect(SW / 2 - 20, 166, 10, 5, C_GOLD); fRect(SW / 2 - 18, 171, 6, 2, C_GOLD);
       drawNum(SW / 2 - 4, 165, acc.b[sel].trophies, C_WHT);
       // niveau
-      fRect(SW / 2 + 40, 162, 22, 14, C_YEL);
-      drawNum(SW / 2 + 46, 165, acc.b[sel].level, C_BLK);
+      fRect(SW / 2 + 40, 160, 28, 16, C_YEL);
+      drawNum(SW / 2 + 48, 163, acc.b[sel].level, C_BLK);
     } else {
       shCircRGB(232, 80 - bob, 30, 0x444444, 0x222222, C_GRE);
       drawTextC(90, "? ? ?", C_GRE);
@@ -2181,16 +2213,16 @@ static void settingsScreen() {
     drawTextC(8, "PARAMETRES", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
-    const char *acts[7] = {"SE DEPLACER", "ATTAQUE VISEE", "AUTOTIR", "ARMER SUPER", "ARMER GADGET", "HYPERCHARGE", "RETOUR MENU"};
+    const char *acts[7] = {"SE DEPLACER", "TIR VISE", "AUTOTIR", "ARMER SUPER", "ARMER GADGET", "HYPERCHARGE", "RETOUR MENU"};
     const char *keys[7] = {"FLECHES", "VAR", "EXE", "OK", "X", "SHIFT", "BACK"};
     for (int i = 0; i < 7; i++) {
-      int y = 44 + i * 16;
-      rRect(50, y - 3, 100, 13, 5, KDColor::RGB24(0x2B3A55));
-      drawText(56, y, acts[i], C_WHT);
-      rRect(170, y - 3, 100, 13, 5, C_BTN);
-      drawText(176, y, keys[i], C_BLK);
+      int y = 40 + i * 15;
+      rRect(16, y - 2, 150, 14, 4, KDColor::RGB24(0x2B3A55));
+      drawText(22, y, acts[i], C_WHT);
+      rRect(186, y - 2, 120, 14, 4, C_BTN);
+      drawText(192, y, keys[i], C_BLK);
     }
-    drawTextC(150, "ACHATS: + NIV  * GADGET  / STAR", C_GRE);
+    drawTextC(158, "+ NIV  * GADGET  / STAR", C_GRE);
     rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
     drawTextC(196, "OK RETOUR", C_BLK);
     blit();
@@ -2221,64 +2253,64 @@ static void brawlerMenu(int myBrawler) {
       rRect(18, 26, 62, 70, 8, unlocked ? KDColor::RGB24(RAR_COL[d.rar]) : C_DGREY);
       if (unlocked) {
         drawBrawlerSprite(50, 60 - bob, 22, sel, 90, false);
-        fRect(64, 40, 22, 16, C_YEL); fRect(64, 51, 22, 5, C_BTND);
-        drawNum(70, 43, a.level, C_BLK);
+        fRect(62, 38, 30, 20, C_YEL); fRect(62, 52, 30, 6, C_BTND);
+        drawNum(68, 41, a.level, C_BLK);
       } else {
         shCircRGB(50, 60 - bob, 22, 0x444444, 0x222222, C_GRE);
         drawText(40, 56, "?", C_GRE);
-        drawText(22, 98, "A", C_GRE);
-        drawNum(30, 98, d.unlockTroph, C_YEL);
-        drawText(38, 98, "TROPHEES", C_GRE);
+        drawText(22, 102, "A", C_GRE);
+        drawNum(34, 102, d.unlockTroph, C_YEL);
+        drawText(70, 102, "TROPHEES", C_GRE);
       }
       shadow(50, 88, 16, 4);
       drawText(90, 30, d.name, unlocked ? C_YEL : C_GRE);
-      drawText(90, 42, RAR_NAME[d.rar], unlocked ? KDColor::RGB24(RAR_COL[d.rar]) : C_GRE);
-      fRect(230, 28, 8, 4, C_GOLD); fRect(231, 32, 6, 2, C_GOLD); fRect(233, 34, 2, 4, C_GOLD);
-      drawNum(245, 30, a.trophies, C_WHT);
-      oCirc(230, 50, 4, C_YEL, C_BTND); drawNum(245, 46, acc.coins, C_WHT);
+      drawText(90, 46, RAR_NAME[d.rar], unlocked ? KDColor::RGB24(RAR_COL[d.rar]) : C_GRE);
+      if (unlocked) {
+        drawText(90, 62, "DEG", C_WHT);
+        drawNum(130, 62, (int)(d.baseDmg * mul * ((a.starPower && d.star == STAR_DMG) ? 1.1f : 1)), C_ORG);
+        drawText(180, 62, "PORTEE", C_WHT);
+        drawNum(258, 62, d.range, C_CYN);
+      }
+      fRect(230, 28, 10, 6, C_GOLD); fRect(233, 35, 8, 3, C_GOLD); fRect(236, 39, 3, 6, C_GOLD);
+      drawNum(250, 30, a.trophies, C_WHT);
+      oCirc(236, 56, 4, C_YEL, C_BTND); drawNum(250, 52, acc.coins, C_WHT);
 
       if (unlocked) {
-        rRect(10, 134, 96, 26, 5, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
-        drawText(16, 140, "GADGET", a.gadget ? C_BLK : C_GRE);
-        drawText(16, 148, a.gadget ? curGadgetName(sel) : "NON", a.gadget ? C_BLK : C_GRE);
-        if (a.gadget) drawNum(92, 148, a.gadChoice + 1, C_BLK);
-        rRect(112, 134, 96, 26, 5, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
-        drawText(118, 140, "POUV. STAR", a.starPower ? C_WHT : C_GRE);
-        drawText(118, 148, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
-        if (a.starPower) drawNum(196, 148, a.starChoice + 1, C_WHT);
-        rRect(214, 134, 96, 26, 5, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
-        drawText(220, 140, "HYPERCH.", a.hyper ? C_WHT : C_GRE);
-        drawText(220, 148, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
+        // super du brawler
+        rRect(10, 104, 300, 28, 5, KDColor::RGB24(0x2B3A55));
+        drawText(16, 108, "SUPER", C_YEL);
+        drawText(16, 120, SUPER_NAMES[sel], C_WHT);
+        // gadget / pouvoir star / hypercharge : 3 lignes pleine largeur
+        rRect(10, 136, 300, 16, 4, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
+        drawText(16, 139, "GADGET", a.gadget ? C_BLK : C_GRE);
+        drawText(96, 139, a.gadget ? curGadgetName(sel) : "NON", a.gadget ? C_BLK : C_GRE);
+        if (a.gadget) drawNum(284, 139, a.gadChoice + 1, C_BLK);
+        rRect(10, 155, 300, 16, 4, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
+        drawText(16, 158, "STAR", a.starPower ? C_WHT : C_GRE);
+        drawText(70, 158, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
+        if (a.starPower) drawNum(284, 158, a.starChoice + 1, C_WHT);
+        rRect(10, 174, 300, 16, 4, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
+        drawText(16, 177, "HYPER", a.hyper ? C_WHT : C_GRE);
+        drawText(80, 177, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
 
-        // super et bio du brawler
-        rRect(10, 100, 90, 26, 5, KDColor::RGB24(0x2B3A55));
-        drawText(16, 104, "SUPER", C_YEL);
-        drawText(16, 112, SUPER_NAMES[sel], C_WHT);
-        rRect(110, 100, 90, 26, 5, KDColor::RGB24(0x2B3A55));
-        drawText(116, 104, "DEG", C_WHT);
-        drawNum(116, 112, (int)(d.baseDmg * mul * ((a.starPower && d.star == STAR_DMG) ? 1.1f : 1)), C_ORG);
-        rRect(210, 100, 100, 26, 5, KDColor::RGB24(0x2B3A55));
-        drawText(216, 104, "PORTEE", C_WHT);
-        drawNum(216, 112, d.range, C_CYN);
-
+        // boutons d'achat
         cost = upgradeCost(a.level);
         if (a.level < 11) {
-          rRect(10, 168, 140, 24, 5, (acc.coins >= cost) ? C_YEL : KDColor::RGB24(0x5A4A9A));
-          drawText(16, 175, "+ NIV SUIVANT", C_BLK); drawNum(110, 175, cost, C_BLK);
+          rRect(6, 196, 74, 32, 5, (acc.coins >= cost) ? C_YEL : KDColor::RGB24(0x5A4A9A));
+          drawText(12, 199, "+ NIV", C_BLK); drawNum(12, 215, cost, C_BLK);
         } else {
-          rRect(10, 168, 140, 24, 5, C_GREEN);
-          drawText(16, 175, "NIVEAU MAX!", C_BLK);
+          rRect(6, 196, 74, 32, 5, C_GREEN);
+          drawText(12, 207, "NIV MAX", C_BLK);
         }
-        if (!a.gadget) { rRect(156, 168, 74, 24, 5, (acc.coins >= 100) ? C_CYN : KDColor::RGB24(0x225566)); drawText(162, 175, "* GADGET", C_BLK); drawNum(202, 175, 100, C_BLK); }
-        else drawTextC(224, "* CHANGE GADGET", C_CYN);
-        if (a.level >= 3 && !a.starPower) { rRect(156, 196, 74, 22, 5, (acc.coins >= 150) ? C_PUR : KDColor::RGB24(0x3A1F55)); drawText(162, 202, "/ STAR", C_WHT); drawNum(202, 202, 150, C_WHT); }
-        else if (a.starPower) drawTextC(224, "/ CHANGE STAR", C_PUR);
-        if (a.level >= 11 && !a.hyper) { rRect(234, 196, 76, 22, 5, (acc.coins >= 300) ? C_MAG : KDColor::RGB24(0x55114A)); drawText(240, 202, "- HYP", C_WHT); drawNum(272, 202, 300, C_WHT); }
-        drawText(240, 175, "OK RETOUR", C_GRE);
+        if (!a.gadget) { rRect(84, 196, 74, 32, 5, (acc.coins >= 100) ? C_CYN : KDColor::RGB24(0x225566)); drawText(90, 199, "* GADGET", C_BLK); drawNum(90, 215, 100, C_BLK); }
+        else { rRect(84, 196, 74, 32, 5, C_CYN); drawText(90, 207, "* CHANGE", C_BLK); }
+        if (a.level >= 3 && !a.starPower) { rRect(162, 196, 74, 32, 5, (acc.coins >= 150) ? C_PUR : KDColor::RGB24(0x3A1F55)); drawText(168, 199, "/ STAR", C_WHT); drawNum(168, 215, 150, C_WHT); }
+        else if (a.starPower) { rRect(162, 196, 74, 32, 5, C_PUR); drawText(168, 207, "/ CHANGE", C_WHT); }
+        if (a.level >= 11 && !a.hyper) { rRect(240, 196, 74, 32, 5, (acc.coins >= 300) ? C_MAG : KDColor::RGB24(0x55114A)); drawText(246, 199, "- HYP", C_WHT); drawNum(246, 215, 300, C_WHT); }
       } else {
         drawTextC(120, "BRAWLER NON DEBLOQUE", C_GRE);
         drawTextC(140, "GAGNE DES TROPHEES POUR", C_WHT);
-        drawTextC(152, "LE DEBLOQUER!", C_WHT);
+        drawTextC(156, "LE DEBLOQUER!", C_WHT);
       }
       blit();
       pollKeys();
@@ -2516,13 +2548,13 @@ static void trainingMode(int myBrawler) {
       }
     // panneau de stats
     drawText(8, 6, "ENTRAINEMENT", C_YEL);
-    drawText(8, 22, "TIRS:", C_WHT); drawNum(48, 22, shots, C_WHT);
-    drawText(8, 34, "TOUCHES:", C_WHT); drawNum(64, 34, hits, C_CYN);
-    drawText(8, 46, "PRECISION:", C_WHT);
-    if (shots > 0) drawNum(72, 46, hits * 100 / shots, C_GREEN);
-    else drawText(72, 46, "0", C_GREEN);
-    drawText(8, 58, "DEGATS:", C_WHT); drawNum(60, 58, dmgTotal, C_ORG);
-    drawTextC(SH - 14, "OK TIR   FLECHES BOUGER   BACK QUITTER", C_GRE);
+    drawText(8, 24, "TIRS:", C_WHT); drawNum(76, 24, shots, C_WHT);
+    drawText(8, 40, "TOUCHES:", C_WHT); drawNum(112, 40, hits, C_CYN);
+    drawText(8, 56, "PRECISION:", C_WHT);
+    if (shots > 0) drawNum(132, 56, hits * 100 / shots, C_GREEN);
+    else drawText(132, 56, "0", C_GREEN);
+    drawText(8, 72, "DEGATS:", C_WHT); drawNum(96, 72, dmgTotal, C_ORG);
+    drawTextC(SH - 14, "OK TIR  BACK QUITTER", C_GRE);
     blit();
     Ion::Timing::msleep(20);
   }
@@ -2565,9 +2597,9 @@ void ion_main(int argc, char *argv[]) {
       drawTextC(8, "AIDE", C_YEL);
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
       const char *lines[8] = {
-        "FLECHES: BOUGER", "OK: ARMER LE SUPER",
-        "VAR: TIR VISE", "EXP/EXE: AUTOTIR",
-        "X: ARMER GADGET  SHIFT: HYP", "LE TIR LANCE L'ACTION ARMEE",
+        "FLECHES: BOUGER", "OK: ARMER SUPER",
+        "VAR: TIR VISE", "EXE: AUTOTIR",
+        "X: GADGET  SHIFT: HYP", "TIRER LANCE L ACTION",
         "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
       };
       for (int i = 0; i < 8; i++) drawTextC(38 + i * 17, lines[i], C_WHT);

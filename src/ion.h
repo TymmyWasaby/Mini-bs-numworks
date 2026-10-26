@@ -44,7 +44,7 @@ inline void pushRectUniform(KDRect r, KDColor c) {
 }
 namespace Keyboard {
 enum class Key : uint8_t {
-  Left = 0, Up = 1, Down = 2, Right = 3, OK = 4, Back = 5,
+  Left = 0, Up = 1, Down = 2, Right = 3, OK = 4, Back = 5, Home = 6,
   Shift = 12, X = 14, Var = 15, Toolbox = 16, Backspace = 17, Exp = 18,
   Power = 23, Multiply = 39, Division = 40,
   Plus = 45, Minus = 46, EXE = 52

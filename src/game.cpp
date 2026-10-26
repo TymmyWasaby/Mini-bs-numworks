@@ -2,12 +2,12 @@
 //  BRAWL MICROSTARS v4 — Shooter 2D type Brawl Stars pour NumWorks
 //  App externe Epsilon (.nwa via nwlink / EADK)
 //
-//  CONTROLES (V5, comme la calculette de Guénolé) :
+//  CONTROLES (V5, comme le schema de Guénolé) :
 //    Fleches : bouger | var : attaque visee (direction du deplacement)
-//    exp/EXE : autotir (ennemi le plus proche)
-//    OK : armer/annuler le SUPER | X : armer/annuler le GADGET
+//    menu (toolbox) ou EXE : autotir (ennemi le plus proche)
+//    OK : armer/annuler le SUPER | effacer (retour arr.) : armer/annuler le GADGET
 //    Shift : hypercharge | Back : quitter
-//    Le tir (var/exp) consomme l'action armee. Porteur de balle : tir = shoot.
+//    Le tir (var/menu) consomme l'action armee. Porteur de balle : tir = shoot.
 //    + * / - : achats dans le menu BRAWLERS
 //
 //  V5 : menu style Brawl Stars, front montants (plus de double-appui),
@@ -1032,8 +1032,12 @@ static void pollKeys() {
   kUp = st.keyDown(K::Up); kDown = st.keyDown(K::Down);
   kLeft = st.keyDown(K::Left); kRight = st.keyDown(K::Right);
   keyOK = st.keyDown(K::OK);
-  kShift = st.keyDown(K::Shift); kX = st.keyDown(K::X);
-  kVar = st.keyDown(K::Var); kExp = st.keyDown(K::Exp) || st.keyDown(K::EXE);
+  kShift = st.keyDown(K::Shift);
+  // gadget : touche EFFACER (retour arriere) comme sur le schema, X garde en alias
+  kX = st.keyDown(K::Backspace) || st.keyDown(K::X);
+  kVar = st.keyDown(K::Var);
+  // autotir : touche MENU (toolbox, 3 lignes) comme sur le schema, EXE garde en alias
+  kExp = st.keyDown(K::Toolbox) || st.keyDown(K::EXE);
   kMinus = st.keyDown(K::Minus); keyBack = st.keyDown(K::Back);
   kPlus = st.keyDown(K::Plus); kMul = st.keyDown(K::Multiply);
   kDiv = st.keyDown(K::Division); kPow = st.keyDown(K::Power);
@@ -1102,6 +1106,13 @@ static void updateAI(Ent &e, float dt) {
         for (int z = 0; z < MAX_ZONE; z++)
           if (zones[z].prog < bestP) { bestP = zones[z].prog; tx = zones[z].x; ty = zones[z].y; }
       }
+    }
+    else if (mode == MODE_BOUNTY || mode == MODE_KO || mode == MODE_SOLO || mode == MODE_DUO) {
+      // chasse active dans TOUS ces modes : l'IA poursuit toujours un objectif
+      Ent *t0 = nullptr;
+      nearestEnemyDist(e, &t0);
+      if (t0) { tx = t0->x; ty = t0->y; }       // ennemi connu : on le traque
+      else { tx = MAPW * TILE / 2; ty = MAPH * TILE / 2; } // sinon on va au centre
     }
     Ent *tgt = nullptr;
     float ed = nearestEnemyDist(e, &tgt);
@@ -1940,7 +1951,7 @@ static void renderMatch() {
   }
   // bandeau bas : rappel des touches a gauche, score du mode a droite
   fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
-  drawText(4, SH - 12, "OK:SUP X:GAD -HYP", C_GRE);
+  drawText(4, SH - 12, "OK:SUP EFF:GAD -HYP", C_GRE);
   if (mode == MODE_GEM) {
     drawNum(SW - 72, SH - 12, teamGems[0], C_BLUE);
     drawText(SW - 48, SH - 12, "-", C_WHT);
@@ -2245,7 +2256,7 @@ static void settingsScreen() {
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
     const char *acts[7] = {"SE DEPLACER", "TIR VISE", "AUTOTIR", "ARMER SUPER", "ARMER GADGET", "HYPERCHARGE", "RETOUR MENU"};
-    const char *keys[7] = {"FLECHES", "VAR", "EXE", "OK", "X", "SHIFT", "BACK"};
+    const char *keys[7] = {"FLECHES", "VAR", "MENU", "OK", "EFFACER", "SHIFT", "BACK"};
     for (int i = 0; i < 7; i++) {
       int y = 40 + i * 15;
       rRect(16, y - 2, 150, 14, 4, KDColor::RGB24(0x2B3A55));
@@ -2633,8 +2644,8 @@ void ion_main(int argc, char *argv[]) {
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
       const char *lines[8] = {
         "FLECHES: BOUGER", "OK: ARMER SUPER",
-        "VAR: TIR VISE", "EXE: AUTOTIR",
-        "X: GADGET  SHIFT: HYP", "TIRER LANCE L ACTION",
+        "VAR: TIR VISE", "MENU: AUTOTIR",
+        "EFFACER: GADGET  SHIFT: HYP", "TIRER LANCE L ACTION",
         "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
       };
       for (int i = 0; i < 8; i++) drawTextC(38 + i * 17, lines[i], C_WHT);

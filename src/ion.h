@@ -16,7 +16,7 @@ public:
   static constexpr KDColor RGB(uint8_t r, uint8_t g, uint8_t b) {
     return KDColor((uint16_t)(((uint16_t)(r >> 3) << 11) | ((uint16_t)(g >> 2) << 5) | (b >> 3)));
   }
-  uint8_t red() const { return (uint8_t)((((value >> 11) & 31) * 255 + 15) / 31); }
+  uint8_t red() const { return (uint8_t)((((value >> 11) & 31) * 255 + 15) / 31; }
   uint8_t green() const { return (uint8_t)((((value >> 5) & 63) * 255 + 31) / 63); }
   uint8_t blue() const { return (uint8_t)(((value & 31) * 255 + 15) / 31); }
   operator eadk_color_t() const { return (eadk_color_t)value; }
@@ -45,7 +45,7 @@ inline void pushRectUniform(KDRect r, KDColor c) {
 namespace Keyboard {
 enum class Key : uint8_t {
   Left = 0, Up = 1, Down = 2, Right = 3, OK = 4, Back = 5,
-  Shift = 12, X = 14, Var = 15, Toolbox = 16, Exp = 18,
+  Shift = 12, X = 14, Var = 15, Toolbox = 16, Backspace = 17, Exp = 18,
   Power = 23, Multiply = 39, Division = 40,
   Plus = 45, Minus = 46, EXE = 52
 };

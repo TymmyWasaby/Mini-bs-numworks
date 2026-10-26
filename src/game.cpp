@@ -736,6 +736,20 @@ static bool inBush(float x, float y) {
   if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) return false;
   return tileMap[tx][ty] == 2;
 }
+// destruction de murs par les supers (Shelly, Bull, El Primo, Colt... comme dans BS)
+static void breakWalls(float cx, float cy, float r) {
+  int t0x = (int)fmaxf(0, (cx - r) / TILE), t1x = (int)fminf(MAPW - 1, (cx + r) / TILE);
+  int t0y = (int)fmaxf(0, (cy - r) / TILE), t1y = (int)fminf(MAPH - 1, (cy + r) / TILE);
+  for (int tx = t0x; tx <= t1x; tx++)
+    for (int ty = t0y; ty <= t1y; ty++) {
+      float wx = tx * TILE + TILE / 2.0f, wy = ty * TILE + TILE / 2.0f;
+      float dx = wx - cx, dy = wy - cy;
+      if (tileMap[tx][ty] == 1 && dx * dx + dy * dy < r * r) {
+        tileMap[tx][ty] = 0;
+        spawnParts(wx, wy, 1, 6);
+      }
+    }
+}
 static void moveEnt(Ent &e, float dx, float dy) {
   if (solidAt(e.x + dx, e.y)) dx = 0;
   if (solidAt(e.x, e.y + dy)) dy = 0;
@@ -947,6 +961,7 @@ static void doSuper(Ent &e, float ang) {
   shakeT = 200; shakeMag = 3;
   switch (d.sup) {
     case SUP_BURST: {
+      breakWalls(e.x, e.y, 70); // le super dezone : detruit les murs autour (Shelly, Jacky...)
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].team != e.team) {
           float dx = ents[i].x - e.x, dy = ents[i].y - e.y;
@@ -955,7 +970,7 @@ static void doSuper(Ent &e, float ang) {
       for (int a = 0; a < 16; a++) fireProj(e, a * 0.3927f, true, mul * 0.6f, 1.2f, 0.5f);
       break;
     }
-    case SUP_DASH: { e.dashT = 0.35f; e.dashDx = (int)(cosf(ang) * 320); e.dashDy = (int)(sinf(ang) * 320); break; }
+    case SUP_DASH: { e.dashT = 0.35f; e.dashDx = (int)(cosf(ang) * 320); e.dashDy = (int)(sinf(ang) * 320); breakWalls(e.x, e.y, 40); break; } // charge qui defonce les murs (Bull, Darryl...)
     case SUP_HEAL: {
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].team == e.team) {
@@ -1261,6 +1276,7 @@ static void updateMatch(float dt) {
     if (e.attackT > 0) e.attackT -= (int)(dt * 1000);
     if (e.dashT > 0) {
       e.dashT -= dt;
+      breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
       moveEnt(e, e.dashDx * dt, e.dashDy * dt);
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team) {
@@ -1304,8 +1320,15 @@ static void updateMatch(float dt) {
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
     if (p.travelled > p.range) { p.active = false; continue; }
-    // anti-tunneling : on teste aussi le milieu du pas (projectiles rapides vs murs fins)
-    if (!p.lob && (solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f))) { p.active = false; continue; }
+    // anti-tunneling : milieu du pas teste aussi. Les supers perceurs cassent
+    // les murs a l'impact (Colt, Brock, Rico...), les tirs normaux s'y arretent.
+    if (!p.lob) {
+      bool hitWall = solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f);
+      if (hitWall) {
+        if (p.fromSuper) breakWalls(p.x, p.y, 16);
+        else { p.active = false; continue; }
+      }
+    }
     if (mode == MODE_HEIST)
       for (int s = 0; s < MAX_SAFE; s++) {
         if (safes[s].hp <= 0 || safes[s].team == p.team) continue;
@@ -2062,6 +2085,7 @@ static void updateQuests(int result) {
 }
 
 // ------------------------- Menus --------------------------------------
+static const char **gMenuDesc = nullptr; // descriptions optionnelles des items du menu
 static int menuPick(const char *title, const char **items, int n, int start) {
   int sel = start;
   bool pU = false, pD = false;
@@ -2078,8 +2102,9 @@ static int menuPick(const char *title, const char **items, int n, int start) {
         int y = 28 + (i - first) * 19;
         if (i == sel) rRect(36, y, SW - 72, 16, 6, C_YEL);
         else rRect(36, y, SW - 72, 16, 6, C_BTN);
-        drawTextC(y + 5, items[i], i == sel ? C_BLK : C_WHT);
+        drawTextC(y + 3, items[i], i == sel ? C_BLK : C_WHT);
       }
+      if (gMenuDesc && gMenuDesc[sel]) drawTextC(206, gMenuDesc[sel], C_GRE); // description du mode
       drawTextC(SH - 14, "OK CHOISIR   BACK RETOUR", C_GRE);
       blit();
       drawn = sel;
@@ -2096,7 +2121,8 @@ static int menuPick(const char *title, const char **items, int n, int start) {
 }
 
 static void trophyRoadScreen() {
-  while (true) {
+  waitRelease();
+  { // dessin unique (ecran statique)
     bgPanel();
     drawTextC(6, "ROUTE DES TROPHEES", C_YEL);
     fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
@@ -2132,9 +2158,14 @@ static void trophyRoadScreen() {
     }
     drawTextC(SH - 14, "OK RETOUR", C_GRE);
     blit();
-    prevOK = true;
-    while (prevOK) { pollKeys(); prevOK = keyOK; Ion::Timing::msleep(60); }
-    return;
+  }
+  // reste affiche jusqu'a un vrai appui OK (avant : l'ecran sautait aussitot)
+  while (true) {
+    pollKeys();
+    if (keyOK && !prevOK) { prevOK = true; return; }
+    if (keyBack && !prevBack) { prevBack = true; return; }
+    prevOK = keyOK; prevBack = keyBack;
+    Ion::Timing::msleep(60);
   }
 }
 
@@ -2241,6 +2272,7 @@ static void brawlerMenu(int myBrawler) {
     int sel = brawlerPicker(myBrawler);
     if (sel < 0) return;
     myBrawler = sel;
+    waitRelease(); // sinon le OK du picker refermait la fiche aussitot
     while (true) {
       const BrawlerDef &d = BRAWLERS[sel];
       BrawlerAccount &a = acc.b[sel];
@@ -2270,6 +2302,7 @@ static void brawlerMenu(int myBrawler) {
         drawNum(130, 62, (int)(d.baseDmg * mul * ((a.starPower && d.star == STAR_DMG) ? 1.1f : 1)), C_ORG);
         drawText(180, 62, "PORTEE", C_WHT);
         drawNum(258, 62, d.range, C_CYN);
+        drawTextC(80, BRAWLER_BIOS[sel], C_GRE);
       }
       fRect(230, 28, 10, 6, C_GOLD); fRect(233, 35, 8, 3, C_GOLD); fRect(236, 39, 3, 6, C_GOLD);
       drawNum(250, 30, a.trophies, C_WHT);
@@ -2573,7 +2606,9 @@ void ion_main(int argc, char *argv[]) {
     if (choice == 0) {
       const char *modes[MODE_COUNT];
       for (int i = 0; i < MODE_COUNT; i++) modes[i] = MODE_NAMES[i];
+      gMenuDesc = MODE_DESC; // affiche la description du mode selectionne
       int selMode = menuPick("MODE DE JEU", modes, MODE_COUNT, 0);
+      gMenuDesc = nullptr;
       if (selMode < 0) { waitRelease(); continue; }
       waitRelease();
       // selection du brawler (V5) : on choisit qui on joue

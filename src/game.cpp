@@ -658,6 +658,7 @@ struct Ent {
   bool hasBall;
   int aiThinkT, aiWx, aiWy;
   float aiSkill, stuckT;
+  uint8_t aiRole; // 0 = attaquant/buteur, 1 = defenseur, 2 = tueur
   int walkT, lastHitT, attackT;
   bool drawDone;
 };
@@ -819,7 +820,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.aimAng = e.faceAng = (team == 0) ? 0 : 180;
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = rnd(500); e.aiWx = x; e.aiWy = y;
-  e.aiSkill = aiSkill; e.stuckT = 0;
+  e.aiSkill = aiSkill; e.stuckT = 0; e.aiRole = 0;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
 }
 
@@ -860,7 +861,7 @@ static void setupMatch(int selMode, int myBrawler) {
       }
     }
     soloShrink = (MAPW + MAPH) * TILE / 2 + 200;
-    poisonWaveT = 25000;
+    poisonWaveT = 60000; // le poison n'arrive qu'apres 1 minute de partie
   } else {
     addEnt(myBrawler, myBrawler, 0, 40, MAPH * TILE / 2, true, skill); humanIdx = 0;
     int a1 = pick(); if (a1 == myBrawler) a1 = pick();
@@ -887,6 +888,15 @@ static void setupMatch(int selMode, int myBrawler) {
       zones[0].x = MAPW * TILE / 2; zones[0].y = MAPH * TILE / 2 - 60;
       zones[1].x = MAPW * TILE / 2 - 70; zones[1].y = MAPH * TILE / 2 + 50;
       zones[2].x = MAPW * TILE / 2 + 70; zones[2].y = MAPH * TILE / 2 + 50;
+    }
+  }
+  // roles IA : dans chaque equipe, le 1er attaque l'objectif, le 2e defend, le 3e chasse
+  {
+    int memberCount[5] = {0, 0, 0, 0, 0};
+    for (int i = 0; i < entCount; i++) {
+      if (ents[i].isHuman) { ents[i].aiRole = 0; continue; }
+      int r = memberCount[ents[i].team]++ % 3;
+      ents[i].aiRole = (uint8_t)r;
     }
   }
 }
@@ -1043,15 +1053,38 @@ static void updateAI(Ent &e, float dt) {
     if (mode == MODE_GEM)
       for (int i = 0; i < 10; i++)
         if (gems[i].active) { tx = gems[i].x; ty = gems[i].y; break; }
-    else if (mode == MODE_BALL && !e.hasBall && ballVX == 0 && ballVY == 0) { tx = ballX; ty = ballY; }
+    else if (mode == MODE_BALL) {
+      // roles Brawl Ball : 0 = buteur, 1 = defenseur, 2 = tueur
+      float goalX = (e.team == 0) ? MAPW * TILE - 20 : 20;   // but adverse
+      float ownX  = (e.team == 0) ? 20 : MAPW * TILE - 20;   // son but
+      if (e.hasBall) { tx = goalX; ty = MAPH * TILE / 2; }   // porteur : fonce marquer
+      else if (e.aiRole == 1) { // defenseur : reste devant son but, patrouille un peu
+        tx = ownX + ((e.team == 0) ? 45 : -45);
+        ty = MAPH * TILE / 2 + ((e.walkT / 600) % 2 ? 50 : -50);
+      }
+      else if (e.aiRole == 2) { /* tueur : cible l'ennemi le plus proche (via tgt plus bas) */ }
+      else if (ballVX == 0 && ballVY == 0) { tx = ballX; ty = ballY; } // ballon libre : buteur va le prendre
+      else { tx = (goalX + ballX) / 2; ty = ballY; } // soutien : avance avec le ballon
+    }
     else if (mode == MODE_HEIST) {
       for (int s = 0; s < MAX_SAFE; s++)
         if (safes[s].maxHP > 0 && safes[s].hp > 0 && safes[s].team != e.team) { tx = safes[s].x; ty = safes[s].y; }
     }
     else if (mode == MODE_ZONE) {
-      float bestP = 1e9;
-      for (int z = 0; z < MAX_ZONE; z++)
-        if (zones[z].prog < bestP) { bestP = zones[z].prog; tx = zones[z].x; ty = zones[z].y; }
+      // Zone chaude : aller a la plus proche zone PAS encore capturee par son equipe
+      float bestD = 1e9; bool found = false;
+      for (int z = 0; z < MAX_ZONE; z++) {
+        bool mine = (e.team == 0) ? zones[z].prog >= 100 : zones[z].prog <= -100;
+        if (mine) continue; // deja a nous : on aide ailleurs
+        float ddx = zones[z].x - e.x, ddy = zones[z].y - e.y;
+        float dd = ddx * ddx + ddy * ddy;
+        if (dd < bestD) { bestD = dd; found = true; tx = zones[z].x; ty = zones[z].y; }
+      }
+      if (!found) { // tout est pris : on defend la zone la moins avancee
+        float bestP = 1e9;
+        for (int z = 0; z < MAX_ZONE; z++)
+          if (zones[z].prog < bestP) { bestP = zones[z].prog; tx = zones[z].x; ty = zones[z].y; }
+      }
     }
     Ent *tgt = nullptr;
     float ed = nearestEnemyDist(e, &tgt);
@@ -1173,11 +1206,16 @@ static void updateMatch(float dt) {
     if (kX && !prevX) armedAction = (armedAction == 2) ? 0 : 2;
     if (kMinus && !prevMinus) doHypercharge(me);
     bool shotVar = kVar && !prevVar, shotExp = kExp && !prevExp;
+    // maintien de var/exp = tir continu (respecte le cooldown d'attaque)
+    if (me.attackT <= 0 && me.ammo >= 1) {
+      if (kVar) shotVar = true;
+      else if (kExp) shotExp = true;
+    }
     if (shotVar || shotExp) {
       Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
       float ang;
-      if (shotVar && !tgt) ang = (dx || dy) ? atan2f(dy, dx) : me.aimAng;
-      else ang = tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : ((dx || dy) ? atan2f(dy, dx) : me.aimAng);
+      if (shotExp && tgt) ang = atan2f(tgt->y - me.y, tgt->x - me.x); // exp : autotir vise
+      else ang = (dx || dy) ? atan2f(dy, dx) : me.aimAng;             // var : direction du deplacement
       if (mode == MODE_BALL && me.hasBall) {
         shootBall(me, ang); // on tire le ballon au lieu d'attaquer
       } else if (armedAction == 1) {
@@ -1391,7 +1429,12 @@ static void updateMatch(float dt) {
 
   if (mode == MODE_KO || ffa) {
     poisonWaveT -= (int)(dt * 1000);
-    if (poisonWaveT <= 0) { poisonWaveT = 4000; soloShrink -= (mode == MODE_KO) ? 90 : 60; }
+    if (poisonWaveT <= 0) {
+      // vague lente : retrait progressif, bloque au minimum (= poison sur toute la map)
+      poisonWaveT = 7000;
+      soloShrink -= (mode == MODE_KO) ? 50 : 35;
+      if (soloShrink < 80) soloShrink = 80; // toute la map empoisonnee : ca reste jusqu'au gagnant
+    }
     int cx = MAPW * TILE / 2, cy = MAPH * TILE / 2;
     for (int i = 0; i < entCount; i++) {
       Ent &e = ents[i];
@@ -1406,9 +1449,13 @@ static void updateMatch(float dt) {
       if (alive0 == 0) matchResult = -1;
       if (alive1 == 0) matchResult = 1;
     } else {
-      int aliveTeams = 0;
-      for (int i = 0; i < entCount; i++) if (ents[i].alive) aliveTeams++;
-      if (aliveTeams == 1 && ents[humanIdx].alive) matchResult = 1;
+      // Survivant solo/duo : victoire si tous les ennemis sont morts ET qu'il
+      // reste quelqu'un de ton equipe (toi OU ton coequipier), defaite sinon
+      bool myTeam = false, otherTeam = false;
+      for (int i = 0; i < entCount; i++)
+        if (ents[i].alive) { if (ents[i].team == 0) myTeam = true; else otherTeam = true; }
+      if (!myTeam) matchResult = -1;        // equipe du joueur eliminee
+      else if (!otherTeam) matchResult = 1; // tous les ennemis morts : on gagne
     }
   }
 
@@ -1421,7 +1468,7 @@ static void updateMatch(float dt) {
       for (int z = 0; z < MAX_ZONE; z++) { if (zones[z].prog > 0) m += zones[z].prog; else n -= zones[z].prog; }
       matchResult = (m > n) ? 1 : ((m < n) ? -1 : 0);
     }
-    else matchResult = ffa ? (ents[humanIdx].alive ? 1 : -1) : 0;
+    else if (!ffa && mode != MODE_KO) matchResult = 0; // pas de limite de temps en solo/duo/KO : le poison decide
   }
 }
 
@@ -2280,6 +2327,7 @@ static void resultScreen(int result, int myBrawler) {
   const char *msg = (result == 1) ? "VICTOIRE!" : (result == 0) ? "EGALITE" : "DEFAITE";
   KDColor col = (result == 1) ? C_YEL : (result == 0) ? C_WHT : C_RED;
   bool opened = (starDrop <= 0); // pas de coffre si pas de star drop
+  int dropUnlock = -1; // star drop rare : peut debloquer un brawleur
   waitRelease();
   while (true) {
     bgPanel();
@@ -2299,20 +2347,23 @@ static void resultScreen(int result, int myBrawler) {
         oCirc(SW / 2, 126, 3, C_YEL, C_BLK);
         drawTextC(146, "APPUIE OK POUR OUVRIR", C_WHT);
       } else {
-        // coffre ouvert : pieces bonus tombent
+        // coffre ouvert : pieces bonus tombent (+ brawleur debloque si chanceux)
         fRect(SW / 2 - 18, 108, 36, 4, C_WHT);
         rRect(SW / 2 - 18, 112, 36, 26, 4, C_MAG);
         drawText(SW / 2 - 16, 120, "+", C_WHT);
         drawNum(SW / 2 - 8, 120, starDrop, C_CYN);
-        drawTextC(146, "PIECES BONUS!", C_CYN);
+        if (dropUnlock >= 0) {
+          drawTextC(146, "BRAWLER DEBLOQUE!", C_GOLD);
+          drawTextC(158, BRAWLERS[dropUnlock].name, C_YEL);
+        } else drawTextC(146, "PIECES BONUS!", C_CYN);
       }
     }
     if (newUnlock >= 0) {
       const BrawlerDef &d = BRAWLERS[newUnlock];
-      int ubY = (starDrop > 0) ? 158 : 148;
-      rRect(SW / 2 - 110, ubY, 220, 30, 8, KDColor::RGB24(RAR_COL[d.rar]));
-      drawTextC(ubY + 4, "NOUVEAU BRAWLER!", C_BLK);
-      drawTextC(ubY + 16, d.name, C_WHT);
+      int ubY = (starDrop > 0) ? ((dropUnlock >= 0 && opened) ? 166 : 158) : 148;
+      rRect(SW / 2 - 110, ubY, 220, 24, 8, KDColor::RGB24(RAR_COL[d.rar]));
+      drawTextC(ubY + 3, "NOUVEAU BRAWLER!", C_BLK);
+      drawTextC(ubY + 14, d.name, C_WHT);
     }
     rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
     drawTextC(196, opened ? "OK CONTINUER" : "OK OUVRIR", C_BLK);
@@ -2322,6 +2373,12 @@ static void resultScreen(int result, int myBrawler) {
       prevOK = true;
       if (opened) return;
       acc.coins += starDrop; // recompense ajoutee seulement a l'ouverture
+      // tres faible chance (4%) que le star drop debloque un brawleur
+      if (rnd(100) < 4) {
+        int locked[50], nl = 0;
+        for (int i = 0; i < 50; i++) if (!isUnlocked(i)) locked[nl++] = i;
+        if (nl > 0) { dropUnlock = locked[rnd(nl)]; acc.b[dropUnlock].level = 1; }
+      }
       saveAcc();
       opened = true;
     }

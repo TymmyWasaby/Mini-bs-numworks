@@ -606,6 +606,7 @@ static void refreshUnlocks(int *newlyUnlocked) {
   for (int i = 0; i < 50; i++) if (isUnlocked(i)) unlockedBrawlers++;
 }
 
+static void initQuests(); // prototype : definie plus bas, appelee par initAcc
 static void initAcc() {
   memset(&acc, 0, sizeof(acc));
   acc.coins = 100;

@@ -1037,6 +1037,7 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.nHits = 0;
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     p.bounce = ((e.brawlerIdx == 13 || e.brawlerIdx == 23) && !e.isPet) ? (e.brawlerIdx == 13 ? 3 : 1) : 0; // Rico rebondit 3x, Bibi 1x
+    if (!isSuper) spawnParts(e.x + cosf(ang) * 10, e.y + sinf(ang) * 10 - 4, 0, 2); // FLASH DE BOUCHE
     return;
   }
 }
@@ -1514,8 +1515,18 @@ static void updateAI(Ent &e, float dt) {
       if (fdx * fdx + fdy * fdy < 60 * 60) { wx = e.x + fdx * 2.0f; wy = e.y + fdy * 2.0f; break; }
     }
 
-  // ---------- 3) COMBAT : on tire a chaque occasion, en bougeant ----------
+  // ---------- 3) COMBAT : chaque classe joue comme un vrai joueur de son perso ----------
   float angT = e.aimAng;
+  // distance de confort selon la classe : un Tick ne FONCE pas sur une Shelly
+  bool lobber = (d.atk == ATK_LOB);                            // Barley, Dynamike, Tick... : bombardent de loin
+  bool sniper = (!lobber && d.atk == ATK_SHOT && d.projCount <= 1 && d.range >= 250); // Piper, Brock, Bea...
+  float keepDist = d.range * 0.55f;                           // par defaut : mi-distance
+  if (lobber) keepDist = d.range * 0.85f;                     // les lanceurs restent en arriere et arrosent
+  if (sniper) keepDist = d.range * 0.92f;                      // les snipers tirent de TRES loin
+  if (e.brawlerIdx == 50) keepDist = d.range * 0.97f;         // Piper : la reine du combat a distance
+  if (melee) keepDist = d.range * 0.35f;                      // les melees doivent coller pour exister
+  if (d.baseHP >= 6000 && !lobber) keepDist *= 0.85f;         // les tanks osent s'approcher
+  if (d.baseHP <= 4200) keepDist = fmaxf(keepDist, 175.0f);   // les fragiles gardent AU MOINS 175 px (Tick, Shelly...)
   if (tgt) {
     angT = atan2f(tgt->y - e.y, tgt->x - e.x);
     // PREDICTION : un vrai joueur anticipe le deplacement de sa cible (les bons le font mieux)
@@ -1529,15 +1540,16 @@ static void updateAI(Ent &e, float dt) {
       doAttack(e, angT + (rnd(100) / 100.0f - 0.5f) * err * 0.01745f);
       gLobRangeMul = -1.0f;
     }
-    // kite : les tireurs gardent leurs distances, les melees collent la cible
-    if (!melee && !low && ed < d.range * 0.5f) {
+    // placement par classe : trop pres pour NOTRE style -> on decroche en tirant
+    if (!melee && !low && ed < keepDist * 0.8f && ed < d.range) {
       float l = fmaxf(ed, 1);
       wx = e.x - (tgt->x - e.x) / l * 90; wy = e.y - (tgt->y - e.y) / l * 90;
     } else if (tgt && ed < d.range * 0.9f && !low) {
-      // STRAFE : on canarde en se decale lateralement, comme un joueur qui juke
+      // a bonne distance : on canarde en strafant, comme un joueur qui juke
       float side = ((e.walkT / 800) % 2) ? 1.5708f : -1.5708f;
       wx = e.x + cosf(angT + side) * 80; wy = e.y + sinf(angT + side) * 80;
     }
+    // sinon (cible trop loin) : on file a l'objectif, la rencontre viendra a nous
   }
   // IA porteuse du ballon : fonce au but, TIRE vers le but des qu'elle est a portee, et shoote les defenseurs
   if (mode == MODE_BALL && e.hasBall) {
@@ -1636,7 +1648,7 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
   if (!src.isPet && src.brawlerIdx == 20) chg = 100.0f; // Stu : UNE touche = super rechargee
   src.superCharge = fminf(100, src.superCharge + chg); // ~7 tirs reussis = ulti prete
   addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg);
-  spawnParts(e.x, e.y, 0, 3);
+  spawnParts(e.x, e.y, 0, 5); // etincelles d'impact plus visibles
 }
 
 // IA des creatures invoquees : ours/rats/pingouins melee, tourelle/ego tireurs, station de soin
@@ -1943,7 +1955,7 @@ static void updateMatch(float dt) {
           p.x -= p.vx * dt * 2; p.y -= p.vy * dt * 2; // on se degage du mur
         }
         else if (p.fromSuper) breakWalls(p.x, p.y, 16);
-        else { p.active = false; continue; }
+        else { spawnParts(p.x, p.y, 0, 3); p.active = false; continue; } // etincelles quand un tir se crase au mur
       }
     }
     if (mode == MODE_HEIST)
@@ -1983,10 +1995,10 @@ static void updateMatch(float dt) {
         }
         // Barley : le cocktail explose ET laisse une PETITE flaque qui brule 2 s
         if (ents[p.owner].brawlerIdx == 6 && !ents[p.owner].isPet)
-          spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner, 2.0f, 24.0f);
+          spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner, 2.0f, 28.0f);
         // Amber : flaque enflammee RENFORCEE mais qui disparait vite (1 s)
         else if (ents[p.owner].brawlerIdx == 43 && !ents[p.owner].isPet)
-          spawnFireZone(p.x, p.y, p.dmg * 0.7f, p.team, p.owner, 1.0f, 26.0f);
+          spawnFireZone(p.x, p.y, p.dmg * 0.7f, p.team, p.owner, 1.0f, 40.0f);
         int R = p.fromSuper ? 40 : 30;
         spawnParts(p.x, p.y, 0, 10);
         shakeT = 100; shakeMag = 2;
@@ -2498,6 +2510,18 @@ static void drawProj(Proj &p, int sx, int sy, int myTeam) {
     if ((animT / blink) % 2 == 0) oCirc(sx, sy, 3, C_YEL, C_BLK);
     else oCirc(sx, sy, 3, C_ORG, C_BLK);
     return;
+  }
+  // EFFET D'ARC : les projectiles lances (Barley, Dynamike...) montent puis retombent
+  if (p.lob && p.range > 1) {
+    float t = fminf(1.0f, p.travelled / p.range);
+    sy -= (int)(sinf(t * 3.14159f) * 14); // l'ombre au sol reste, le projectile decolle
+  }
+  // TRAINEE : 3 pixels qui s'estompent derriere le projectile
+  if (!p.lob) {
+    for (int tr = 1; tr <= 3; tr++) {
+      KDColor tc = (tr == 3) ? KDColor::RGB24(0x444444) : (tr == 2 ? c : c2);
+      px(sx - (int)(p.vx * 0.007f * tr), sy - (int)(p.vy * 0.007f * tr), tc);
+    }
   }
   switch (p.shape) {
     case 0: oCirc(sx, sy, p.radius + 1, c, C_BLK); break;

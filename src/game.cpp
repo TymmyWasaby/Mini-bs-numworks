@@ -254,7 +254,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Rosa",     6400, 1250, 120, 1500, 340, 3, 12, ATK_SPREAD, SUP_SHIELD,   GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
   {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
-  {"Tick",     3000, 1120, 260, 1500, 260, 3, 14, ATK_LOB,    SUP_SUMMON,   GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
+  {"Tick",     3000, 1120, 260, 1500, 260, 1,  0, ATK_LOB,    SUP_SUMMON,   GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
   {"8-Bit",    5800, 1350, 260, 2000, 330, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_DMG,   2,   880, 0xC9A03B, 0x8A6E22, 1},
   {"Rico",     4200, 1010, 260, 1500, 400, 5,  6, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   2,  1000, 0x3BC9B0, 0x228A78, 1},
   {"Darryl",   6300, 1460, 130, 1400, 380, 2, 14, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    2,  1150, 0xC96B3B, 0x8A4822, 0},
@@ -701,8 +701,23 @@ struct Proj {
   float x, y, vx, vy, dmg, travelled, range;
   int team, owner, radius, shape, spin;
   uint8_t hitIds[8]; int nHits; // pour les projectiles perforants : touche chaque cible une fois
+  float mineT; // >0 : mine posee au sol (attaque de Tick), explose au contact ou a la fin du delai
 };
 static Proj projs[MAX_PROJ];
+
+// zones au sol persistantes (cocktails de Barley) : degats toutes les 0.66 s pendant 2 s
+struct FireZone { bool active; float x, y, life, tickT, dmg; int team, owner; };
+static FireZone fireZones[8];
+static void spawnFireZone(float x, float y, float dmg, int team, int owner) {
+  for (int i = 0; i < 8; i++)
+    if (!fireZones[i].active) {
+      fireZones[i].active = true;
+      fireZones[i].x = x; fireZones[i].y = y; fireZones[i].dmg = dmg;
+      fireZones[i].team = team; fireZones[i].owner = owner;
+      fireZones[i].life = 2.0f; fireZones[i].tickT = 0.0f;
+      return;
+    }
+}
 static bool gPierceProj = false; // le prochain projectile perce tout (SUP_WAVE)
 static float gLobRangeMul = -1.0f; // <0 = portee max ; sinon le lob atterrit sur sa cible
 static bool gForceLob = false;     // force le prochain tir en lob (mines de Bo, grenades de Piper)
@@ -910,6 +925,7 @@ static void setupMatch(int selMode, int myBrawler) {
   for (int i = 0; i < MAX_PART; i++) parts[i].active = false;
   for (int i = 0; i < KILLFEED; i++) killfeed[i].alive = 0;
   for (int i = 0; i < 10; i++) gems[i].active = false;
+  for (int i = 0; i < 8; i++) fireZones[i].active = false;
   for (int i = 0; i < MAX_SAFE; i++) { safes[i].hp = 0; safes[i].maxHP = 0; }
   for (int i = 0; i < MAX_ZONE; i++) zones[i].prog = 0;
   genMap();
@@ -997,7 +1013,7 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.radius = isSuper ? 4 : 2;
     p.pierce = gPierceProj; if (p.pierce) p.radius = 7;
     p.nHits = 0;
-    p.shape = d.projShape; p.spin = 0;
+    p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     return;
   }
 }
@@ -1655,6 +1671,30 @@ static void updateMatch(float dt) {
     Proj &p = projs[i];
     if (!p.active) continue;
     p.spin += 30;
+    // mine posee (attaque de Tick) : attend 3 s ou explose au contact d'un ennemi
+    if (p.mineT > 0) {
+      p.mineT -= dt;
+      bool boom = (p.mineT <= 0);
+      if (!boom)
+        for (int j = 0; j < entCount && !boom; j++) {
+          Ent &t = ents[j];
+          if (!t.alive || t.team == p.team) continue;
+          float ddx = t.x - p.x, ddy = t.y - p.y;
+          if (ddx * ddx + ddy * ddy < 36 * 36) boom = true;
+        }
+      if (boom) {
+        spawnParts(p.x, p.y, 0, 10);
+        shakeT = 100; shakeMag = 2;
+        for (int j = 0; j < entCount; j++) {
+          Ent &t = ents[j];
+          if (!t.alive || t.team == p.team) continue;
+          float ddx = t.x - p.x, ddy = t.y - p.y;
+          if (ddx * ddx + ddy * ddy < 34 * 34) damageEnt(t, p.dmg, ents[p.owner]);
+        }
+        p.active = false;
+      }
+      continue;
+    }
     float nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
@@ -1684,6 +1724,28 @@ static void updateMatch(float dt) {
     // ennemis, puis explose en ZONE a l'atterrissage (comme dans Brawl Stars)
     if (p.lob) {
       if (p.travelled >= p.range) {
+        // Tick : sa tete atterrie eclate en 3 mines armees pendant 3 s
+        if (ents[p.owner].brawlerIdx == 11 && !p.fromSuper && !ents[p.owner].isPet) {
+          static const float mOff[3][2] = {{-12,-6},{12,-6},{0,10}};
+          for (int m = 0; m < 3; m++) {
+            for (int k = 0; k < MAX_PROJ; k++) {
+              if (projs[k].active) continue;
+              Proj &mp = projs[k];
+              mp.active = true; mp.lob = false; mp.fromSuper = false; mp.pierce = false;
+              mp.x = p.x + mOff[m][0]; mp.y = p.y + mOff[m][1];
+              mp.vx = mp.vy = 0; mp.dmg = p.dmg; mp.travelled = 0; mp.range = 0;
+              mp.team = p.team; mp.owner = p.owner; mp.radius = 3;
+              mp.nHits = 0; mp.shape = p.shape; mp.spin = 0; mp.mineT = 3.0f;
+              break;
+            }
+          }
+          spawnParts(p.x, p.y, 0, 6);
+          p.active = false;
+          continue;
+        }
+        // Barley : le cocktail explose ET laisse une flaque qui brule 2 s
+        if (ents[p.owner].brawlerIdx == 6 && !ents[p.owner].isPet)
+          spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner);
         int R = p.fromSuper ? 40 : 30;
         spawnParts(p.x, p.y, 0, 10);
         shakeT = 100; shakeMag = 2;
@@ -1722,6 +1784,30 @@ static void updateMatch(float dt) {
           p.active = false; break;
         }
       }
+    }
+  }
+
+  // zones au sol (Barley) : degats toutes les 0.66 s tant qu'on reste dedans
+  for (int i = 0; i < 8; i++) {
+    FireZone &z = fireZones[i];
+    if (!z.active) continue;
+    z.life -= dt;
+    if (z.life <= 0) { z.active = false; continue; }
+    z.tickT -= dt;
+    if (z.tickT <= 0) {
+      z.tickT = 0.66f;
+      for (int j = 0; j < entCount; j++) {
+        Ent &t = ents[j];
+        if (!t.alive || t.team == z.team || t.isPet) continue;
+        float ddx = t.x - z.x, ddy = t.y - z.y;
+        if (ddx * ddx + ddy * ddy < 40 * 40) damageEnt(t, z.dmg, ents[z.owner]);
+      }
+      if (mode == MODE_HEIST)
+        for (int s = 0; s < MAX_SAFE; s++) {
+          if (safes[s].hp <= 0 || safes[s].team == z.team) continue;
+          float ddx = safes[s].x - z.x, ddy = safes[s].y - z.y;
+          if (ddx * ddx + ddy * ddy < 50 * 50) { safes[s].hp -= z.dmg; addPop(safes[s].x, safes[s].y - 14, (int)z.dmg); }
+        }
     }
   }
 
@@ -2137,6 +2223,12 @@ static void drawEnt(Ent &e, int sx, int sy) {
 static void drawProj(Proj &p, int sx, int sy, int myTeam) {
   KDColor c = p.fromSuper ? C_PUR : (p.team == myTeam ? C_YEL : C_RED);
   KDColor c2 = p.fromSuper ? C_MAG : C_ORG;
+  if (p.mineT > 0) { // mine posee de Tick : clignote, plus vite quand elle va sauter
+    int blink = (p.mineT < 1.0f) ? 120 : 300;
+    if ((animT / blink) % 2 == 0) oCirc(sx, sy, 3, C_YEL, C_BLK);
+    else oCirc(sx, sy, 3, C_ORG, C_BLK);
+    return;
+  }
   switch (p.shape) {
     case 0: oCirc(sx, sy, p.radius + 1, c, C_BLK); break;
     case 1:
@@ -2243,6 +2335,17 @@ static void renderMatch() {
     drawEnt(e, sx, sy2);
   }
   for (int i = 0; i < entCount; i++) ents[i].drawDone = false;
+
+  // zones au sol (flaques de Barley)
+  for (int i = 0; i < 8; i++) {
+    FireZone &z = fireZones[i];
+    if (!z.active) continue;
+    int zx = (int)z.x - camX, zy = (int)z.y - camY;
+    if (zx < -50 || zx > SW + 50 || zy < -50 || zy > SH + 50) continue;
+    KDColor fc = (z.team == ents[humanIdx].team) ? C_YEL : C_ORG;
+    oCirc(zx, zy, 40, KDColor::RGB24(0x9A4A00), KDColor::RGB24(0x6A3200)); // flaque orange foncee
+    if ((animT / 200) % 2 == 0) fCirc(zx + rnd(60) - 30, zy + rnd(60) - 30, 2, fc); // flammes
+  }
 
   for (int i = 0; i < MAX_PROJ; i++)
     if (projs[i].active) {

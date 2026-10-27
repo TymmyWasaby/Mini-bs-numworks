@@ -1364,6 +1364,16 @@ static void drawHeroSprite(int cx, int cy, int r, int bIdx, int faceAng, bool fl
 }
 
 // dessine le sprite complet d'un brawler (corps + traits uniques)
+// V5.12 : structs de compte deplaces ici (acc utilise par le skin equipe ci-dessous)
+struct BrawlerAccount { int level, trophies; bool gadget, starPower, hyper; uint8_t gadChoice, starChoice; };
+struct Account { BrawlerAccount b[55]; int coins;
+  int matches, wins, losses, killsTotal; // carrieres (V5.10)
+  uint8_t skin[55];     // skin selectionne par brawler : 0 normal, 1 AZUR, 2 OR, 3 OMBRE
+  uint8_t skinOwned[7]; // bitmask 55 skins achetes
+  uint8_t emoteP, emoteM; // emote assignee aux touches + et - (0 = aucune)
+  char name[9];  // pseudo du joueur (V5.11)
+  int bestWave;  // record du mode SURVIE (V5.11)
+} acc;
 // walk : phase d'animation de marche (0 = immobile)
 static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0, int attackT = 0) {
   // les 55 brawlers ont un sprite dessine a la main (V5.8 : vague 6 + mega robot de Meg)
@@ -1451,15 +1461,7 @@ static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool
 }
 
 // ------------------------- Compte / progression ----------------------
-struct BrawlerAccount { int level, trophies; bool gadget, starPower, hyper; uint8_t gadChoice, starChoice; };
-struct Account { BrawlerAccount b[55]; int coins;
-  int matches, wins, losses, killsTotal; // carrieres (V5.10)
-  uint8_t skin[55];     // skin selectionne par brawler : 0 normal, 1 AZUR, 2 OR, 3 OMBRE
-  uint8_t skinOwned[7]; // bitmask 55 skins achetes
-  uint8_t emoteP, emoteM; // emote assignee aux touches + et - (0 = aucune)
-  char name[9];  // pseudo du joueur (V5.11)
-  int bestWave;  // record du mode SURVIE (V5.11)
-} acc;
+// V5.12 : struct BrawlerAccount/Account et la globale acc definis plus haut (avant drawBrawlerSprite)
 static int unlockedBrawlers = 0;
 
 // gadget/star equipe selon le choix du joueur

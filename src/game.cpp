@@ -1411,6 +1411,8 @@ static float nearestEnemyDist(Ent &e, Ent **out) {
   return sqrtf(best);
 }
 
+static void shootBall(Ent &e, float ang); // declaree ici : updateAI l'utilise avant sa definition
+
 static void updateAI(Ent &e, float dt) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   float sk = e.aiSkill;

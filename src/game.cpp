@@ -254,7 +254,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Rosa",     6400, 1250, 120, 1500, 340, 3, 12, ATK_SPREAD, SUP_SHIELD,   GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
   {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
-  {"Tick",     3000, 1120, 260, 1500, 260, 3, 14, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
+  {"Tick",     3000, 1120, 260, 1500, 260, 3, 14, ATK_LOB,    SUP_SUMMON,   GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
   {"8-Bit",    5800, 1350, 260, 2000, 330, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_DMG,   2,   880, 0xC9A03B, 0x8A6E22, 1},
   {"Rico",     4200, 1010, 260, 1500, 400, 5,  6, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   2,  1000, 0x3BC9B0, 0x228A78, 1},
   {"Darryl",   6300, 1460, 130, 1400, 380, 2, 14, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    2,  1150, 0xC96B3B, 0x8A4822, 0},
@@ -887,7 +887,7 @@ static void spawnPet(Ent &owner, int kind) {
   Ent &e = ents[entCount++];
   e.brawlerIdx = owner.brawlerIdx; e.accIdx = -1; e.team = owner.team;
   e.x = owner.x + cosf(owner.aimAng) * 22; e.y = owner.y + sinf(owner.aimAng) * 22;
-  e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 2200 : (kind == 4 ? 3000 : 2600))));
+  e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 2200 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
   e.hp = e.maxHP; e.ammo = 3; e.superCharge = 0; e.gadgetUses = 0;
   e.isHuman = false; e.alive = true; e.respawnT = 0;
   e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0;
@@ -899,7 +899,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.stealthT = 0; e.shieldT = 0; e.upStage = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
-  e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : 25.0f);
+  e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
 }
 
@@ -1072,6 +1072,7 @@ static void doSuper(Ent &e, float ang) {
     case SUP_SUMMON: { // creature invoquee (Nita ours, Jessie/8-Bit/Penny tourelle, Pam station, Ash rats, Lola ego, Mr. P pingouins)
       int kind = 1;
       if (e.brawlerIdx == 1) kind = 0; // Nita : ours
+      else if (e.brawlerIdx == 11) kind = 6; // Tick : sa tete-mine
       else if (e.brawlerIdx == 21) kind = 2; // Pam : station de soin
       else if (e.brawlerIdx == 32) kind = 3; // Ash : rats
       else if (e.brawlerIdx == 33) kind = 4; // Lola : ego tireur
@@ -1449,7 +1450,7 @@ static void teamGoal(int team) {
 static void damageEnt(Ent &e, float dmg, Ent &src) {
   if (e.shieldT > 0) dmg *= 0.35f; // carapace de Rosa active
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
-  src.superCharge = fminf(100, src.superCharge + (src.hyperT > 0 ? 3.5f : 2.0f));
+  src.superCharge = fminf(100, src.superCharge + (src.hyperT > 0 ? 20.0f : 14.0f)); // ~7 tirs reussis = ulti prete
   addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg);
   spawnParts(e.x, e.y, 0, 3);
 }
@@ -1482,6 +1483,23 @@ static void updatePet(Ent &e, float dt) {
       e.aimAng = e.faceAng = ang;
       fireProj(e, ang, false, 1.0f, 1.0f, 0.7f);
       e.attackT = 600;
+    }
+  } else if (e.petKind == 6) { // tete-mine de Tick : court vers l'ennemi et explose dessus
+    Ent *t = nullptr; float ed = nearestEnemyDist(e, &t);
+    if (t) {
+      float dx = t->x - e.x, dy = t->y - e.y;
+      if (ed > 30) { moveEnt(e, dx / ed * 130 * dt, dy / ed * 130 * dt); e.walkT += (int)(dt * 1000); }
+      if (ed < 34 && e.attackT <= 0) { // boum : gros degats en zone autour de la tete
+        for (int i = 0; i < entCount; i++) {
+          Ent &o = ents[i];
+          if (!o.alive || o.team == e.team || o.isPet) continue;
+          float ox2 = o.x - e.x, oy2 = o.y - e.y;
+          if (ox2 * ox2 + oy2 * oy2 < 55 * 55) damageEnt(o, 2400, ents[e.petOwner]);
+        }
+        shakeT = 250; shakeMag = 4;
+        spawnParts(e.x, e.y, 2, 12);
+        e.hp = 0; e.petLife = 0; e.attackT = 600; // la tete est detruite par son explosion
+      }
     }
   } else { // station de soin de Pam : regenere les allies proches
     for (int i = 0; i < entCount; i++) {
@@ -1906,6 +1924,7 @@ static void drawText(int x, int y, const char *s, KDColor c) {
     if (ch == ':') { fRect(x, y, 2, 2, c); fRect(x, y + 6, 2, 2, c); x += 8; continue; }
     if (ch == '.') { fRect(x, y + 8, 2, 2, c); x += 8; continue; }
     if (ch == '+') { fRect(x, y + 4, 8, 2, c); fRect(x + 3, y + 2, 2, 6, c); x += 12; continue; }
+    if (ch == '?') { fRect(x, y, 2, 4, c); fRect(x + 4, y, 2, 2, c); fRect(x + 2, y + 4, 2, 2, c); fRect(x + 2, y + 8, 2, 2, c); x += 10; continue; }
     if (ch >= 'A' && ch <= 'Z') {
       for (int r = 0; r < 5; r++) drawGlyphRow(x, y + r * 2, FONTA[ch - 'A'][r], 5, c);
     } else if (ch >= '0' && ch <= '9') drawDigit(x, y, ch - '0', c);
@@ -2057,6 +2076,11 @@ static void drawEnt(Ent &e, int sx, int sy) {
     } else if (e.petKind == 4) { // ego de Lola : mini clone aux couleurs du proprio
       drawBrawlerSprite(sx, by, 5, e.brawlerIdx, (int)e.faceAng, flash, e.walkT, e.attackT);
       fRing(sx, by, 7, tCol);
+    } else if (e.petKind == 6) { // tete-mine de Tick
+      fCirc(sx, by - 4, 7, flash ? C_WHT : tCol);
+      fRect(sx - 3, by - 7, 6, 2, C_WHT);
+      fCirc(sx - 3, by - 5, 1, C_BLK); fCirc(sx + 3, by - 5, 1, C_BLK);
+      fRing(sx, by - 4, 9 + (animT / 300) % 2, C_RED); // clignote : danger
     } else { // pingouins de Mr. P
       fCirc(sx, by - 3, 6, flash ? C_WHT : tCol);
       fRect(sx - 2, by - 2, 4, 4, C_WHT); // ventre
@@ -2093,6 +2117,13 @@ static void drawEnt(Ent &e, int sx, int sy) {
     arc(sx, by, 10, -1.5708f, -1.5708f + 6.2832f * e.superCharge / 100.0f, 2, C_PUR);
   }
   drawHPBar(sx, by - 15, e.hp, e.maxHP, e.isHuman ? C_GREEN : tCol, tColD);
+  // points de vie affiches au-dessus de la barre (comme dans Brawl Stars)
+  {
+    int hv = (int)(e.hp + 0.5f); if (hv < 0) hv = 0;
+    int digits = 1, tmp = hv;
+    while (tmp >= 10) { tmp /= 10; digits++; }
+    drawNum(sx - digits * 6, by - 29, hv, e.isHuman ? C_YEL : C_WHT);
+  }
   if (e.gems > 0) {
     fCirc(sx + 12, by - 12, 6, C_GREEN);
     drawNum(sx + 9, by - 14, e.gems, C_WHT);
@@ -2553,11 +2584,12 @@ static int brawlerPicker(int myBrawler) {
     for (int i = first; i < 55 && i < first + 11; i++) {
       int y = 30 + (i - first) * 15;
       bool un = isUnlocked(i);
-      if (i == sel) rRect(6, y - 3, 130, 14, 5, C_YEL);
+      // fond de ligne pour garantir le contraste des noms sur le panneau raye
+      rRect(6, y - 3, 138, 14, 5, (i == sel) ? C_YEL : KDColor::RGB24(0x241A4A));
       // mini-portrait
       drawBrawlerSprite(16, y + 3, 5, i, 90, false);
-      drawText(26, y, BRAWLERS[i].name, i == sel ? C_BLK : (un ? C_WHT : C_GRE));
-      if (!un) drawText(26 + textW(BRAWLERS[i].name) + 2, y, "?", C_GRE);
+      drawText(28, y, BRAWLERS[i].name, (i == sel) ? C_BLK : C_WHT);
+      if (!un) drawText(28 + textW(BRAWLERS[i].name) + 2, y, "?", (i == sel) ? C_BLK : C_GRE);
     }
 
     // grand portrait a droite avec cadre de rarete
@@ -2595,7 +2627,7 @@ static int brawlerPicker(int myBrawler) {
     animT += 100;
     pollKeys();
     if (kUp && !pU && sel > 0) sel--; // front montant seulement
-    if (kDown && !pD && sel < 49) sel++;
+    if (kDown && !pD && sel < 54) sel++;
     pU = kUp; pD = kDown;
     if (keyOK && !prevOK) { prevOK = true; return sel; }
     if (keyBack && !prevBack) { prevBack = true; return -1; }

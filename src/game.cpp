@@ -4,7 +4,7 @@
 //
 //  CONTROLES (V5.3) :
 //    Fleches : bouger | OK ou var : attaque vers la direction du perso
-//    RETOUR : ulti (super) | SHIFT : gadget | EFFACER : hypercharge
+//    RETOUR : ulti (super) | HOME : quitter le match (sans ecran de resultat)
 //    HOME : quitter le match | + * / - : achats dans le menu BRAWLERS
 //
 //  V5 : menu style Brawl Stars, front montants (plus de double-appui),
@@ -248,10 +248,10 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Colt",     4000,  940, 240, 1600, 420, 6,  8, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   0,     0, 0x3B9AC9, 0x22628A, 1},
   {"Bull",     6600, 1750, 100, 1900, 300, 5, 30, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    1,    60, 0xC9973B, 0x8A6622, 0},
   {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
-  {"El Primo", 6800, 1400,  90, 1300, 330, 4, 20, ATK_SPREAD, SUP_DASH,     GAD_HEAL,  STAR_HP,    1,   180, 0x3BA05C, 0x22663A, 0},
+  {"El Primo", 6800, 1400,  90, 1300, 330, 4,  0, ATK_SHOT,   SUP_DASH,     GAD_HEAL,  STAR_HP,    1,   180, 0x3BA05C, 0x22663A, 0},
   {"Barley",   3600, 1160, 240, 1700, 260, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 1,   240, 0x7BC93B, 0x4F8A22, 3},
   {"Poco",     5600, 1100, 200, 1400, 300, 3, 16, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 1,   300, 0xB03BE0, 0x7822A0, 1},
-  {"Rosa",     6400, 1250, 120, 1500, 340, 3, 12, ATK_SPREAD, SUP_SHIELD,   GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
+  {"Rosa",     6400, 1250, 120, 1500, 340, 3, 35, ATK_SPREAD, SUP_SHIELD,   GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
   {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
   {"Tick",     3000, 1120, 260, 1500, 260, 1,  0, ATK_LOB,    SUP_SUMMON,   GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
@@ -266,13 +266,13 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Stu",      3800, 1080, 220, 1300, 420, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_DMG,   3,  2350, 0xC93BA0, 0x8A2270, 2},
   {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_SUMMON,   GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
   {"Frank",    7400, 1800, 140, 2400, 260, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
-  {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_DASH,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
+  {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_WAVE,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
   {"Bea",      3600,  960, 270, 1500, 380, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   3,  3500, 0xE0C93B, 0xA08A22, 2},
-  {"Nani",     3400, 1420, 260, 1900, 340, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
+  {"Nani",     3400, 1420, 260, 1900, 340, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
   {"Edgar",    4200, 1050,  80, 1100, 380, 2, 10, ATK_SPREAD, SUP_DASH,     GAD_HEAL,  STAR_REGEN, 4,  4300, 0x3B3B50, 0x22223A, 0},
   {"Griff",    4900, 1080, 230, 1500, 360, 3,  8, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   4,  4700, 0xC9C93B, 0x8A8A22, 1},
   {"Gale",     5300, 1240, 200, 1600, 320, 3, 14, ATK_SPREAD, SUP_PUSH,     GAD_SPEED, STAR_HP,    4,  5100, 0x7BC9E0, 0x508A9B, 2},
-  {"Colette",  4800, 1300, 210, 1500, 330, 2,  6, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   4,  5500, 0xE05C9B, 0xA03E68, 1},
+  {"Colette",  4800, 1300, 210, 1500, 330, 2,  6, ATK_SHOT,   SUP_DASH, GAD_AMMO,  STAR_DMG,   4,  5500, 0xE05C9B, 0xA03E68, 1},
   {"Belle",    3900, 1150, 260, 1700, 350, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_SPEED, STAR_DMG,   4,  6000, 0x7B3BE0, 0x5022A0, 2},
   {"Buzz",     6100, 1380, 110, 1300, 370, 3, 18, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    4,  6500, 0x3BE0C9, 0x229B8A, 0},
   {"Ash",      6500, 1290, 180, 1700, 300, 4, 12, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_HP,    4,  7000, 0x9BA05C, 0x686A3A, 3},
@@ -288,7 +288,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Sandy",    4600, 1180, 240, 1600, 320, 3,  9, ATK_LOB,    SUP_STEALTH,  GAD_AMMO,  STAR_REGEN, 5, 13700, 0x7B7BE0, 0x5050A0, 2},
   {"Amber",    4800, 1090, 200, 1200, 340, 2,  4, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   5, 14600, 0xE0C95C, 0xA08A3E, 1},
   {"Gene",     4500, 1230, 250, 1700, 310, 1,  0, ATK_SHOT,   SUP_PULL,     GAD_HEAL,  STAR_REGEN, 5, 15500, 0x9B3BE0, 0x6822A0, 2},
-  {"Mortis",   5000, 1260, 150, 1300, 380, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_HP,    5, 16500, 0x3B3B5C, 0x22223E, 3},
+  {"Mortis",   5000, 1260, 150, 1300, 380, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_SPEED, STAR_HP,    5, 16500, 0x3B3B5C, 0x22223E, 3},
   {"Byron",    3900, 1050, 270, 1800, 340, 1,  0, ATK_SHOT,   SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 5, 17500, 0xC9C9C9, 0x8A8A8A, 2},
   {"Meg",      4100, 1150, 230, 1500, 330, 2,  9, ATK_SHOT,   SUP_MECH,     GAD_AMMO,  STAR_DMG,   5, 18600, 0xE03BC9, 0xA0228A, 1},
   {"Chester",  4600, 1210, 210, 1400, 350, 3, 11, ATK_SPREAD, SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   5, 19800, 0x5CC9E0, 0x3E8A9B, 0},
@@ -349,7 +349,7 @@ static const char *SUPER_NAMES[55] = {
   "METEOR PRIMO","ULTIME COCKTAIL","GUERISON ENCOREE","CARAPACE VEGETALE","SCRAPPY FURIEUX",
   "GRANDE DYNAMITE","MINE REJETEE","TOURELLE BOOSTEUSE","PLUIE RICOCHET","DOUBLE BARIL",
   "MORTIER","FURIE CARROUEL","SEISME TOTAL","TRIPLE MINE","SPRAY MASSIF",
-  "TURBO BURNOUT","STATION DE SOIN","MASSUE SEISME","BALLE FURIEUSE","ESSAIM GEANT",
+  "TURBO BURNOUT","STATION DE SOIN","MASSUE SEISME","GOMME FURIEUSE","ESSAIM GEANT",
   "PEEP AUTO","SAUT OMBREUX","PLUIE DE PIECES","BLIZZARD POLAIRE","PERCUTE TOUT",
   "MARQUE POSEE","TORPILLE SAISIE","RATS EN COLERE","EGO SURSCENE","SAVATE VOLANTE",
   "CHOC ARDENT","BLOB SPLITTEUR","BALLON MASTODONTE","FOURNAISE","ZONE EPINEUSE",
@@ -365,7 +365,7 @@ static const char *SUPER_DESC[55] = {
   "INVOQUE UNE TOURELLE","BALLES REBONDISSANTES","ROULE ET DEGONFLE",
   "INVOQUE UN CANON","CHARGE TOURNOYANTE","ASPIRE ET FRAPPE AUTOUR",
   "POSE TROIS MINES","SPRAY QUI RALENTIT","DASH VELOCE",
-  "STATION QUI SOIGNE","ONDE SEISMIQUE PERCENTE","CHARGE FRAPPE RECUL",
+  "STATION QUI SOIGNE","ONDE SEISMIQUE PERCENTE","BALLE GOMME QUI TRAVERSE TOUT",
   "ESSAIM PERCENT","BOMBE GUIDEE PEPP","SAUT SUR L ENNEMI",
   "PLUIE DE PIECES","BLIZZARD QUI REPOUSSE","CHARGE PERFIDE",
   "TIR MARQUEUR","SAISIT UN ENNEMI","INVOQUE DEUX RATS",
@@ -679,6 +679,8 @@ struct Ent {
   float regenT;
   float speedBuffT, hyperT, dashT, aimAng, faceAng;
   int dashDx, dashDy;
+  float boostT, boostCd; // Carl : super = boost 5 s qui blesse au passage
+  bool dashRet; // Colette : le dash fait un aller-retour
   int gems, goals, stars, kills;
   bool hasBall;
   int aiThinkT, aiWx, aiWy;
@@ -691,6 +693,8 @@ struct Ent {
   bool drawDone;
   bool isPet; int petOwner; uint8_t petKind; float petLife; // creature invoquee (0=ours 1=tourelle 2=station de soin)
   float stealthT, shieldT; // invisibilite (Leon/Sandy) et bouclier (Rosa)
+  float slowT; // ralenti (drones de Bea, spray d'Emz)
+  float atkCharge; // charge de Hank : maintenir l'attaque pour gonfler le ballon
   int upStage; // paliers de Surge
 };
 static Ent ents[MAX_ENT]; static int entCount = 0;
@@ -702,19 +706,21 @@ struct Proj {
   int team, owner, radius, shape, spin;
   uint8_t hitIds[8]; int nHits; // pour les projectiles perforants : touche chaque cible une fois
   float mineT; // >0 : mine posee au sol (attaque de Tick), explose au contact ou a la fin du delai
+  bool boomer, ret; // pic de Carl : boomerang qui revient vers son proprietaire
+  int bounce; // rebonds restants sur les murs (Rico)
 };
 static Proj projs[MAX_PROJ];
 
 // zones au sol persistantes (cocktails de Barley) : degats toutes les 0.66 s pendant 2 s
 struct FireZone { bool active; float x, y, life, tickT, dmg; int team, owner; };
 static FireZone fireZones[8];
-static void spawnFireZone(float x, float y, float dmg, int team, int owner) {
+static void spawnFireZone(float x, float y, float dmg, int team, int owner, float life = 2.0f) {
   for (int i = 0; i < 8; i++)
     if (!fireZones[i].active) {
       fireZones[i].active = true;
       fireZones[i].x = x; fireZones[i].y = y; fireZones[i].dmg = dmg;
       fireZones[i].team = team; fireZones[i].owner = owner;
-      fireZones[i].life = 2.0f; fireZones[i].tickT = 0.0f;
+      fireZones[i].life = life; fireZones[i].tickT = 0.0f;
       return;
     }
 }
@@ -880,9 +886,9 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.x = x; e.y = y;
   e.maxHP = d.baseHP * mul; e.hp = e.maxHP;
   e.ammo = 3; e.superCharge = 0;
-  e.gadgetUses = (accIdx >= 0 && !gad) ? 0 : 2;
+  e.gadgetUses = 0; // gadgets supprimes
   e.isHuman = human; e.alive = true; e.respawnT = 0;
-  e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0;
+  e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = (team == 0) ? 0 : 180;
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = rnd(500); e.aiWx = x; e.aiWy = y;
@@ -890,29 +896,36 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0;
-  e.stealthT = 0; e.shieldT = 0; e.upStage = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.atkCharge = 0; e.upStage = 0;
 }
 
 // invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
 static void spawnPet(Ent &owner, int kind) {
-  if (entCount >= MAX_ENT) return;
-  // une seule creature vivante par proprietaire, sauf les rats d'Ash (2 a la fois)
+  // recycle le slot d'une creature morte, sinon ajoute (les slots morts ne se liberent jamais)
+  int slot = -1;
+  for (int i = 0; i < entCount; i++)
+    if (ents[i].isPet && !ents[i].alive) { slot = i; break; }
+  if (slot < 0) {
+    if (entCount >= MAX_ENT) return;
+    slot = entCount++;
+  }
+  // une seule creature vivante par proprietaire, sauf les rats d'Ash (plusieurs a la fois)
   for (int i = 0; i < entCount; i++)
     if (ents[i].isPet && ents[i].petOwner == (&owner - ents) && ents[i].alive && (kind != 3 || ents[i].petKind != 3)) { ents[i].hp = 0; ents[i].petLife = 0; }
-  Ent &e = ents[entCount++];
+  Ent &e = ents[slot];
   e.brawlerIdx = owner.brawlerIdx; e.accIdx = -1; e.team = owner.team;
   e.x = owner.x + cosf(owner.aimAng) * 22; e.y = owner.y + sinf(owner.aimAng) * 22;
-  e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 2200 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
+  e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 900 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
   e.hp = e.maxHP; e.ammo = 3; e.superCharge = 0; e.gadgetUses = 0;
   e.isHuman = false; e.alive = true; e.respawnT = 0;
-  e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0;
+  e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = owner.aimAng;
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = 0; e.aiWx = e.x; e.aiWy = e.y;
   e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0; e.aiOnObj = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
-  e.stealthT = 0; e.shieldT = 0; e.upStage = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.atkCharge = 0; e.upStage = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
   e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
@@ -1011,9 +1024,11 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     if (p.lob && gLobRangeMul > 0) p.range = p.range * fminf(1.0f, gLobRangeMul); // atterrit sur la cible
     p.travelled = 0; p.team = e.team; p.owner = (&e - ents);
     p.radius = isSuper ? 4 : 2;
-    p.pierce = gPierceProj; if (p.pierce) p.radius = 7;
+    p.boomer = (!isSuper && e.brawlerIdx == 16); p.ret = false; // Carl : pic-boomerang
+    p.pierce = gPierceProj || p.boomer; if (p.pierce) p.radius = 7; // le pic de Carl traverse tout, aller et retour
     p.nHits = 0;
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
+    p.bounce = ((e.brawlerIdx == 13 || e.brawlerIdx == 23) && !e.isPet) ? (e.brawlerIdx == 13 ? 3 : 1) : 0; // Rico rebondit 3x, Bibi 1x
     return;
   }
 }
@@ -1028,18 +1043,38 @@ static void doAttack(Ent &e, float ang) {
   if (e.hyperT > 0) mul *= 1.25f;
   if (e.accIdx >= 0 && acc.b[e.accIdx].starPower && d.star == STAR_DMG) mul *= 1.1f;
   int n = d.projCount + e.upStage, spread = d.spreadDeg; // Surge : +1 balle par palier
+  // Hank : la charge accumulee gonfle le ballon (plus de degats, plus de portee)
+  float hm = 1.0f, hrm = 1.0f;
+  if ((e.brawlerIdx == 37 || e.brawlerIdx == 32) && !e.isPet) { // Hank / Ash : attaque a charge
+    float ch = fminf(1.2f, e.atkCharge);
+    hm = 1.0f + ch * 0.9f; hrm = 1.0f + ch * 0.45f;
+    e.atkCharge = 0;
+  }
+  // Mortis : chaque coup de pelle le propulse en avant
+  if (e.brawlerIdx == 45 && !e.isPet) { e.dashT = 0.15f; e.dashDx = (int)(cosf(ang) * 240); e.dashDy = (int)(sinf(ang) * 240); }
   if (n > 1 && d.atk == ATK_SHOT) {
     // tir en rafale (Colt, Rico, Bo...) : les balles partent l'une apres l'autre,
     // pas toutes d'un coup en eventail. La premiere part maintenant.
-    fireProj(e, ang, false, mul, 1.0f, 1.0f);
-    e.burstLeft = n - 1; e.burstAng = ang; e.burstMul = mul; e.burstTickT = 70;
+    fireProj(e, ang, false, mul * hm, 1.0f, hrm);
+    e.burstLeft = n - 1; e.burstAng = ang; e.burstMul = mul * hm; e.burstTickT = 70;
   } else {
     for (int i = 0; i < n; i++) {
       float a = ang + ((n > 1) ? (spread * 0.01745f * (i - (n - 1) / 2.0f)) : 0);
-      fireProj(e, a, false, mul, 1.0f, 1.0f);
+      fireProj(e, a, false, mul * hm, 1.0f, hrm);
     }
   }
   e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
+  // Lola : son ego tire au meme endroit qu'elle
+  if (e.brawlerIdx == 33 && !e.isPet) {
+    for (int i = 0; i < entCount; i++) {
+      Ent &g = ents[i];
+      if (g.alive && g.isPet && g.petKind == 4 && g.petOwner == (&e - ents)) {
+        fireProj(g, ang, false, mul * hm, 1.0f, 0.7f);
+        g.attackT = 150; g.aimAng = g.faceAng = ang;
+        break;
+      }
+    }
+  }
 }
 
 static void doSuper(Ent &e, float ang) {
@@ -1061,8 +1096,55 @@ static void doSuper(Ent &e, float ang) {
       for (int a = 0; a < 16; a++) fireProj(e, a * 0.3927f, true, mul * 0.6f, 1.2f, 0.5f);
       break;
     }
-    case SUP_DASH: { e.dashT = 0.35f; e.dashDx = (int)(cosf(ang) * 320); e.dashDy = (int)(sinf(ang) * 320); breakWalls(e.x, e.y, 40); break; } // charge qui defonce les murs (Bull, Darryl...)
+    case SUP_DASH: { // charge qui defonce les murs (Bull, Darryl, El Primo...)
+      if (e.brawlerIdx == 16) { // Carl : vitesse spectaculaire 5 s + degats en passant (casse PAS les murs)
+        e.speedBuffT = 5.0f; e.boostT = 5.0f; e.boostCd = 0;
+        spawnParts(e.x, e.y, 1, 10);
+      } else if (e.brawlerIdx == 20) { // Stu : dash fulgurant, casse PAS les murs
+        e.dashT = 0.25f; e.speedBuffT = 1.0f;
+        e.dashDx = (int)(cosf(ang) * 380); e.dashDy = (int)(sinf(ang) * 380);
+      } else if (e.brawlerIdx == 29) { // Colette : aller-retour, casse PAS les murs
+        e.dashT = 0.4f; e.dashRet = true;
+        e.dashDx = (int)(cosf(ang) * 330); e.dashDy = (int)(sinf(ang) * 330);
+      } else if (e.brawlerIdx == 34) { // Fang : le coup volant enchaine les ennemis proches
+        bool hit[MAX_ENT] = {};
+        for (int step = 0; step < 4; step++) {
+          int best = -1; float bd = 200.0f;
+          for (int j = 0; j < entCount; j++) {
+            Ent &o = ents[j];
+            if (!o.alive || o.isPet || o.team == e.team || hit[j]) continue;
+            float dx = o.x - e.x, dy = o.y - e.y;
+            float dd = sqrtf(dx * dx + dy * dy);
+            if (dd < bd) { bd = dd; best = j; }
+          }
+          if (best < 0) break;
+          hit[best] = true;
+          e.x = ents[best].x; e.y = ents[best].y;
+          damageEnt(ents[best], 1000.0f, e);
+          spawnParts(e.x, e.y, 0, 6);
+        }
+      } else {
+        e.dashT = 0.35f; e.dashDx = (int)(cosf(ang) * 320); e.dashDy = (int)(sinf(ang) * 320); breakWalls(e.x, e.y, 40);
+      }
+      break; }
     case SUP_HEAL: {
+      if (e.brawlerIdx == 38) { // Pearl : onde de choc - casse les murs proches et REPOUSSE (pas de soin)
+        breakWalls(e.x, e.y, 70);
+        for (int i = 0; i < entCount; i++) {
+          Ent &o = ents[i];
+          if (!o.alive || o.team == e.team) continue;
+          float dx = o.x - e.x, dy = o.y - e.y;
+          float dd = sqrtf(dx * dx + dy * dy);
+          if (dd < 130 && dd > 0.01f) {
+            o.x += dx / dd * 70; o.y += dy / dd * 70; // repousse
+            damageEnt(o, 500.0f, e);
+            spawnParts(o.x, o.y, 0, 4);
+          }
+        }
+        shakeT = 150; shakeMag = 3;
+        spawnParts(e.x, e.y, 2, 12);
+        break;
+      }
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].team == e.team) {
           float before = ents[i].hp;
@@ -1072,7 +1154,28 @@ static void doSuper(Ent &e, float ang) {
       break;
     }
     case SUP_BARRAGE: {
-      for (int i = 0; i < 8; i++) fireProj(e, ang + (rnd(30) - 15) * 0.01745f, true, mul, 1.0f, 1.3f);
+      // Barley : 5 bouteilles en eventail (au lieu de 8 au hasard)
+      if (e.brawlerIdx == 6) {
+        for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.13f, true, mul, 1.0f, 1.3f);
+      } else if (e.brawlerIdx == 10) {
+        // Dynamike : UNE giga-dynamite (degats x2.2, rayon d'explosion x2) - tres cher a charger
+        fireProj(e, ang, true, mul * 2.2f, 1.0f, 1.25f);
+        shakeT = 150; shakeMag = 3;
+      } else if (e.brawlerIdx == 37) {
+        // Hank : 8 projectiles en cercle ET regenere 30% de ses PV
+        for (int i = 0; i < 8; i++) fireProj(e, ang + i * 0.7854f, true, mul * 0.75f, 1.0f, 1.15f);
+        float before = e.hp;
+        e.hp = fminf(e.maxHP, e.hp + e.maxHP * 0.3f);
+        if (e.hp > before) addPop(e.x, e.y - 12, (int)(e.hp - before));
+        spawnParts(e.x, e.y, 1, 8);
+      } else if (e.brawlerIdx == 43) {
+        // Amber : barrage de flammes qui laisse des flaques enflammees (fortes mais courtes)
+        gForceLob = true;
+        for (int i = 0; i < 10; i++) fireProj(e, ang + (i - 4.5f) * 0.05f, true, mul * 0.55f, 1.4f, 1.15f);
+        gForceLob = false;
+      } else {
+        for (int i = 0; i < 8; i++) fireProj(e, ang + (rnd(30) - 15) * 0.01745f, true, mul, 1.0f, 1.3f);
+      }
       break;
     }
     case SUP_MEGASHOT: { // volée perceuse qui defonce les murs (Colt, Brock, Rico...)
@@ -1083,26 +1186,42 @@ static void doSuper(Ent &e, float ang) {
       gPierceProj = true;
       fireProj(e, ang, true, mul * 1.5f, 0.9f, 1.4f);
       gPierceProj = false;
+      if (e.brawlerIdx == 45) { // Mortis : son super le SOIGNE (35% des PV)
+        float before = e.hp;
+        e.hp = fminf(e.maxHP, e.hp + e.maxHP * 0.35f);
+        if (e.hp > before) addPop(e.x, e.y - 12, (int)(e.hp - before));
+        spawnParts(e.x, e.y, 1, 6);
+      }
       break;
     }
     case SUP_SUMMON: { // creature invoquee (Nita ours, Jessie/8-Bit/Penny tourelle, Pam station, Ash rats, Lola ego, Mr. P pingouins)
       int kind = 1;
       if (e.brawlerIdx == 1) kind = 0; // Nita : ours
       else if (e.brawlerIdx == 11) kind = 6; // Tick : sa tete-mine
+      else if (e.brawlerIdx == 25) kind = 6; // Nani : Peep, bombe qui fonce sur l'ennemi
+      else if (e.brawlerIdx == 12) kind = 7; // 8-Bit : tourelle BOOSTER (ne tire pas, booste les degats allies)
       else if (e.brawlerIdx == 21) kind = 2; // Pam : station de soin
       else if (e.brawlerIdx == 32) kind = 3; // Ash : rats
       else if (e.brawlerIdx == 33) kind = 4; // Lola : ego tireur
       else if (e.brawlerIdx == 54) kind = 5; // Mr. P : pingouin
       spawnPet(e, kind);
-      if (kind == 3) spawnPet(e, 3); // Ash invoque deux rats
+      if (kind == 3) { // Ash : remplace ses anciens rats par 8 rats faibles
+        for (int i = 0; i < entCount; i++)
+          if (ents[i].isPet && ents[i].petOwner == (&e - ents) && ents[i].petKind == 3 && ents[i].alive) { ents[i].hp = 0; ents[i].petLife = 0; }
+        for (int r = 0; r < 8; r++) spawnPet(e, 3);
+      }
       break;
     }
-    case SUP_STEALTH: { // invisibilite d'equipe (Leon, tempete de sable de Sandy)
+    case SUP_STEALTH: { // Leon : LUI SEUL devient invisible | Sandy : tempete de sable pour l'equipe proche
+      if (e.brawlerIdx == 41) {
+        e.stealthT = 8.0f; spawnParts(e.x, e.y, 1, 8);
+      } else {
       for (int i = 0; i < entCount; i++) {
         Ent &a = ents[i];
         if (!a.alive || a.team != e.team || a.isPet) continue;
         float dx = a.x - e.x, dy = a.y - e.y;
         if (dx * dx + dy * dy < 260 * 260) { a.stealthT = 8.0f; spawnParts(a.x, a.y, 1, 5); }
+      }
       }
       break;
     }
@@ -1146,10 +1265,25 @@ static void doSuper(Ent &e, float ang) {
       shakeT = 250; shakeMag = 4;
       break;
     }
-    case SUP_MINES: { // Bo : pose 3 hiboux-mines explosifs autour de sa visee
-      gForceLob = true;
-      for (int i = 0; i < 3; i++) fireProj(e, ang + (i - 1) * 0.4f, true, mul * 1.2f, 0.7f, 0.5f);
-      gForceLob = false;
+    case SUP_MINES: { // Bo : pose 3 mines INVISIBLES qui n'explosent que si un ennemi marche dessus
+      {
+        float cx = e.x + cosf(ang) * 110, cy = e.y + sinf(ang) * 110;
+        static const float mOff[3][2] = {{-18, 0}, {18, 0}, {0, 16}};
+        for (int m = 0; m < 3; m++) {
+          for (int k = 0; k < MAX_PROJ; k++) {
+            if (projs[k].active) continue;
+            Proj &mp = projs[k];
+            mp.active = true; mp.lob = false; mp.fromSuper = true; mp.pierce = false;
+            mp.x = cx + mOff[m][0]; mp.y = cy + mOff[m][1];
+            mp.vx = mp.vy = 0; mp.dmg = 1300.0f * mul; mp.travelled = 0; mp.range = 0;
+            mp.team = e.team; mp.owner = (&e - ents); mp.radius = 3;
+            mp.nHits = 0; mp.shape = 1; mp.spin = 0; mp.mineT = 15.0f;
+            mp.boomer = false; mp.ret = false; mp.bounce = 0;
+            break;
+          }
+        }
+        spawnParts(cx, cy, 0, 4);
+      }
       break;
     }
     case SUP_UPGRADE: { // Surge : palier suivant (+1 balle par tir, plus rapide)
@@ -1163,8 +1297,9 @@ static void doSuper(Ent &e, float ang) {
       spawnParts(e.x, e.y, 1, 10);
       break;
     }
-    case SUP_LEAP: { // Piper : bond arriere en laissant tomber des grenades
-      e.dashT = 0.35f; e.dashDx = (int)(-cosf(ang) * 340); e.dashDy = (int)(-sinf(ang) * 340);
+    case SUP_LEAP: { // Piper : bond vers sa direction de deplacement (plus d'arriere) + grenades
+      float ja = e.faceAng * 0.017453f; // faceAng suit la direction du deplacement
+      e.dashT = 0.35f; e.dashDx = (int)(cosf(ja) * 340); e.dashDy = (int)(sinf(ja) * 340);
       gForceLob = true;
       for (int i = 0; i < 4; i++) fireProj(e, ang + (rnd(30) - 15) * 0.01745f, true, mul * 0.7f, 0.8f, 0.45f);
       gForceLob = false;
@@ -1222,7 +1357,7 @@ static void doHypercharge(Ent &e) {
 // ------------------------- Clavier ------------------------------------
 // Commandes (V5.3, nouveau schema) :
 //   Fleches : bouger | OK ou var : attaque vers la direction du perso
-//   RETOUR (back) : ulti (super) | SHIFT : gadget | EFFACER : hypercharge
+//   RETOUR (back) : ulti (super) | HOME : quitter
 //   HOME : quitter le match. Le maintien de OK/var tire en continu.
 static bool keyOK, keyBack, prevOK, prevShift, prevMinus, prevBack;
 static bool kUp, kDown, kLeft, kRight, kShift, kBacksp, kHome, kMinus, kVar, kExp;
@@ -1235,8 +1370,8 @@ static void pollKeys() {
   kUp = st.keyDown(K::Up); kDown = st.keyDown(K::Down);
   kLeft = st.keyDown(K::Left); kRight = st.keyDown(K::Right);
   keyOK = st.keyDown(K::OK);
-  kShift = st.keyDown(K::Shift); // gadget
-  kBacksp = st.keyDown(K::Backspace) || st.keyDown(K::X); // hypercharge (effacer)
+  kShift = st.keyDown(K::Shift); // inutilise (gadgets supprimes)
+  kBacksp = st.keyDown(K::Backspace) || st.keyDown(K::X); // inutilise
   kHome = st.keyDown(K::Home);
   kVar = st.keyDown(K::Var);
   kExp = st.keyDown(K::Toolbox) || st.keyDown(K::EXE); // alias d'attaque
@@ -1352,7 +1487,7 @@ static void updateAI(Ent &e, float dt) {
   // ---------- 2) SURVIE : on decroche quand on est trop amoché ----------
   bool low = e.hp < e.maxHP * (0.38f - 0.15f * sk);
   float wx = e.aiWx, wy = e.aiWy;
-  if (low && tgt && ed < 240 && e.gadgetUses <= 0) {
+  if (low && tgt && ed < 240) {
     // repli vers son coin de depart en tirant en reculant si possible
     wx = (e.team == 0) ? 30 : MAPW * TILE - 30;
     wy = MAPH * TILE / 2 + (rnd(120) - 60);
@@ -1364,13 +1499,24 @@ static void updateAI(Ent &e, float dt) {
     int ddx = e.x - cx, ddy = e.y - cy;
     if (ddx * ddx + ddy * ddy > (soloShrink - 40) * (soloShrink - 40)) { wx = cx; wy = cy; }
   }
+  // fuir les flaques ennemies (Barley, Amber...) : un joueur ne reste pas dans le feu
+  for (int fz = 0; fz < 8; fz++)
+    if (fireZones[fz].active && fireZones[fz].team != e.team) {
+      float fdx = e.x - fireZones[fz].x, fdy = e.y - fireZones[fz].y;
+      if (fdx * fdx + fdy * fdy < 60 * 60) { wx = e.x + fdx * 2.0f; wy = e.y + fdy * 2.0f; break; }
+    }
 
   // ---------- 3) COMBAT : on tire a chaque occasion, en bougeant ----------
   float angT = e.aimAng;
   if (tgt) {
     angT = atan2f(tgt->y - e.y, tgt->x - e.x);
+    // PREDICTION : un vrai joueur anticipe le deplacement de sa cible (les bons le font mieux)
+    float lead = sk * 0.8f * ed / fmaxf(d.projSpeed, 100.0f);
+    float tvx = cosf(tgt->faceAng * 0.017453f) * 88.0f, tvy = sinf(tgt->faceAng * 0.017453f) * 88.0f;
+    angT = atan2f(tgt->y + tvy * lead - e.y, tgt->x + tvx * lead - e.x);
     float err = (1.0f - sk) * 12.0f;
     if (ed < d.range * 0.95f && e.ammo >= 1 && e.attackT <= 0 && !(mode == MODE_BALL && e.hasBall)) {
+      if (e.brawlerIdx == 37 || e.brawlerIdx == 32) e.atkCharge = 0.4f + rnd(70) / 100.0f; // l'IA (Hank/Ash) charge un peu au hasard
       if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
       doAttack(e, angT + (rnd(100) / 100.0f - 0.5f) * err * 0.01745f);
       gLobRangeMul = -1.0f;
@@ -1379,8 +1525,10 @@ static void updateAI(Ent &e, float dt) {
     if (!melee && !low && ed < d.range * 0.5f) {
       float l = fmaxf(ed, 1);
       wx = e.x - (tgt->x - e.x) / l * 90; wy = e.y - (tgt->y - e.y) / l * 90;
-    } else if (tgt && e.aiOnObj && ed < d.range * 0.85f) {
-      wx = e.aiWx; wy = e.aiWy; // on reste sur l'objectif en canardant
+    } else if (tgt && ed < d.range * 0.9f && !low) {
+      // STRAFE : on canarde en se decale lateralement, comme un joueur qui juke
+      float side = ((e.walkT / 800) % 2) ? 1.5708f : -1.5708f;
+      wx = e.x + cosf(angT + side) * 80; wy = e.y + sinf(angT + side) * 80;
     }
   }
   // IA porteuse du ballon : fonce au but ET shoote sur les defenseurs proches
@@ -1405,8 +1553,8 @@ static void updateAI(Ent &e, float dt) {
         if (tgt && ed < d.range * 1.2f) { doSuper(e, angT); done = true; } break;
       case SUP_HASTE: case SUP_UPGRADE: case SUP_HEAL:
         if (rnd(100) < 25) { doSuper(e, angT); done = true; } break;
-      default: // supers d'attaque : seulement a portee d'une cible
-        if (tgt && ed < d.range) {
+      default: // supers d'attaque : seulement a portee d'une cible, et pas claques a la va-vite
+        if (tgt && ed < d.range && rnd(100) < 55 + 35 * sk) {
           if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
           doSuper(e, angT); gLobRangeMul = -1.0f; done = true;
         }
@@ -1415,18 +1563,14 @@ static void updateAI(Ent &e, float dt) {
     (void)done;
   }
 
-  // ---------- 5) GADGET : defensif si blesse, offensif si l'ennemi colle ----------
-  if (e.gadgetUses > 0 && e.attackT <= 0) {
-    if (e.hp < e.maxHP * 0.35f) doGadget(e);
-    else if (d.gad == GAD_BLAST && tgt && ed < 70 && sk > 0.3f) doGadget(e);
-    else if (d.gad == GAD_SPEED && low && tgt && ed < 200) doGadget(e);
-  }
-
-  // ---------- 6) DEPLACEMENT ----------
+  // ---------- 5) DEPLACEMENT ----------
   float dx = wx - e.x, dy = wy - e.y;
   float len = sqrtf(dx * dx + dy * dy);
   if (len > 10) {
-    float sp = 90 + 30 * sk;
+    float sp = 72 + 24 * sk;
+    if (e.speedBuffT > 0) sp *= 1.3f; // boost de vitesse (super de Carl, Max, Stu...)
+    if (e.boostT > 0) sp *= 1.7f; // super de Carl
+    if (e.slowT > 0) sp *= 0.6f;
     float ox = e.x, oy = e.y;
     moveEnt(e, dx / len * sp * dt, dy / len * sp * dt);
     e.walkT += (int)(dt * 1000);
@@ -1465,8 +1609,18 @@ static void teamGoal(int team) {
 }
 static void damageEnt(Ent &e, float dmg, Ent &src) {
   if (e.shieldT > 0) dmg *= 0.35f; // carapace de Rosa active
+  // tourelle booster de 8-Bit : +30% degats pour les allies proches d'elle
+  for (int i = 0; i < entCount; i++) {
+    Ent &b = ents[i];
+    if (!b.alive || !b.isPet || b.petKind != 7 || b.team != src.team) continue;
+    float bx = b.x - src.x, by = b.y - src.y;
+    if (bx * bx + by * by < 220 * 220) { dmg *= 1.3f; break; }
+  }
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
-  src.superCharge = fminf(100, src.superCharge + (src.hyperT > 0 ? 20.0f : 14.0f)); // ~7 tirs reussis = ulti prete
+  float chg = (src.hyperT > 0) ? 20.0f : 14.0f;
+  if (!src.isPet && src.brawlerIdx == 10) chg = 7.0f; // Dynamike : la giga-dynamite est TRES cher (15 touches)
+  if (!src.isPet && src.brawlerIdx == 20) chg = 100.0f; // Stu : UNE touche = super rechargee
+  src.superCharge = fminf(100, src.superCharge + chg); // ~7 tirs reussis = ulti prete
   addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg);
   spawnParts(e.x, e.y, 0, 3);
 }
@@ -1477,7 +1631,7 @@ static void updatePet(Ent &e, float dt) {
   if (e.petLife <= 0) { e.hp = 0; return; } // expiration : part en particules via le bloc de mort
   if (e.petKind == 0 || e.petKind == 3 || e.petKind == 5) { // chasseurs au corps a corps (ours, rats, pingouin)
     float spd = (e.petKind == 3) ? 200.0f : ((e.petKind == 5) ? 170.0f : 150.0f);
-    float dmg = (e.petKind == 3) ? 550.0f : ((e.petKind == 5) ? 700.0f : 950.0f);
+    float dmg = (e.petKind == 3) ? 400.0f : ((e.petKind == 5) ? 700.0f : 950.0f);
     Ent *t = nullptr; nearestEnemyDist(e, &t);
     if (t) {
       float dx = t->x - e.x, dy = t->y - e.y, l = sqrtf(dx * dx + dy * dy);
@@ -1488,12 +1642,15 @@ static void updatePet(Ent &e, float dt) {
         e.attackT = 500;
       }
     }
-  } else if (e.petKind == 1 || e.petKind == 4) { // tireurs : tourelle immobile, ego de Lola mobile
-    Ent *t = nullptr; float ed = nearestEnemyDist(e, &t);
-    if (e.petKind == 4 && t && ed > 220) { // l'ego avance pour rester a portee
-      float dx = t->x - e.x, dy = t->y - e.y;
-      moveEnt(e, dx / ed * 120 * dt, dy / ed * 120 * dt); e.walkT += (int)(dt * 1000);
+  } else if (e.petKind == 4) { // ego de Lola : colle a sa maitresse et tire quand elle tire (doAttack)
+    Ent &ow = ents[e.petOwner];
+    if (ow.alive) {
+      float dx = ow.x - e.x, dy = ow.y - e.y, l = sqrtf(dx * dx + dy * dy);
+      if (l > 36) { moveEnt(e, dx / l * 200 * dt, dy / l * 200 * dt); e.walkT += (int)(dt * 1000); }
+      e.aimAng = e.faceAng = ow.aimAng; // meme visee que Lola
     }
+  } else if (e.petKind == 1) { // tourelle (Jessie, Penny) : immobile, tire toute seule
+    Ent *t = nullptr; float ed = nearestEnemyDist(e, &t);
     if (t && ed < 260 && e.attackT <= 0 && e.ammo >= 1) {
       float ang = atan2f(t->y - e.y, t->x - e.x);
       e.aimAng = e.faceAng = ang;
@@ -1517,6 +1674,8 @@ static void updatePet(Ent &e, float dt) {
         e.hp = 0; e.petLife = 0; e.attackT = 600; // la tete est detruite par son explosion
       }
     }
+  } else if (e.petKind == 7) { // tourelle booster de 8-Bit : immobile, ne tire pas
+    // l'effet (+30% degats pour les allies proches) est applique dans damageEnt
   } else { // station de soin de Pam : regenere les allies proches
     for (int i = 0; i < entCount; i++) {
       Ent &a = ents[i];
@@ -1558,30 +1717,40 @@ static void updateMatch(float dt) {
 
   Ent &me = ents[humanIdx];
   pollKeys();
-  if (kHome) { matchResult = 0; return; } // HOME quitte le match (RETOUR sert d'ulti)
+  if (kHome) { matchResult = 2; return; } // HOME quitte : pas d.ecran de resultat (matchResult=2 = abandon)
   if (me.alive) {
-    float spd = 110.0f;
+    float spd = 88.0f;
     if (me.speedBuffT > 0) spd *= 1.3f;
+    if (me.boostT > 0) spd *= 1.7f; // super de Carl : vitesse spectaculaire
     if (me.hyperT > 0) spd *= 1.15f;
+    if (me.slowT > 0) spd *= 0.6f;
     const BrawlerDef &d = BRAWLERS[me.brawlerIdx];
     if (me.accIdx >= 0 && acc.b[me.accIdx].starPower && d.star == STAR_SPEED) spd *= 1.1f;
     float dx = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
     float dy = (kDown ? 1 : 0) - (kUp ? 1 : 0);
     if (dx || dy) { float l = sqrtf(dx * dx + dy * dy); moveEnt(me, dx / l * spd * dt, dy / l * spd * dt); }
     // --- Commandes V5.3 : OK/var = attaque vers la direction du perso,
-    //     RETOUR = ulti, SHIFT = gadget, EFFACER = hypercharge, HOME = quitter ---
-    if (kBacksp && !prevBacksp) doHypercharge(me);
-    bool shotGad = kShift && !prevShift;
+    //     RETOUR = ulti, HOME = quitter (sans ecran de resultat) ---
     bool shotUlti = keyBack && !prevBack;
     bool shotAtk = (keyOK && !prevOK) || (kVar && !prevVar) || (kExp && !prevExp);
     // maintien de OK/var/menu = tir continu (respecte le cooldown d'attaque)
     if (me.attackT <= 0 && me.ammo >= 1 && (keyOK || kVar || kExp)) shotAtk = true;
+    // Hank : maintenir OK gonfle son ballon, relacher (ou charge max) pour tirer
+    if (me.brawlerIdx == 37 || me.brawlerIdx == 32) { // Hank / Ash : maintenir pour charger
+      if ((keyOK || kVar || kExp) && me.ammo >= 1) {
+        shotAtk = false;
+        me.atkCharge += dt;
+        if (me.atkCharge >= 1.2f && me.attackT <= 0) { me.atkCharge = 1.2f; shotAtk = true; } // pleine charge : boum
+      } else if (me.atkCharge > 0) {
+        if (me.attackT <= 0 && me.ammo >= 1) shotAtk = true; // relachement : on lance
+        else me.atkCharge = 0;
+      }
+    }
     // le tir va vers la direction du perso ; a l'arret, vers l'ennemi le plus proche
     Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
     float ang = (dx || dy) ? atan2f(dy, dx)
               : (tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : me.aimAng);
     if (shotUlti) { if (me.superCharge >= 100) doSuper(me, ang); }
-    if (shotGad) doGadget(me);
     if (shotAtk) {
       if (mode == MODE_BALL && me.hasBall) {
         shootBall(me, ang); // on tire le ballon au lieu d'attaquer
@@ -1612,6 +1781,7 @@ static void updateMatch(float dt) {
     if (e.speedBuffT > 0) e.speedBuffT -= dt;
     if (e.stealthT > 0) e.stealthT -= dt;
     if (e.shieldT > 0) e.shieldT -= dt;
+    if (e.slowT > 0) e.slowT -= dt;
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
     if (e.attackT > 0) e.attackT -= (int)(dt * 1000);
@@ -1619,18 +1789,34 @@ static void updateMatch(float dt) {
     if (e.burstLeft > 0) {
       e.burstTickT -= (int)(dt * 1000);
       if (e.burstTickT <= 0) {
-        fireProj(e, e.burstAng, false, e.burstMul, 1.0f, 1.0f);
+        fireProj(e, e.burstAng, false, e.burstMul, 1.0f, e.burstMul > 1.9f ? 1.55f : 1.0f); // rafale chargee de Hank : portee etendue
         e.burstLeft--; e.burstTickT = 70;
       }
     }
     if (e.dashT > 0) {
       e.dashT -= dt;
-      breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
+      if (e.dashT <= 0 && e.dashRet) { // Colette : demi-tour, elle revient d'ou elle vient
+        e.dashRet = false; e.dashT = 0.4f; e.dashDx = -e.dashDx; e.dashDy = -e.dashDy;
+      }
+      // seuls les dashs "classiques" (Bull, Darryl, El Primo...) defoncent les murs
+      if (e.brawlerIdx != 20 && e.brawlerIdx != 29 && e.brawlerIdx != 50)
+        breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
       moveEnt(e, e.dashDx * dt, e.dashDy * dt);
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team) {
           float ddx = ents[j].x - e.x, ddy = ents[j].y - e.y;
           if (ddx * ddx + ddy * ddy < 20 * 20) damageEnt(ents[j], 2200, e);
+        }
+    }
+    // Carl booste : il blesse les ennemis qu'il traverse pendant 5 s
+    if (e.boostT > 0) {
+      e.boostT -= dt; e.boostCd -= dt;
+      if (e.boostCd <= 0)
+        for (int j = 0; j < entCount; j++) {
+          Ent &o = ents[j];
+          if (!o.alive || o.team == e.team) continue;
+          float dx = o.x - e.x, dy = o.y - e.y;
+          if (dx * dx + dy * dy < 26 * 26) { damageEnt(o, 900.0f, e); e.boostCd = 0.35f; break; }
         }
     }
     const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
@@ -1698,13 +1884,51 @@ static void updateMatch(float dt) {
     float nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
-    if (!p.lob && p.travelled > p.range) { p.active = false; continue; } // le lob, lui, explose (voir plus bas)
+    if (!p.lob && p.travelled > p.range) {
+      if (p.boomer && !p.ret) { // le pic de Carl fait demi-tour : il revient comme un boomerang
+        p.ret = true; p.nHits = 0; p.travelled = 0;
+      } else if (!p.fromSuper && ents[p.owner].brawlerIdx == 44 && !ents[p.owner].isPet) {
+        // Gene : sa boule n'a touche personne -> elle eclate en eventail de 5 eclats
+        float fa = atan2f(p.vy, p.vx);
+        for (int s = 0; s < 5; s++) {
+          for (int k = 0; k < MAX_PROJ; k++) {
+            if (projs[k].active) continue;
+            Proj &sp = projs[k];
+            sp.active = true; sp.lob = false; sp.fromSuper = false; sp.pierce = false;
+            sp.x = p.x; sp.y = p.y;
+            float a2 = fa + (s - 2) * 0.16f;
+            sp.vx = cosf(a2) * 260; sp.vy = sinf(a2) * 260;
+            sp.dmg = p.dmg * 0.35f; sp.range = 90; sp.travelled = 0;
+            sp.team = p.team; sp.owner = p.owner; sp.radius = 2;
+            sp.nHits = 0; sp.shape = 0; sp.spin = 0; sp.mineT = 0;
+            sp.boomer = false; sp.ret = false; sp.bounce = 0;
+            break;
+          }
+        }
+        spawnParts(p.x, p.y, 0, 5);
+        p.active = false; continue;
+      } else { p.active = false; continue; }
+    }
+    if (p.ret) { // retour vers Carl : peut toucher d'autres cibles au passage
+      float bdx = ents[p.owner].x - p.x, bdy = ents[p.owner].y - p.y;
+      float bl = sqrtf(bdx * bdx + bdy * bdy);
+      if (bl < 12 || !ents[p.owner].alive) { p.active = false; continue; }
+      float bsp = sqrtf(p.vx * p.vx + p.vy * p.vy);
+      p.vx = bdx / bl * bsp; p.vy = bdy / bl * bsp;
+    }
     // anti-tunneling : milieu du pas teste aussi. Les supers perceurs cassent
     // les murs a l'impact (Colt, Brock, Rico...), les tirs normaux s'y arretent.
-    if (!p.lob) {
+    if (!p.lob && !p.boomer) {
       bool hitWall = solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f);
       if (hitWall) {
-        if (p.fromSuper) breakWalls(p.x, p.y, 16);
+        if (p.bounce > 0) { // Rico : demi-tour sur le mur, la balle continue
+          p.bounce--;
+          p.range += 100; // le rebond prolonge la portee
+          if (solidAt(p.x + p.vx * dt, p.y)) p.vx = -p.vx; // mur vertical : rebond horizontal
+          else p.vy = -p.vy;
+          p.x -= p.vx * dt * 2; p.y -= p.vy * dt * 2; // on se degage du mur
+        }
+        else if (p.fromSuper) breakWalls(p.x, p.y, 16);
         else { p.active = false; continue; }
       }
     }
@@ -1746,9 +1970,15 @@ static void updateMatch(float dt) {
         // Barley : le cocktail explose ET laisse une flaque qui brule 2 s
         if (ents[p.owner].brawlerIdx == 6 && !ents[p.owner].isPet)
           spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner);
+        // Amber : flaque enflammee RENFORCEE mais qui disparait vite (1 s)
+        else if (ents[p.owner].brawlerIdx == 43 && !ents[p.owner].isPet)
+          spawnFireZone(p.x, p.y, p.dmg * 0.7f, p.team, p.owner, 1.0f);
         int R = p.fromSuper ? 40 : 30;
         spawnParts(p.x, p.y, 0, 10);
         shakeT = 100; shakeMag = 2;
+        if (p.fromSuper && ents[p.owner].brawlerIdx == 10) { // giga-dynamite : rayon double + gros screen shake
+          R = 80; shakeT = 200; shakeMag = 4; spawnParts(p.x, p.y, 0, 20);
+        }
         for (int j = 0; j < entCount; j++) {
           Ent &t = ents[j];
           if (!t.alive || t.team == p.team) continue;
@@ -1773,15 +2003,27 @@ static void updateMatch(float dt) {
       if (!t.alive || t.team == p.team) continue;
       float ddx = t.x - p.x, ddy = t.y - p.y;
       if (ddx * ddx + ddy * ddy < (p.radius + 7) * (p.radius + 7)) {
+        float dm = p.dmg;
+        // Piper : plus la cible est loin, plus ca fait mal (x0.5 a bout portant, x1.5 a portee max)
+        if (ents[p.owner].brawlerIdx == 50)
+          dm *= 0.5f + fminf(1.0f, p.travelled / fmaxf(1.0f, p.range));
+        // drones de Bea / spray d'Emz (super) : la cible est ralentie
+        if (p.fromSuper && (ents[p.owner].brawlerIdx == 24 || ents[p.owner].brawlerIdx == 19)) t.slowT = 2.5f;
         if (p.pierce) { // onde perforante : chaque cible touchee une seule fois
           bool already = false;
           for (int k = 0; k < p.nHits; k++) if (p.hitIds[k] == j) { already = true; break; }
           if (already) continue;
           if (p.nHits < 8) p.hitIds[p.nHits++] = j;
-          damageEnt(t, p.dmg, ents[p.owner]);
+          damageEnt(t, dm, ents[p.owner]);
         } else {
-          damageEnt(t, p.dmg, ents[p.owner]);
+          damageEnt(t, dm, ents[p.owner]);
           p.active = false; break;
+        }
+        // Edgar : chaque coup qui touche lui rend de la vie
+        if (ents[p.owner].brawlerIdx == 26 && ents[p.owner].alive) {
+          float before = ents[p.owner].hp;
+          ents[p.owner].hp = fminf(ents[p.owner].maxHP, ents[p.owner].hp + dm * 0.35f);
+          if ((int)ents[p.owner].hp != (int)before) addPop(ents[p.owner].x, ents[p.owner].y - 12, (int)(ents[p.owner].hp - before));
         }
       }
     }
@@ -2167,6 +2409,11 @@ static void drawEnt(Ent &e, int sx, int sy) {
       fRect(sx - 3, by - 7, 6, 2, C_WHT);
       fCirc(sx - 3, by - 5, 1, C_BLK); fCirc(sx + 3, by - 5, 1, C_BLK);
       fRing(sx, by - 4, 9 + (animT / 300) % 2, C_RED); // clignote : danger
+    } else if (e.petKind == 7) { // tourelle booster de 8-Bit : ne tire pas, aura de boost
+      fRect(sx - 7, by, 14, 5, tColD);
+      fRect(sx - 5, by - 6, 10, 7, flash ? C_WHT : tCol);
+      fCirc(sx - 3, by - 4, 1, C_YEL); fCirc(sx + 3, by - 4, 1, C_YEL);
+      fRing(sx, by - 2, 12 + (animT / 300) % 3, C_YEL); // aura de degats boosts
     } else { // pingouins de Mr. P
       fCirc(sx, by - 3, 6, flash ? C_WHT : tCol);
       fRect(sx - 2, by - 2, 4, 4, C_WHT); // ventre
@@ -2185,7 +2432,6 @@ static void drawEnt(Ent &e, int sx, int sy) {
   }
 
   shadow(sx, sy + 7, 7, 3);
-  if (e.hyperT > 0) { fRing(sx, sy, 12, C_MAG); fRing(sx, sy, 13 + (animT / 80) % 2, C_PUR); }
   drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash, e.walkT, e.attackT);
   arc(sx, by, 8, 3.34f, 6.08f, 2, tCol);
   int gx = (int)(cosf(e.aimAng) * 9), gy = (int)(sinf(e.aimAng) * 9);
@@ -2210,6 +2456,11 @@ static void drawEnt(Ent &e, int sx, int sy) {
     while (tmp >= 10) { tmp /= 10; digits++; }
     drawNum(sx - digits * 6, by - 29, hv, e.isHuman ? C_YEL : C_WHT);
   }
+  // jauge de charge de Hank : le ballon gonfle tant qu'on maintient l'attaque
+  if (e.isHuman && e.atkCharge > 0) {
+    fRect(sx - 11, by - 42, 22, 5, C_BLK);
+    fRect(sx - 10, by - 41, (int)(20 * fminf(1.2f, e.atkCharge) / 1.2f), 3, C_ORG);
+  }
   if (e.gems > 0) {
     fCirc(sx + 12, by - 12, 6, C_GREEN);
     drawNum(sx + 9, by - 14, e.gems, C_WHT);
@@ -2223,7 +2474,8 @@ static void drawEnt(Ent &e, int sx, int sy) {
 static void drawProj(Proj &p, int sx, int sy, int myTeam) {
   KDColor c = p.fromSuper ? C_PUR : (p.team == myTeam ? C_YEL : C_RED);
   KDColor c2 = p.fromSuper ? C_MAG : C_ORG;
-  if (p.mineT > 0) { // mine posee de Tick : clignote, plus vite quand elle va sauter
+  if (p.mineT > 0) { // mine posee : celle de Bo est INVISIBLE, celle de Tick clignote
+    if (ents[p.owner].brawlerIdx == 18) return; // mines de Bo : rien a l'ecran
     int blink = (p.mineT < 1.0f) ? 120 : 300;
     if ((animT / blink) % 2 == 0) oCirc(sx, sy, 3, C_YEL, C_BLK);
     else oCirc(sx, sy, 3, C_ORG, C_BLK);
@@ -2349,6 +2601,7 @@ static void renderMatch() {
 
   for (int i = 0; i < MAX_PROJ; i++)
     if (projs[i].active) {
+      if (projs[i].mineT > 0 && ents[projs[i].owner].brawlerIdx == 18) continue; // mine de Bo : invisible
       shadow((int)projs[i].x - camX, (int)projs[i].y - camY + 6, 2, 1);
       drawProj(projs[i], (int)projs[i].x - camX, (int)projs[i].y - camY, ents[humanIdx].team);
     }
@@ -2414,16 +2667,12 @@ static void renderMatch() {
   drawNum(36 + textW(d.name), 3, lvl, C_BLK);
   // chrono du match
   drawNum(150, 3, fmaxf(0, 150 - matchTimeMs / 1000), C_WHT);
-  // indicateur de l'action armee (OK = super, X = gadget) + hypercharge
+  // indicateur ULTI prete (touche RETOUR)
   if (mode == MODE_GEM && gemCountdown > 0) {
     drawText(190, 3, "FIN!", C_YEL);
     drawNum(244, 3, gemCountdown / 1000 + 1, C_YEL);
-  } else if (me.hyperT > 0) { drawText(190, 3, "HYP!", C_MAG); }
+    }
   else if (me.superCharge >= 100) { drawText(190, 3, "ULTI!", C_YEL); } // ulti prete (touche RETOUR)
-  // gadget (SHIFT) : nombre d'utilisations restantes
-  fRect(268, 1, 48, 24, me.gadgetUses > 0 ? C_CYN : KDColor::RGB24(0x225566));
-  drawText(274, 3, "SH", C_BLK);
-  drawNum(288, 3, me.gadgetUses, C_WHT);
 
   // compte a rebours 3-2-1-GO au lancement du match
   if (startCountdown > -800) {
@@ -2442,7 +2691,7 @@ static void renderMatch() {
   }
   // bandeau bas : rappel des touches a gauche, score du mode a droite
   fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
-  drawText(4, SH - 12, "OK:ATK RET:ULTI SH:GAD", C_GRE);
+  drawText(4, SH - 12, "OK:ATK RET:ULTI HOME:QUIT", C_GRE);
   if (mode == MODE_GEM) {
     drawNum(SW - 72, SH - 12, teamGems[0], C_BLUE);
     drawText(SW - 48, SH - 12, "-", C_WHT);
@@ -2747,16 +2996,16 @@ static void settingsScreen() {
     drawTextC(8, "PARAMETRES", C_YEL);
     fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
     drawTextC(32, "TOUCHES DU JEU", C_CYN);
-    const char *acts[7] = {"SE DEPLACER", "ATTAQUE", "ULTI", "GADGET", "HYPERCHARGE", "QUITTER", "RETOUR MENU"};
-    const char *keys[7] = {"FLECHES", "OK / VAR", "RETOUR", "SHIFT", "EFFACER", "HOME", "BACK"};
-    for (int i = 0; i < 7; i++) {
+    const char *acts[5] = {"SE DEPLACER", "ATTAQUE", "ULTI", "QUITTER", "RETOUR MENU"};
+    const char *keys[5] = {"FLECHES", "OK / VAR", "RETOUR", "HOME", "BACK"};
+    for (int i = 0; i < 5; i++) {
       int y = 40 + i * 15;
       rRect(16, y - 2, 150, 14, 4, KDColor::RGB24(0x2B3A55));
       drawText(22, y, acts[i], C_WHT);
       rRect(186, y - 2, 120, 14, 4, C_BTN);
       drawText(192, y, keys[i], C_BLK);
     }
-    drawTextC(158, "+ NIV  * GADGET  / STAR", C_GRE);
+    drawTextC(158, "+ NIV  / STAR", C_GRE);
     rRect(SW / 2 - 70, 190, 140, 24, 8, C_YEL);
     drawTextC(196, "OK RETOUR", C_BLK);
     blit();
@@ -2816,18 +3065,11 @@ static void brawlerMenu(int myBrawler) {
         rRect(10, 104, 300, 28, 5, KDColor::RGB24(0x2B3A55));
         drawText(16, 108, "SUPER", C_YEL);
         drawText(16, 120, SUPER_NAMES[sel], C_WHT);
-        // gadget / pouvoir star / hypercharge : 3 lignes pleine largeur
-        rRect(10, 136, 300, 16, 4, a.gadget ? C_CYN : KDColor::RGB24(0x225566));
-        drawText(16, 139, "GADGET", a.gadget ? C_BLK : C_GRE);
-        drawText(96, 139, a.gadget ? curGadgetName(sel) : "NON", a.gadget ? C_BLK : C_GRE);
-        if (a.gadget) drawNum(284, 139, a.gadChoice + 1, C_BLK);
-        rRect(10, 155, 300, 16, 4, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
-        drawText(16, 158, "STAR", a.starPower ? C_WHT : C_GRE);
-        drawText(70, 158, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
-        if (a.starPower) drawNum(284, 158, a.starChoice + 1, C_WHT);
-        rRect(10, 174, 300, 16, 4, a.hyper ? C_MAG : KDColor::RGB24(0x55114A));
-        drawText(16, 177, "HYPER", a.hyper ? C_WHT : C_GRE);
-        drawText(80, 177, a.hyper ? "OUI" : (a.level >= 11 ? "DISPO" : "NIV 11"), a.hyper ? C_WHT : C_GRE);
+        // pouvoir star : 1 ligne pleine largeur
+        rRect(10, 136, 300, 16, 4, a.starPower ? C_PUR : KDColor::RGB24(0x3A1F55));
+        drawText(16, 139, "STAR", a.starPower ? C_WHT : C_GRE);
+        drawText(70, 139, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
+        if (a.starPower) drawNum(284, 139, a.starChoice + 1, C_WHT);
 
         // boutons d'achat
         cost = upgradeCost(a.level);
@@ -2838,11 +3080,8 @@ static void brawlerMenu(int myBrawler) {
           rRect(6, 196, 74, 32, 5, C_GREEN);
           drawText(12, 207, "NIV MAX", C_BLK);
         }
-        if (!a.gadget) { rRect(84, 196, 74, 32, 5, (acc.coins >= 100) ? C_CYN : KDColor::RGB24(0x225566)); drawText(90, 199, "* GADGET", C_BLK); drawNum(90, 215, 100, C_BLK); }
-        else { rRect(84, 196, 74, 32, 5, C_CYN); drawText(90, 207, "* CHANGE", C_BLK); }
-        if (a.level >= 3 && !a.starPower) { rRect(162, 196, 74, 32, 5, (acc.coins >= 150) ? C_PUR : KDColor::RGB24(0x3A1F55)); drawText(168, 199, "/ STAR", C_WHT); drawNum(168, 215, 150, C_WHT); }
-        else if (a.starPower) { rRect(162, 196, 74, 32, 5, C_PUR); drawText(168, 207, "/ CHANGE", C_WHT); }
-        if (a.level >= 11 && !a.hyper) { rRect(240, 196, 74, 32, 5, (acc.coins >= 300) ? C_MAG : KDColor::RGB24(0x55114A)); drawText(246, 199, "- HYP", C_WHT); drawNum(246, 215, 300, C_WHT); }
+        if (a.level >= 3 && !a.starPower) { rRect(84, 196, 74, 32, 5, (acc.coins >= 150) ? C_PUR : KDColor::RGB24(0x3A1F55)); drawText(90, 199, "/ STAR", C_WHT); drawNum(90, 215, 150, C_WHT); }
+        else if (a.starPower) { rRect(84, 196, 74, 32, 5, C_PUR); drawText(90, 207, "/ CHANGE", C_WHT); }
       } else {
         drawTextC(120, "BRAWLER NON DEBLOQUE", C_GRE);
         drawTextC(140, "GAGNE DES TROPHEES POUR", C_WHT);
@@ -2853,22 +3092,15 @@ static void brawlerMenu(int myBrawler) {
       animT += 80;
       if (unlocked) {
         // achats par front montant : 1 appui = 1 achat, plus de double comptage
-        static bool pPlus = false, pMul = false, pDiv = false, pMinus = false;
-        bool doPlus = kPlus && !pPlus, doMul = kMul && !pMul,
-             doDiv = kDiv && !pDiv, doMinus = kMinus && !pMinus;
-        pPlus = kPlus; pMul = kMul; pDiv = kDiv; pMinus = kMinus;
+        static bool pPlus = false, pDiv = false;
+        bool doPlus = kPlus && !pPlus, doDiv = kDiv && !pDiv;
+        pPlus = kPlus; pDiv = kDiv;
         if (a.level < 11 && acc.coins >= cost && doPlus)
           { acc.coins -= cost; a.level++; saveAcc(); }
-        if (!a.gadget && acc.coins >= 100 && doMul)
-          { acc.coins -= 100; a.gadget = true; a.gadChoice = 0; saveAcc(); }
-        else if (a.gadget && doMul)
-          { a.gadChoice ^= 1; saveAcc(); }
         if (a.level >= 3 && !a.starPower && acc.coins >= 150 && doDiv)
           { acc.coins -= 150; a.starPower = true; a.starChoice = 0; saveAcc(); }
         else if (a.starPower && doDiv)
           { a.starChoice ^= 1; saveAcc(); }
-        if (a.level >= 11 && !a.hyper && acc.coins >= 300 && doMinus)
-          { acc.coins -= 300; a.hyper = true; saveAcc(); }
       }
       if (keyOK || keyBack) { prevOK = keyOK; prevBack = keyBack; break; }
       prevOK = keyOK; prevBack = keyBack;
@@ -2965,7 +3197,7 @@ static void playMatch(int myBrawler, int selMode) {
     int frameMs = (int)Ion::Timing::millis() - t0;
     Ion::Timing::msleep(frameMs < 33 ? 33 - frameMs : 1);
   }
-  resultScreen(matchResult, myBrawler);
+  if (matchResult != 2) resultScreen(matchResult, myBrawler); // 2 = abandon via HOME
 }
 
 // ------------------------- Mode Entrainement ---------------------------
@@ -3134,13 +3366,12 @@ void ion_main(int argc, char *argv[]) {
       bgPanel();
       drawTextC(8, "AIDE", C_YEL);
       fRect(SW / 2 - 60, 22, 120, 3, C_BTND);
-      const char *lines[8] = {
+      const char *lines[6] = {
         "FLECHES: BOUGER", "OK/VAR: ATTAQUE",
-        "RETOUR: ULTI", "SHIFT: GADGET",
-        "EFFACER: HYPERCHARGE", "HOME: QUITTER",
+        "RETOUR: ULTI", "HOME: QUITTER",
         "GAGNE DES TROPHEES POUR", "DEBLOQUER DES BRAWLERS"
       };
-      for (int i = 0; i < 8; i++) drawTextC(38 + i * 17, lines[i], C_WHT);
+      for (int i = 0; i < 6; i++) drawTextC(38 + i * 17, lines[i], C_WHT);
       rRect(SW / 2 - 70, 184, 140, 24, 8, C_YEL);
       drawTextC(190, "OK RETOUR", C_BLK);
       blit();

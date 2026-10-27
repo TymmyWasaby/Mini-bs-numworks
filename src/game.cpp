@@ -439,10 +439,609 @@ static void brawlerLook(int i, Look &L) {
   L.size = (i * 11 + 2) % 3;
   L.weapon = (i * 13) % 5;
 }
+// ----------------- V5.7b : sprites manuels redessines (10 premiers brawlers) -----------------
+// Refonte complete apres preview : vraies silhouettes humanoïdes (tete separee,
+// torse, jambes, arme tenue PRES du corps) inspirees des graphismes reels.
+// Tout est proportionnel a r (float), coordonnees arrondies aux fonctions de dessin.
+static void heroEyes(int x, int y, int r, int dx, bool angry) {
+  int sp = (r >= 6) ? (r / 3 + 1) : 1;
+  int pup = (dx > 0) ? 1 : 0;
+  if (r >= 8) {
+    fCirc(x - sp, y, 2, C_WHT); fCirc(x + sp, y, 2, C_WHT);
+    px(x - sp + pup, y, C_BLK); px(x + sp + pup, y, C_BLK);
+  } else { px(x - 1, y, C_WHT); px(x + 1, y, C_WHT); }
+  if (angry && r >= 6) { fRect(x - sp - 1, y - 3, 3, 1, C_BLK); fRect(x + sp - 1, y - 3, 3, 1, C_BLK); }
+}
+// corps humanoide commun : jambes animees + torse. r = rayon total du sprite.
+static void heroBody(int cx, int cy, int r, bool flash, uint32_t topRGB, uint32_t botRGB, uint32_t legsRGB, int walk) {
+  int step = (walk > 0 && r >= 6) ? ((walk / 40) % 2) : 0;
+  uint32_t tg = flash ? 0xFFFFFF : topRGB, bg = flash ? 0xAAAAAA : botRGB;
+  // jambes (petit decalage vertical alterne = marche)
+  fRect(cx - (int)(r * 0.42f), cy + (int)(r * 0.45f), (int)(r * 0.34f), (int)(r * 0.5f), KDColor::RGB24(legsRGB));
+  fRect(cx + (int)(r * 0.08f), cy + (int)(r * 0.45f) - step, (int)(r * 0.34f), (int)(r * 0.5f) + step, KDColor::RGB24(legsRGB));
+  // torse (deux cercles + pont = silhouette de buste)
+  fCirc(cx, cy + (int)(r * 0.18f), (int)(r * 0.45f), KDColor::RGB24(tg));
+  fCirc(cx, cy + (int)(r * 0.48f), (int)(r * 0.38f), KDColor::RGB24(bg));
+  fRect(cx - (int)(r * 0.45f), cy + (int)(r * 0.2f), (int)(r * 0.9f), (int)(r * 0.3f), KDColor::RGB24(bg));
+}
+static void drawHeroSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk, int attackT) {
+  float fa = faceAng * 0.01745f;
+  int fx = (int)(cosf(fa) * r * 0.3f), fy = (int)(sinf(fa) * r * 0.3f); // regard vers la visee
+  int ex = (fx > 2) ? 2 : 1;                                              // decalage des yeux selon la visee
+  int hy = cy - (int)(r * 0.55f), hr = (int)(r * 0.48f);                  // centre/rayon de la tete
+  switch (bIdx) {
+    case 0: { // SHELLY : chevelure noire a frange rose, veste rose, fusil a pompe
+      heroBody(cx, cy, r, flash, 0xE0559B, 0xC2347F, 0x3A2030, walk);
+      fCirc(cx, hy, hr + 1, flash ? C_WHT : KDColor::RGB24(0x26262F));    // masse de cheveux
+      fCirc(cx + 1, hy + 1, hr - (hr >= 8 ? hr * 0.35f : 2), flash ? C_WHT : KDColor::RGB24(0xB07850)); // visage
+      fRect(cx - hr, hy - (int)(hr * 0.55f), hr * 2, 2, flash ? C_WHT : KDColor::RGB24(0xE880A8)); // frange rose haute
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.55f), 5, 1, C_BLK);     // sourire
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.1f), (int)(r * 0.75f), (int)(r * 0.14f) + 1, flash ? C_GRE : KDColor::RGB24(0x6A4A2A)); // crosse bois
+      fRect(cx + (int)(r * 0.95f), cy + (int)(r * 0.07f), (int)(r * 0.35f), (int)(r * 0.2f) + 1, C_GRE); // canon acier
+      break;
+    }
+    case 1: { // NITA : capuche d'ours a oreilles, manteau orange
+      heroBody(cx, cy, r, flash, 0xE8A33D, 0xC98833, 0x4A3010, walk);
+      KDColor hood = KDColor::RGB24(0x8A5838), hood2 = KDColor::RGB24(flash ? 0xFFFFFF : 0xB07850);
+      int er = hr / 2 + 1;                                                 // oreilles d'ours
+      fCirc(cx - (int)(r * 0.62f), hy - (int)(r * 0.42f), er, hood); fCirc(cx + (int)(r * 0.62f), hy - (int)(r * 0.42f), er, hood);
+      fCirc(cx, hy, hr + 2, hood);                                         // capuche
+      fCirc(cx, hy + 1, hr - 2, hood2);                                    // visage
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, true);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_BLK);       // grande bouche
+      break;
+    }
+    case 2: { // COLT : casquette rouge, cheveux blonds, veste bleue, 2 revolvers
+      heroBody(cx, cy, r, flash, 0x4A90D9, 0x3568B0, 0x2A3A5A, walk);
+      KDColor hair = KDColor::RGB24(0xE8C93D);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xB07850));         // visage
+      fRect(cx - hr, hy - 2, 2, (int)(hr * 0.7f), hair); fRect(cx + hr - 2, hy - 2, 2, (int)(hr * 0.7f), hair); // meches blondes
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.72f), flash ? C_WHT : KDColor::RGB24(0xD93B3B)); // casquette
+      fRect(cx, hy - (int)(hr * 0.35f), hr + 4, 2, flash ? C_GRE : KDColor::RGB24(0xB02A2A)); // visiere
+      heroEyes(cx + ex, hy + 1 + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx - (int)(r * 0.62f), cy + (int)(r * 0.25f), (int)(r * 0.4f), (int)(r * 0.12f) + 1, C_GRE); // revolver gauche
+      fRect(cx + (int)(r * 0.25f), cy + (int)(r * 0.25f), (int)(r * 0.4f), (int)(r * 0.12f) + 1, C_GRE);   // revolver droit
+      break;
+    }
+    case 3: { // BULL : cornes, barbe, marcelle, gros fusil a double canon
+      heroBody(cx, cy, r, flash, 0x8A5838, 0x6A4328, 0x3A2515, walk);
+      KDColor horn = KDColor::RGB24(0xE8E0D0);
+      fCirc(cx, hy, hr + 1, flash ? C_WHT : KDColor::RGB24(0xB07850));     // tete
+      fRect(cx - hr - 3, hy - (int)(hr * 0.3f), 3, 2, horn); fRect(cx + hr, hy - (int)(hr * 0.3f), 3, 2, horn); // cornes
+      fRect(cx - (int)(hr * 0.7f), hy + (int)(hr * 0.35f), (int)(hr * 1.4f), (int)(hr * 0.5f), KDColor::RGB24(0x3A2515)); // barbe
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, true);
+      if (r >= 8) fRect(cx - 3, hy + (int)(hr * 0.5f), 7, 1, C_WHT);       // dents
+      fRect(cx - (int)(r * 0.1f), cy + (int)(r * 0.15f), (int)(r * 0.9f), (int)(r * 0.13f) + 1, KDColor::RGB24(0x6A4A2A)); // canon 1
+      fRect(cx - (int)(r * 0.1f), cy + (int)(r * 0.3f), (int)(r * 0.9f), (int)(r * 0.13f) + 1, KDColor::RGB24(0x6A4A2A)); // canon 2
+      fRect(cx + (int)(r * 0.7f), cy + (int)(r * 0.12f), (int)(r * 0.3f), (int)(r * 0.35f), C_GRE); // pompe acier
+      break;
+    }
+    case 4: { // BROCK : afro rouge, veste verte, lance-roquettes sur l'epaule
+      heroBody(cx, cy, r, flash, 0x2A7A4A, 0x1F5C38, 0x143D24, walk);
+      KDColor afro = KDColor::RGB24(0xE83B3B);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x7A4A28));         // visage
+      fCirc(cx, hy - (int)(hr * 0.3f), hr + 1, afro);                      // afro
+      fCirc(cx - (int)(hr * 0.6f), hy - (int)(hr * 0.1f), (int)(hr * 0.55f), afro);
+      fCirc(cx + (int)(hr * 0.6f), hy - (int)(hr * 0.1f), (int)(hr * 0.55f), afro);
+      heroEyes(cx + ex, hy + 2 + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_WHT);       // grand sourire
+      fRect(cx - (int)(r * 0.9f), cy - (int)(r * 0.15f), (int)(r * 1.1f), (int)(r * 0.3f), KDColor::RGB24(0x3A5A3A)); // lance-roquettes
+      fCirc(cx + (int)(r * 0.25f), cy, (int)(r * 0.18f) + 1, flash ? C_WHT : KDColor::RGB24(0xE8447A)); // ogive
+      break;
+    }
+    case 5: { // EL PRIMO : masque de luchador vert, torse muscule, poings leves
+      uint32_t skin = flash ? 0xFFFFFF : 0xC98A5C;
+      int step = (walk > 0 && r >= 6) ? ((walk / 40) % 2) : 0;
+      fRect(cx - (int)(r * 0.42f), cy + (int)(r * 0.45f), (int)(r * 0.34f), (int)(r * 0.5f), KDColor::RGB24(0x3B6EA5)); // jambes bleues
+      fRect(cx + (int)(r * 0.08f), cy + (int)(r * 0.45f) - step, (int)(r * 0.34f), (int)(r * 0.5f) + step, KDColor::RGB24(0x3B6EA5));
+      fCirc(cx, cy + (int)(r * 0.2f), (int)(r * 0.5f), KDColor::RGB24(skin));   // torse muscule
+      fCirc(cx, cy + (int)(r * 0.5f), (int)(r * 0.4f), KDColor::RGB24(skin));
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.25f), r, (int)(r * 0.25f), KDColor::RGB24(skin));
+      fRect(cx - (int)(r * 0.4f), cy, (int)(r * 0.15f), (int)(r * 0.5f), KDColor::RGB24(0x2A6A46)); // bretelles
+      fRect(cx + (int)(r * 0.25f), cy, (int)(r * 0.15f), (int)(r * 0.5f), KDColor::RGB24(0x2A6A46));
+      fCirc(cx - (int)(r * 0.55f), cy - (int)(r * 0.05f), (int)(r * 0.2f), flash ? C_WHT : KDColor::RGB24(0x3BA05C)); // poings verts
+      fCirc(cx + (int)(r * 0.55f), cy - (int)(r * 0.05f), (int)(r * 0.2f), flash ? C_WHT : KDColor::RGB24(0x3BA05C));
+      fCirc(cx, hy, hr + 1, flash ? C_WHT : KDColor::RGB24(0x3BA05C));      // masque vert
+      fCirc(cx + 1, hy + 1, hr - (hr >= 8 ? (int)(hr * 0.3f) : 2), KDColor::RGB24(0x2A6A46)); // ouverture du masque
+      fRect(cx - (int)(hr * 0.8f), hy - (int)(hr * 0.1f), (int)(hr * 1.7f), 2, C_GOLD); // bande doree
+      heroEyes(cx + ex + 1, hy + 1 + fy / 2, hr, fx, true);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 6, 2, C_BLK);       // bouche serieuse
+      break;
+    }
+    case 6: { // BARLEY : robot barman fin, yeux verts, noeud papillon, bouteille
+      uint32_t steel = flash ? 0xFFFFFF : 0x9AB8C9, steelD = flash ? 0xAAAAAA : 0x6E8A9A;
+      fRect(cx - (int)(r * 0.22f), cy + (int)(r * 0.05f), (int)(r * 0.44f), (int)(r * 0.95f), KDColor::RGB24(steel)); // corps fin
+      fRect(cx - (int)(r * 0.22f), cy + (int)(r * 0.35f), (int)(r * 0.44f), (int)(r * 0.3f), flash ? C_WHT : KDColor::RGB24(0x2A3A4A)); // gilet
+      fRect(cx - (int)(r * 0.12f), cy + (int)(r * 0.08f), (int)(r * 0.24f), (int)(r * 0.12f) + 1, flash ? C_WHT : KDColor::RGB24(0xC93030)); // noeud papillon
+      fRect(cx - (int)(r * 0.28f), cy - (int)(r * 0.95f), (int)(r * 0.56f), 2, KDColor::RGB24(steelD)); // epaules
+      fCirc(cx, hy - 1, (int)(hr * 0.85f), KDColor::RGB24(steel));         // petite tete metallique
+      fCirc(cx - (int)(hr * 0.35f), hy - 1 + fy / 2, (hr >= 8 ? (int)(hr * 0.22f) : 2) + 1, KDColor::RGB24(0x3BE84A)); // yeux verts
+      fCirc(cx + (int)(hr * 0.35f), hy - 1 + fy / 2, (hr >= 8 ? (int)(hr * 0.22f) : 2) + 1, KDColor::RGB24(0x3BE84A));
+      if (r >= 8) fRect(cx - (int)(hr * 0.3f), hy + (int)(hr * 0.35f), (int)(hr * 0.6f), 2, C_BLK); // bouche LED
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.15f), (int)(r * 0.2f), (int)(r * 0.45f), flash ? C_WHT : KDColor::RGB24(0x3B8A4A)); // bouteille verte
+      fCirc(cx + (int)(r * 0.45f), cy + (int)(r * 0.1f), (int)(r * 0.12f) + 1, C_GRE); // goulot
+      break;
+    }
+    case 7: { // POCO : crane, sombrero, poncho rose, guitare contre le torse
+      fCirc(cx, cy + (int)(r * 0.35f), (int)(r * 0.55f), flash ? C_WHT : KDColor::RGB24(0xC94B6E)); // poncho
+      fRect(cx - (int)(r * 0.55f), cy + (int)(r * 0.3f), (int)(r * 1.1f), (int)(r * 0.5f), flash ? C_WHT : KDColor::RGB24(0xC94B6E));
+      fRect(cx - (int)(r * 0.55f), cy + (int)(r * 0.5f), (int)(r * 1.1f), 2, C_YEL);  // frange doree
+      KDColor bone = KDColor::RGB24(flash ? 0xFFFFFF : 0xF2EAD8);
+      fCirc(cx, hy, hr, bone);                                             // crane
+      fCirc(cx - (int)(hr * 0.38f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.28f) : 2) + 1, C_BLK); // orbites
+      fCirc(cx + (int)(hr * 0.38f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.28f) : 2) + 1, C_BLK);
+      if (r >= 8) { px(cx - (int)(hr * 0.38f) + 1 + ex, hy + fy / 2, C_WHT); px(cx + (int)(hr * 0.38f) + 1 + ex, hy + fy / 2, C_WHT); }
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.55f), 5, 2, C_BLK);      // bouche dente
+      fRect(cx - (int)(r * 0.9f), hy - (int)(hr * 0.35f), (int)(r * 1.8f), 3, flash ? C_WHT : KDColor::RGB24(0xC9703B)); // bord du sombrero
+      fCirc(cx, hy - (int)(hr * 0.5f), (int)(hr * 0.75f), flash ? C_WHT : KDColor::RGB24(0xC9703B)); // calotte
+      fRect(cx - (int)(r * 0.9f), hy - (int)(hr * 0.35f), (int)(r * 1.8f), 1, C_GOLD); // bande doree
+      fCirc(cx + (int)(r * 0.3f), cy + (int)(r * 0.3f), (int)(r * 0.3f), KDColor::RGB24(0x8A5A2A)); // caisse de guitare
+      fRect(cx + (int)(r * 0.27f), cy - (int)(r * 0.1f), (int)(r * 0.08f) + 1, (int)(r * 0.4f), KDColor::RGB24(0x6A4A2A)); // manche
+      break;
+    }
+    case 8: { // ROSA : afro violet, gants de boxe rouges aux bras tendus
+      heroBody(cx, cy, r, flash, 0x7A4AA0, 0x6A3A8A, 0x3A2050, walk);
+      KDColor arm = KDColor::RGB24(flash ? 0xFFFFFF : 0x7A4AA0);
+      fRect(cx - (int)(r * 0.62f), cy + (int)(r * 0.05f), (int)(r * 0.4f), (int)(r * 0.14f) + 1, arm); // bras tendus
+      fRect(cx + (int)(r * 0.22f), cy + (int)(r * 0.05f), (int)(r * 0.4f), (int)(r * 0.14f) + 1, arm);
+      fCirc(cx - (int)(r * 0.6f), cy + (int)(r * 0.1f), (int)(r * 0.22f) + 1, flash ? C_WHT : KDColor::RGB24(0xD93B3B)); // gants rouges
+      fCirc(cx + (int)(r * 0.6f), cy + (int)(r * 0.1f), (int)(r * 0.22f) + 1, flash ? C_WHT : KDColor::RGB24(0xD93B3B));
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));          // visage
+      KDColor afro = KDColor::RGB24(0x7A3BB0);
+      fCirc(cx, hy - (int)(hr * 0.25f), hr + 1, afro);                      // afro violet
+      fCirc(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.05f), (int)(hr * 0.6f), afro);
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.05f), (int)(hr * 0.6f), afro);
+      heroEyes(cx + ex, hy + 2 + fy / 2, hr, fx, true);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      break;
+    }
+    case 9: { // JESSIE : casquette rouge, couette, chemise jaune, fusil bricole
+      heroBody(cx, cy, r, flash, 0xE8C93D, 0xC9A528, 0x6A5A20, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xB07850));          // visage
+      fRect(cx + hr - 2, hy - 2, 3, hr, KDColor::RGB24(0x8A5838));          // couette derriere
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.72f), flash ? C_WHT : KDColor::RGB24(0xD93B3B)); // casquette
+      fRect(cx, hy - (int)(hr * 0.35f), hr + 4, 2, flash ? C_GRE : KDColor::RGB24(0xB02A2A)); // visiere
+      heroEyes(cx + ex, hy + 1 + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.3f), cy + (int)(r * 0.15f), (int)(r * 0.7f), (int)(r * 0.13f) + 1, C_GRE); // canon
+      fRect(cx + (int)(r * 0.3f), cy + (int)(r * 0.02f), (int)(r * 0.25f), (int)(r * 0.12f) + 1, KDColor::RGB24(0x8A5A2A)); // crosse bricolee
+      break;
+    }
+    case 10: { // DYNAMIKE : prospecteur, barbe blanche, casque de mineur, baton de dynamite
+      heroBody(cx, cy, r, flash, 0x8A6A4A, 0x6A4A30, 0x3A2A1A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xC9A070));          // visage
+      fRect(cx - (int)(hr * 0.75f), hy + (int)(hr * 0.25f), (int)(hr * 1.5f), (int)(hr * 0.75f), flash ? C_WHT : KDColor::RGB24(0xE8E0D0)); // grande barbe blanche
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      fCirc(cx, hy - (int)(hr * 0.5f), (int)(hr * 0.7f), flash ? C_WHT : KDColor::RGB24(0x4A5A6A));  // casque de mineur
+      fRect(cx - hr - 1, hy - (int)(hr * 0.3f), hr * 2 + 2, 2, KDColor::RGB24(0x3A4A5A)); // bord du casque
+      fCirc(cx + (int)(hr * 0.55f), hy - (int)(hr * 0.45f), 2, C_YEL);      // lampe frontale
+      fRect(cx + (int)(r * 0.45f), cy + (int)(r * 0.15f), (int)(r * 0.12f) + 1, (int)(r * 0.4f), flash ? C_WHT : KDColor::RGB24(0xD93B3B)); // baton de dynamite
+      px(cx + (int)(r * 0.5f), cy + (int)(r * 0.1f), C_GRE); px(cx + (int)(r * 0.52f), cy + (int)(r * 0.06f), C_YEL); // meche + etincelle
+      break;
+    }
+    case 11: { // TICK : petite tete robot ronde, yeux enormes, cle remontoir
+      fRect(cx - (int)(r * 0.25f), cy, (int)(r * 0.5f) + 1, (int)(r * 0.9f), flash ? C_WHT : KDColor::RGB24(0x5A6A7A));       // petit corps
+      fRect(cx - (int)(r * 0.32f), cy + (int)(r * 0.85f), (int)(r * 0.18f) + 1, (int)(r * 0.15f) + 1, KDColor::RGB24(0x3A4A5A)); // pieds
+      fRect(cx + (int)(r * 0.14f), cy + (int)(r * 0.85f), (int)(r * 0.18f) + 1, (int)(r * 0.15f) + 1, KDColor::RGB24(0x3A4A5A));
+      fRect(cx - 1, hy - hr - 3, 3, 5, C_GRE);                             // tige de la cle
+      fRect(cx - 4, hy - hr - 5, 9, 3, C_GRE);                             // cle remontoir
+      fCirc(cx, hy + 1, hr, flash ? C_WHT : KDColor::RGB24(0xB0C4D8));      // tete ronde acier
+      fCirc(cx - (int)(hr * 0.4f), hy + 1 + fy / 2, (hr >= 8 ? (int)(hr * 0.28f) : 3) + 1, C_WHT); // yeux enormes
+      fCirc(cx + (int)(hr * 0.4f), hy + 1 + fy / 2, (hr >= 8 ? (int)(hr * 0.28f) : 3) + 1, C_WHT);
+      if (r >= 8) { px(cx - (int)(hr * 0.4f) + 1, hy + 1 + fy / 2, C_BLK); px(cx + (int)(hr * 0.4f) + 1, hy + 1 + fy / 2, C_BLK); }
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.6f), 5, 2, C_BLK);        // sourire
+      fRect(cx - (int)(r * 0.4f), cy - (int)(r * 0.1f), (int)(r * 0.8f) + 1, 2, KDColor::RGB24(0x8A9AAC)); // epaules
+      break;
+    }
+    case 12: { // 8-BIT : grosse tete carree arcade, yeux pixel jaunes, antenne
+      heroBody(cx, cy, r, flash, 0x6A6A7A, 0x4A4A5A, 0x2A2A3A, walk);
+      fRect(cx - hr, hy - (int)(hr * 0.9f), hr * 2, (int)(hr * 1.8f) + 1, flash ? C_WHT : KDColor::RGB24(0x8A8A9A)); // tete carree grise
+      fRect(cx - hr, hy - (int)(hr * 0.9f), hr * 2, 2, C_GRE);
+      fRect(cx - (int)(hr * 0.55f), hy - (int)(hr * 0.2f) + fy / 2, 3, 3, C_YEL); // yeux pixel jaunes
+      fRect(cx + (int)(hr * 0.2f), hy - (int)(hr * 0.2f) + fy / 2, 3, 3, C_YEL);
+      if (r >= 6) fRect(cx - (int)(hr * 0.45f), hy + (int)(hr * 0.45f), (int)(hr * 0.9f) + 1, 2, C_BLK); // bouche = fente
+      fRect(cx - 1, hy - (int)(hr * 1.9f), 3, hr, KDColor::RGB24(0x4A4A5A)); // antenne
+      fCirc(cx + 1, hy - (int)(hr * 1.9f) - 1, 2, flash ? C_WHT : KDColor::RGB24(0xE8447A)); // boule rouge
+      fRect(cx + (int)(r * 0.3f), cy + (int)(r * 0.1f), (int)(r * 0.75f) + 1, (int)(r * 0.16f) + 1, flash ? C_WHT : KDColor::RGB24(0x4A4A5A)); // gros laser
+      fRect(cx + (int)(r * 0.95f), cy + (int)(r * 0.05f), (int)(r * 0.25f) + 1, (int)(r * 0.26f) + 1, C_YEL); // muzzle jaune
+      break;
+    }
+    case 13: { // RICO : robot violet, tete allongee, banane de dents, long canon
+      heroBody(cx, cy, r, flash, 0x9A7AB8, 0x7A5A98, 0x4A3A5A, walk);
+      KDColor ric = KDColor::RGB24(flash ? 0xFFFFFF : 0x9A7AB8);
+      fRect(cx - (int)(hr * 0.6f), hy - (int)(hr * 0.8f), (int)(hr * 1.2f) + 1, (int)(hr * 2.1f) + 1, ric);   // tete allongee violette
+      fRect(cx - (int)(hr * 0.6f), hy - (int)(hr * 0.8f), (int)(hr * 1.2f) + 1, 2, flash ? C_GRE : KDColor::RGB24(0xB89AD8));
+      fRect(cx - (int)(hr * 0.4f), hy - (int)(hr * 0.2f) + fy / 2, 3, 3, C_WHT); // yeux carres
+      fRect(cx + (int)(hr * 0.1f), hy - (int)(hr * 0.2f) + fy / 2, 3, 3, C_WHT);
+      if (r >= 6) fRect(cx - (int)(hr * 0.45f), hy + (int)(hr * 0.5f), (int)(hr * 0.9f) + 1, 3, C_WHT); // banane de dents
+      fRect(cx + (int)(r * 0.25f), cy + (int)(r * 0.15f), (int)(r * 0.95f) + 1, (int)(r * 0.12f) + 1, C_GRE); // long canon
+      fRect(cx + (int)(r * 1.1f), cy + (int)(r * 0.08f), (int)(r * 0.2f) + 1, (int)(r * 0.26f) + 1, KDColor::RGB24(0x7A5A98)); // embout evase
+      break;
+    }
+    case 14: { // DARRYL : robot DANS un tonneau de bois
+      fRect(cx - (int)(r * 0.5f), cy - (int)(r * 0.05f), r, (int)(r * 0.95f) + 1, flash ? C_WHT : KDColor::RGB24(0x8A5A2A)); // tonneau bois
+      fRect(cx - (int)(r * 0.5f), cy - (int)(r * 0.05f), r, 2, KDColor::RGB24(0x6A4A2A));
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.3f), r, 2, C_GRE);       // cerclage metal
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.75f), r, 2, C_GRE);
+      fRect(cx - (int)(r * 0.16f), cy - (int)(r * 0.05f), 2, (int)(r * 0.95f), KDColor::RGB24(0x6A4A2A)); // planches
+      fRect(cx + (int)(r * 0.16f), cy - (int)(r * 0.05f), 2, (int)(r * 0.95f), KDColor::RGB24(0x6A4A2A));
+      fRect(cx - (int)(r * 0.34f), cy + (int)(r * 0.9f), (int)(r * 0.3f) + 1, (int)(r * 0.15f) + 1, KDColor::RGB24(0x3A4A5A)); // petits pieds
+      fRect(cx + (int)(r * 0.06f), cy + (int)(r * 0.9f), (int)(r * 0.3f) + 1, (int)(r * 0.15f) + 1, KDColor::RGB24(0x3A4A5A));
+      fCirc(cx - (int)(r * 0.62f), cy + (int)(r * 0.1f), (int)(r * 0.16f), flash ? C_WHT : KDColor::RGB24(0x9AB8C9)); // bras dehors
+      fCirc(cx + (int)(r * 0.62f), cy + (int)(r * 0.1f), (int)(r * 0.16f), flash ? C_WHT : KDColor::RGB24(0x9AB8C9));
+      fCirc(cx, hy, (int)(hr * 0.8f), flash ? C_WHT : KDColor::RGB24(0xB0C4D8)); // tete acier
+      fCirc(cx - (int)(hr * 0.3f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.22f) : 2) + 1, C_WHT); // yeux lunette
+      fCirc(cx + (int)(hr * 0.3f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.22f) : 2) + 1, C_WHT);
+      if (r >= 8) { px(cx - (int)(hr * 0.3f) + 1, hy + fy / 2, C_BLK); px(cx + (int)(hr * 0.3f) + 1, hy + fy / 2, C_BLK); }
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_BLK);
+      break;
+    }
+    case 15: { // PENNY : pirate, chapeau a badge or, mousquet a sac de pieces
+      heroBody(cx, cy, r, flash, 0x3A7A9A, 0x2A5A7A, 0x2A3A4A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xC98850));          // visage
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      if (r >= 8) { px(cx - (int)(hr * 0.55f), hy + (int)(hr * 0.2f), KDColor::RGB24(0xE880A8)); px(cx + (int)(hr * 0.6f), hy + (int)(hr * 0.2f), KDColor::RGB24(0xE880A8)); } // joues roses
+      fRect(cx - hr - 2, hy - (int)(hr * 0.35f), hr * 2 + 4, 3, flash ? C_WHT : KDColor::RGB24(0x2A3A5A)); // large chapeau
+      fCirc(cx, hy - (int)(hr * 0.55f), (int)(hr * 0.65f), flash ? C_WHT : KDColor::RGB24(0x2A3A5A));
+      fCirc(cx + (int)(hr * 0.3f), hy - (int)(hr * 0.5f), 2, C_GOLD);       // badge or
+      fRect(cx + (int)(r * 0.3f), cy + (int)(r * 0.15f), (int)(r * 0.8f) + 1, (int)(r * 0.12f) + 1, KDColor::RGB24(0x6A4A2A)); // mousquet
+      fCirc(cx + (int)(r * 1.05f), cy + (int)(r * 0.15f), (int)(r * 0.16f), flash ? C_WHT : C_GOLD); // sac de pieces
+      break;
+    }
+    case 16: { // CARL : casque bleu, crane ras, grand sourire, pioche sur l'epaule
+      heroBody(cx, cy, r, flash, 0x3A8A8A, 0x2A6A6A, 0x3A4A5A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xC98850));           // crane rase
+      heroEyes(cx + ex, hy - 1 + fy / 2, hr, fx, false);
+      if (r >= 8) { fRect(cx - 3, hy + (int)(hr * 0.35f), 7, 3, C_WHT); fRect(cx - 2, hy + (int)(hr * 0.35f), 5, 1, C_BLK); } // grand sourire
+      fCirc(cx, hy - (int)(hr * 0.5f), (int)(hr * 0.72f), flash ? C_WHT : KDColor::RGB24(0x3568B0)); // casque bleu
+      fRect(cx - hr, hy - (int)(hr * 0.4f), hr * 2, 3, KDColor::RGB24(0x2A4A8A)); // bande
+      fRect(cx - (int)(r * 0.15f), cy - (int)(r * 0.25f), (int)(r * 0.14f) + 1, (int)(r * 0.85f), KDColor::RGB24(0x6A4A2A)); // manche pioche
+      fRect(cx - (int)(r * 0.35f), cy - (int)(r * 0.35f), (int)(r * 0.55f) + 1, (int)(r * 0.14f) + 1, C_GRE); // tete de pioche
+      break;
+    }
+    case 17: { // JACKY : casque de chantier jaune, combinee bleue, marteau-piqueur
+      heroBody(cx, cy, r, flash, 0x3568B0, 0x2A4A8A, 0x2A3A5A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xC98850));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, true);                         // regard determine
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.75f), flash ? C_WHT : C_YEL); // casque jaune
+      fRect(cx - hr - 2, hy - (int)(hr * 0.25f), hr * 2 + 4, 3, flash ? C_GRE : C_YEL); // bord du casque
+      fRect(cx + (int)(r * 0.4f), cy - (int)(r * 0.1f), (int)(r * 0.2f) + 1, (int)(r * 0.7f), C_GRE); // marteau-piqueur
+      fRect(cx + (int)(r * 0.33f), cy + (int)(r * 0.55f), (int)(r * 0.34f) + 1, (int)(r * 0.14f) + 1, C_GRE);
+      px(cx + (int)(r * 0.5f), cy - (int)(r * 0.15f), C_RED);
+      break;
+    }
+    case 18: { // BO : capuche verte, bandeau sur les yeux, arc et fleches
+      heroBody(cx, cy, r, flash, 0x3A8A4A, 0x2A6A38, 0x2A4A2A, walk);
+      fCirc(cx, hy, hr + 1, flash ? C_WHT : KDColor::RGB24(0x2A6A3A));      // capuche
+      fCirc(cx, hy + 1, hr - 2, flash ? C_WHT : KDColor::RGB24(0x9A6844));  // visage
+      fRect(cx - (int)(hr * 0.45f), hy + 1 + fy / 2, (int)(hr * 0.9f) + 1, 2, KDColor::RGB24(0x7A5A3A)); // bandeau sur les yeux
+      if (r >= 8) { px(cx - (int)(hr * 0.3f) + ex, hy + 1 + fy / 2, C_BLK); px(cx + (int)(hr * 0.35f) + ex, hy + 1 + fy / 2, C_BLK); }
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.55f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.5f), cy - (int)(r * 0.2f), (int)(r * 0.1f) + 1, (int)(r * 0.7f), KDColor::RGB24(0x6A4A2A)); // fleches (carquois)
+      fRect(cx + (int)(r * 0.42f), cy - (int)(r * 0.35f), (int)(r * 0.26f) + 1, (int)(r * 0.12f) + 1, KDColor::RGB24(0xE8E0D0)); // empennes
+      fCirc(cx + (int)(r * 0.4f), cy + (int)(r * 0.15f), (int)(r * 0.3f), KDColor::RGB24(0x6A4A2A)); // arc en main
+      break;
+    }
+    case 19: { // EMZ : longue criniere rose, robe rose, telephone a la main
+      heroBody(cx, cy, r, flash, 0xE85A8A, 0xC94B6E, 0x3A2050, walk);
+      KDColor pink = KDColor::RGB24(flash ? 0xFFFFFF : 0xD85AA8);
+      fRect(cx - hr - 2, hy - 2, 3, (int)(r * 1.2f), pink);                  // meches longues
+      fRect(cx + hr - 1, hy - 2, 3, (int)(r * 1.2f), pink);
+      fCirc(cx, hy - (int)(hr * 0.25f), hr + 1, pink);                      // criniere
+      fCirc(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.05f), (int)(hr * 0.6f), pink);
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.05f), (int)(hr * 0.6f), pink);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));          // visage par-dessus
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.1f), (int)(r * 0.22f) + 1, (int)(r * 0.35f), KDColor::RGB24(0x2A2A3A)); // telephone
+      fRect(cx + (int)(r * 0.37f), cy + (int)(r * 0.12f), (int)(r * 0.18f) + 1, (int)(r * 0.28f), KDColor::RGB24(0x3BE84A)); // ecran
+      break;
+    }
+    case 20: { // STU : robot de course, casque violet a visiere, yeux jaunes lumineux
+      heroBody(cx, cy, r, flash, 0x3A5A8A, 0x2A4A6A, 0x1A2A4A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9AB8C9));          // visage robot
+      fRect(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.2f) + fy / 2, (int)(hr * 1.5f), (int)(hr * 0.55f) + 1, KDColor::RGB24(0x2A2A4A)); // visiere sombre
+      fRect(cx - (int)(hr * 0.45f), hy + fy / 2, 3, 3, C_YEL);               // yeux lumineux dans la visiere
+      fRect(cx + (int)(hr * 0.15f), hy + fy / 2, 3, 3, C_YEL);
+      if (r >= 6) fRect(cx - (int)(hr * 0.5f), hy + (int)(hr * 0.45f), hr, 3, C_GRE); // bouche grille
+      fCirc(cx, hy - (int)(hr * 0.65f), (int)(hr * 0.7f), flash ? C_WHT : KDColor::RGB24(0x7A3BB0)); // casque violet
+      fRect(cx - (int)(hr * 0.8f), hy - (int)(hr * 0.9f), 4, 4, KDColor::RGB24(0x7A3BB0)); // flamme arriere
+      fRect(cx + (int)(hr * 0.4f), hy - (int)(hr * 0.95f), 4, 4, KDColor::RGB24(0x7A3BB0));
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.1f), (int)(r * 0.7f) + 1, (int)(r * 0.12f) + 1, C_GRE); // arme laser
+      fCirc(cx + r, cy + (int)(r * 0.16f), (int)(r * 0.14f) + 1, flash ? C_WHT : KDColor::RGB24(0x7A3BB0)); // muzzle violet
+      break;
+    }
+    case 21: { // PAM : maman mecano, frange orange haute + bun, robe turquoise, cle a molette
+      heroBody(cx, cy, r, flash, 0x3AA89A, 0x2A8A7A, 0x2A4A4A, walk);
+      KDColor hair = KDColor::RGB24(flash ? 0xFFFFFF : 0xE87A2A);
+      fRect(cx - (int)(hr * 0.9f), hy - (int)(hr * 0.1f), 3, (int)(hr * 1.3f), hair); // meches cotes
+      fRect(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.1f), 3, (int)(hr * 1.3f), hair);
+      fCirc(cx, hy - (int)(hr * 0.55f), (int)(hr * 0.7f), hair);            // frange haute
+      fCirc(cx, hy - (int)(hr * 1.15f), (int)(hr * 0.35f), hair);           // bun au-dessus
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xB07850));          // visage
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.4f), cy + (int)(r * 0.05f), (int)(r * 0.14f) + 1, (int)(r * 0.6f), C_GRE); // manche de la cle
+      fRect(cx + (int)(r * 0.32f), cy - (int)(r * 0.05f), (int)(r * 0.3f) + 1, (int)(r * 0.14f) + 1, C_GRE); // tete de cle
+      break;
+    }
+    case 22: { // FRANK : monstre zombie geant, capuche, marteau enorme
+      int big = r + 2;                                                     // il est plus grand
+      fRect(cx - (int)(r * 0.45f), cy + (int)(r * 0.5f), (int)(r * 0.38f) + 1, (int)(r * 0.55f), KDColor::RGB24(0x2A4A6A)); // grosses jambes
+      fRect(cx + (int)(r * 0.07f), cy + (int)(r * 0.5f), (int)(r * 0.38f) + 1, (int)(r * 0.55f), KDColor::RGB24(0x2A4A6A));
+      fCirc(cx, cy + (int)(r * 0.15f), (int)(big * 0.5f), flash ? C_WHT : KDColor::RGB24(0x3568B0)); // gros torse (hoodie)
+      fRect(cx - (int)(big * 0.5f), cy + (int)(r * 0.25f), big, (int)(r * 0.45f), KDColor::RGB24(0x2A4A8A));
+      fCirc(cx - (int)(big * 0.62f), cy + (int)(r * 0.05f), (int)(r * 0.24f), flash ? C_WHT : KDColor::RGB24(0xC9D86A)); // mains jaunes zombie
+      fCirc(cx + (int)(big * 0.62f), cy + (int)(r * 0.05f), (int)(r * 0.24f), flash ? C_WHT : KDColor::RGB24(0xC9D86A));
+      fCirc(cx, hy, hr + 2, flash ? C_WHT : KDColor::RGB24(0x3568B0));      // capuche bleue
+      fCirc(cx, hy + 1, hr - 2, flash ? C_WHT : KDColor::RGB24(0xC9D86A)); // visage jaune-vert zombie
+      fRect(cx - (int)(hr * 0.55f), hy - 2 + fy / 2, 4, 4, C_BLK);         // yeux ronds noirs
+      fRect(cx + (int)(hr * 0.2f), hy - 2 + fy / 2, 4, 4, C_BLK);
+      if (r >= 6) fRect(cx - (int)(hr * 0.4f), hy + (int)(hr * 0.45f), (int)(hr * 0.8f) + 1, 3, C_BLK); // bouche cousee
+      px(cx - (int)(hr * 0.3f), hy + (int)(hr * 0.45f), KDColor::RGB24(0x3568B0)); px(cx - (int)(hr * 0.1f), hy + (int)(hr * 0.5f), KDColor::RGB24(0x3568B0)); // points de suture
+      fRect(cx + (int)(r * 0.5f), cy - (int)(r * 0.25f), (int)(r * 0.12f) + 1, (int)(r * 0.85f), KDColor::RGB24(0x6A4A2A)); // manche du marteau
+      fRect(cx + (int)(r * 0.28f), cy - (int)(r * 0.45f), (int)(r * 0.6f), (int)(r * 0.35f), C_GRE); // tete du marteau
+      break;
+    }
+    case 23: { // BIBI : couettes roses, bulle de chewing-gum, batte de baseball
+      heroBody(cx, cy, r, flash, 0xC93050, 0xA82040, 0x2A2A4A, walk);
+      KDColor pink = KDColor::RGB24(flash ? 0xFFFFFF : 0xE87AB8);
+      fCirc(cx - (int)(hr * 0.85f), hy - (int)(hr * 0.3f), (int)(hr * 0.5f), pink); // couettes roses
+      fCirc(cx + (int)(hr * 0.85f), hy - (int)(hr * 0.3f), (int)(hr * 0.5f), pink);
+      fRect(cx - (int)(hr * 0.95f), hy - (int)(hr * 0.4f), 3, (int)(hr * 1.2f), pink);
+      fRect(cx + (int)(hr * 0.92f), hy - (int)(hr * 0.4f), 3, (int)(hr * 1.2f), pink);
+      fCirc(cx + (int)(r * 0.75f), hy - (int)(hr * 0.3f), (int)(r * 0.18f), flash ? C_WHT : KDColor::RGB24(0xE87AB8)); // bulle de chewing-gum
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.4f), cy, (int)(r * 0.14f) + 1, (int)(r * 0.7f), KDColor::RGB24(0xC9A05C)); // manche batte
+      fRect(cx + (int)(r * 0.52f), cy - (int)(r * 0.15f), (int)(r * 0.3f), (int)(r * 0.35f), flash ? C_WHT : KDColor::RGB24(0xC9A05C)); // batte
+      break;
+    }
+    case 24: { // BEA : rayures d'abeille, bonnet jaune, antennes, petite abeille
+      heroBody(cx, cy, r, flash, 0xFFC93D, 0xE8B020, 0x2A2A3A, walk);
+      fRect(cx - (int)(r * 0.45f), cy + (int)(r * 0.25f), (int)(r * 0.9f) + 1, 2, C_BLK); // rayures noires
+      fRect(cx - (int)(r * 0.4f), cy + (int)(r * 0.45f), (int)(r * 0.8f) + 1, 2, C_BLK);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx - hr, hy - (int)(hr * 0.4f), hr * 2, 3, flash ? C_GRE : C_YEL); // bonnet jaune
+      fRect(cx - (int)(hr * 0.7f), hy - hr, 2, (int)(hr * 0.7f), C_GRE);      // antennes
+      fRect(cx + (int)(hr * 0.6f), hy - hr, 2, (int)(hr * 0.7f), C_GRE);
+      fCirc(cx - (int)(r * 0.75f), cy - (int)(r * 0.55f), (int)(r * 0.16f), flash ? C_WHT : KDColor::RGB24(0xFFC93D)); // petite abeille
+      fRect(cx - (int)(r * 0.78f), cy - (int)(r * 0.5f), (int)(r * 0.2f), 2, C_BLK);
+      fRect(cx - (int)(r * 0.75f), cy - (int)(r * 0.62f), (int)(r * 0.1f) + 1, 2, KDColor::RGB24(0xAAAAAA)); // ailes
+      break;
+    }
+    case 25: { // NANI : robot grand-mere, oeil cyclope a iris bleu, robe violette
+      heroBody(cx, cy, r, flash, 0x7A5A9A, 0x5A3A7A, 0x3A2A4A, walk);
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.35f), r, (int)(r * 0.3f) + 1, KDColor::RGB24(0x9A7AB8)); // col de robe
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xB0C4D8));           // tete acier ronde
+      fCirc(cx + 1, hy + fy / 2, (hr >= 8 ? (int)(hr * 0.35f) : 3), C_WHT);  // grand oeil unique
+      fCirc(cx + 2, hy + fy / 2, 2, flash ? C_GRE : KDColor::RGB24(0x3BA0D9)); // iris bleu
+      px(cx + 2, hy + fy / 2, C_BLK);
+      if (r >= 6) fRect(cx - (int)(hr * 0.6f), hy + (int)(hr * 0.5f), (int)(hr * 1.2f), 2, C_GRE); // bouche
+      fRect(cx - 1, hy - hr - 3, 3, 4, C_GRE);                              // antenne
+      fCirc(cx, hy - hr - 4, 2, flash ? C_WHT : KDColor::RGB24(0xC94B6E));   // boule rose
+      fRect(cx + (int)(r * 0.45f), cy + (int)(r * 0.1f), (int)(r * 0.5f) + 1, (int)(r * 0.1f) + 1, KDColor::RGB24(0x9A7AB8)); // petard laser
+      fCirc(cx + (int)(r * 0.9f), cy + (int)(r * 0.15f), (int)(r * 0.12f) + 1, C_YEL);
+      break;
+    }
+    case 26: { // EDGAR : capuche sombre, echarpe sur le bas du visage, frange sur le front
+      heroBody(cx, cy, r, flash, 0x2A3A6A, 0x1A2A4A, 0x1A1A2A, walk);
+      fCirc(cx, hy, hr + 2, flash ? C_WHT : KDColor::RGB24(0x22305A));       // capuche sombre
+      fRect(cx - (int)(hr * 0.8f), hy - (int)(hr * 0.3f), (int)(hr * 1.7f), (int)(hr * 0.75f) + 1, KDColor::RGB24(0x3A4A7A)); // visage couvert
+      fRect(cx - (int)(hr * 0.45f), hy - (int)(hr * 0.15f) + fy / 2, 3, 3, C_WHT); // seuls yeux visibles
+      fRect(cx + (int)(hr * 0.15f), hy - (int)(hr * 0.15f) + fy / 2, 3, 3, C_WHT);
+      fRect(cx - (int)(hr * 0.95f), hy - (int)(hr * 0.5f), 4, (int)(hr * 1.1f), KDColor::RGB24(0x1A1A2A)); // frange
+      fRect(cx + (int)(hr * 0.55f), hy - (int)(hr * 0.5f), 4, (int)(hr * 1.1f), KDColor::RGB24(0x1A1A2A));
+      fRect(cx - hr, hy + (int)(hr * 0.3f), hr * 2, 2, KDColor::RGB24(0x22305A)); // bas d'echarpe
+      fRect(cx + (int)(r * 0.4f), cy + (int)(r * 0.2f), (int)(r * 0.12f) + 1, (int)(r * 0.35f), C_GRE); // dague
+      fRect(cx + (int)(r * 0.3f), cy + (int)(r * 0.5f), (int)(r * 0.3f) + 1, 2, C_GRE);
+      break;
+    }
+    case 27: { // GRIFF : tete de pigeon grise, gros sourcils, cravate, pieces d'or
+      heroBody(cx, cy, r, flash, 0x8A5838, 0x6A4228, 0x2A2A3A, walk);
+      fCirc(cx, hy, hr + 1, flash ? C_WHT : KDColor::RGB24(0x9AA8B8));       // tete grise de pigeon
+      fRect(cx - (int)(hr * 0.3f), hy - (int)(hr * 0.4f), (int)(hr * 0.9f), 4, KDColor::RGB24(0x6A7888)); // sourcils
+      fCirc(cx - (int)(hr * 0.35f), hy + fy / 2, 3, C_WHT); px(cx - (int)(hr * 0.35f) + 1, hy + fy / 2, C_BLK); // oeil gauche
+      fCirc(cx + (int)(hr * 0.35f), hy + fy / 2, 3, C_WHT); px(cx + (int)(hr * 0.35f) + 1, hy + fy / 2, C_BLK);
+      fRect(cx + (int)(hr * 0.5f), hy + (int)(hr * 0.25f), 6, 4, flash ? C_WHT : KDColor::RGB24(0xE8A03D)); // bec orange
+      fRect(cx - 2, cy + (int)(r * 0.05f), 5, (int)(r * 0.35f), KDColor::RGB24(0xC93030)); // cravate rouge
+      fCirc(cx - (int)(r * 0.55f), cy + (int)(r * 0.3f), 3, flash ? C_WHT : C_GOLD); // pieces d'or
+      fCirc(cx - (int)(r * 0.4f), cy + (int)(r * 0.45f), 3, flash ? C_WHT : C_GOLD);
+      fCirc(cx + (int)(r * 0.65f), cy + (int)(r * 0.1f), 3, flash ? C_WHT : C_GOLD);
+      break;
+    }
+    case 28: { // GALE : chevelure orange, col de fourrure, souffleuse a neige
+      heroBody(cx, cy, r, flash, 0x3A8A9A, 0x2A6A78, 0x2A4A4A, walk);
+      fRect(cx - (int)(r * 0.5f), cy - (int)(r * 0.05f), r, (int)(r * 0.25f), flash ? C_WHT : KDColor::RGB24(0xE8E0D0)); // col de fourrure
+      KDColor hair = KDColor::RGB24(flash ? 0xFFFFFF : 0xE8552A);
+      fCirc(cx, hy - (int)(hr * 0.35f), hr + 1, hair);                       // chevelure orange (AVANT le visage)
+      fCirc(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.1f), (int)(hr * 0.6f), hair);
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.1f), (int)(hr * 0.6f), hair);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));           // visage
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.1f), (int)(r * 0.8f) + 1, (int)(r * 0.14f) + 1, C_GRE); // souffleuse
+      fCirc(cx + (int)(r * 1.1f), cy + (int)(r * 0.17f), (int)(r * 0.14f) + 1, flash ? C_GRE : C_WHT); // cone de soufflage
+      break;
+    }
+    case 29: { // COLETTE : fan-girl, grosses lunettes rondes, carnet orange
+      heroBody(cx, cy, r, flash, 0x8A4A9A, 0x6A3A7A, 0x2A2A3A, walk);
+      KDColor hair = KDColor::RGB24(flash ? 0xFFFFFF : 0x5A3A7A);
+      fRect(cx - (int)(hr * 0.9f), hy - (int)(hr * 0.3f), 3, (int)(hr * 1.4f), hair); // meches cotes
+      fRect(cx + (int)(hr * 0.9f), hy - (int)(hr * 0.3f), 3, (int)(hr * 1.4f), hair);
+      fCirc(cx, hy - (int)(hr * 0.55f), (int)(hr * 0.75f), hair);            // chevelure (AVANT le visage)
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xD8A878));           // visage pale
+      fCirc(cx - (int)(hr * 0.38f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.3f) : 3), C_WHT); // lunettes rondes
+      fCirc(cx + (int)(hr * 0.38f), hy + fy / 2, (hr >= 8 ? (int)(hr * 0.3f) : 3), C_WHT);
+      px(cx - (int)(hr * 0.38f) + 1, hy + fy / 2, C_BLK); px(cx + (int)(hr * 0.38f) + 1, hy + fy / 2, C_BLK);
+      fRect(cx - (int)(hr * 0.1f), hy - 1 + fy / 2, (int)(hr * 0.2f) + 1, 2, C_BLK); // pont des lunettes
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.55f), 5, 1, C_RED);        // sourire enthousiaste
+      fRect(cx + (int)(r * 0.4f), cy + (int)(r * 0.15f), (int)(r * 0.3f), (int)(r * 0.4f), flash ? C_WHT : KDColor::RGB24(0xE8552A)); // carnet orange
+      fRect(cx + (int)(r * 0.42f), cy + (int)(r * 0.17f), (int)(r * 0.26f), (int)(r * 0.36f), KDColor::RGB24(0xFFF5E8)); // pages
+      break;
+    }
+    case 30: { // BELLE : chasseuse de primes, meche violette, long manteau, grappin
+      heroBody(cx, cy, r, flash, 0x3A4A6A, 0x2A3A5A, 0x1A2A3A, walk);
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.1f), r, (int)(r * 0.6f), flash ? C_WHT : KDColor::RGB24(0x2A3A4A)); // long manteau
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xD8A878));          // visage
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      KDColor hair = KDColor::RGB24(flash ? 0xFFFFFF : 0x7A5AB8);
+      fRect(cx - (int)(hr * 0.9f), hy - (int)(hr * 0.4f), 4, (int)(hr * 1.5f), hair); // longue meche violette
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.75f), hair);            // chevelure
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.2f), (int)(hr * 0.5f), hair);
+      fRect(cx + (int)(r * 0.35f), cy + (int)(r * 0.1f), (int)(r * 0.7f) + 1, (int)(r * 0.12f) + 1, C_GRE); // fusil-grappin
+      fRect(cx + (int)(r * 0.98f), cy + (int)(r * 0.1f), 3, 3, C_GOLD);     // pointe du grappin
+      break;
+    }
+    case 31: { // BUZZ : robot de securite, casquette jaune, matraque electrique
+      heroBody(cx, cy, r, flash, 0xE8C93D, 0xC9A528, 0x3A4A5A, walk);
+      fRect(cx - (int)(r * 0.42f), cy + (int)(r * 0.2f), (int)(r * 0.84f) + 1, (int)(r * 0.4f), KDColor::RGB24(0x2A3A4A)); // plastron sombre
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9AB8C9));          // tete acier
+      fRect(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.15f) + fy / 2, (int)(hr * 1.5f), (int)(hr * 0.5f) + 1, KDColor::RGB24(0x2A3A4A)); // visiere
+      fRect(cx - (int)(hr * 0.45f), hy + fy / 2, 3, 3, flash ? C_WHT : KDColor::RGB24(0x3BE84A)); // yeux verts
+      fRect(cx + (int)(hr * 0.15f), hy + fy / 2, 3, 3, flash ? C_WHT : KDColor::RGB24(0x3BE84A));
+      if (r >= 6) fRect(cx - hr, hy + (int)(hr * 0.45f), hr * 2, 2, C_GRE); // bouche grille
+      fRect(cx - hr - 2, hy - (int)(hr * 0.35f), hr * 2 + 4, 3, flash ? C_GRE : KDColor::RGB24(0xE8C93D)); // casquette jaune
+      fRect(cx + (int)(r * 0.45f), cy - (int)(r * 0.15f), (int)(r * 0.12f) + 1, (int)(r * 0.6f), C_GRE); // matraque
+      fCirc(cx + (int)(r * 0.51f), cy - (int)(r * 0.2f), 3, flash ? C_WHT : KDColor::RGB24(0x3BE84A)); // etincelle electrique
+      break;
+    }
+    case 32: { // ASH : eboueur, casquette verte, balai, rat sur l'epaule
+      heroBody(cx, cy, r, flash, 0x5A7A4A, 0x4A6838, 0x2A3A2A, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx - hr, hy - (int)(hr * 0.35f), hr * 2, 3, flash ? C_WHT : KDColor::RGB24(0x3A6A3A)); // casquette verte
+      fRect(cx, hy - (int)(hr * 0.25f), hr + 3, 2, KDColor::RGB24(0x2A5A2A)); // visiere
+      fRect(cx + (int)(r * 0.4f), cy + (int)(r * 0.15f), (int)(r * 0.7f) + 1, (int)(r * 0.1f) + 1, KDColor::RGB24(0x8A6A3A)); // manche balai
+      fRect(cx + (int)(r * 0.95f), cy - (int)(r * 0.05f), (int)(r * 0.3f), (int)(r * 0.35f), flash ? C_WHT : KDColor::RGB24(0xC9A05C)); // brosse
+      fCirc(cx - (int)(r * 0.45f), cy - (int)(r * 0.25f), (int)(r * 0.18f), flash ? C_WHT : KDColor::RGB24(0x9A9AA8)); // rat gris
+      px(cx - (int)(r * 0.58f), cy - (int)(r * 0.3f), KDColor::RGB24(0x9A9AA8)); px(cx - (int)(r * 0.57f), cy - (int)(r * 0.34f), C_RED); // oreille + oeil
+      break;
+    }
+    case 33: { // LOLA : star de cinema, boucles roses, robe rouge, plume
+      heroBody(cx, cy, r, flash, 0xC93050, 0xA82040, 0x3A2A3A, walk);
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.1f), r, (int)(r * 0.6f), flash ? C_WHT : KDColor::RGB24(0xC93050)); // longue robe
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xD8A878));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_RED);       // rouge a levres
+      KDColor pink = KDColor::RGB24(flash ? 0xFFFFFF : 0xD85AA8);
+      fCirc(cx - (int)(hr * 0.7f), hy - (int)(hr * 0.35f), (int)(hr * 0.55f), pink); // boucles roses
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.35f), (int)(hr * 0.55f), pink);
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.7f), pink);
+      fRect(cx - hr - 3, hy - (int)(hr * 0.9f), 3, 5, C_YEL);              // plume jaune
+      break;
+    }
+    case 34: { // FANG : karateka, bandeau noir, gi blanc, jambe qui frappe
+      heroBody(cx, cy, r, flash, 0xE8E0D0, 0xC9C0B0, 0x2A2A3A, walk);
+      fRect(cx - (int)(r * 0.2f), cy + (int)(r * 0.1f), (int)(r * 0.4f) + 1, (int)(r * 0.5f), KDColor::RGB24(0xC93030)); // ceinture rouge
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xD8A878));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, true);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      fRect(cx - (int)(hr * 0.9f), hy - (int)(hr * 0.1f), (int)(hr * 1.9f) + 1, 3, KDColor::RGB24(0x1A1A2A)); // bandeau
+      fRect(cx - (int)(hr * 1.1f), hy - (int)(hr * 0.2f), 4, (int)(hr * 0.7f), KDColor::RGB24(0x1A1A2A)); // pans
+      fRect(cx - (int)(r * 0.5f), cy + (int)(r * 0.7f), (int)(r * 0.4f) + 1, (int)(r * 0.2f) + 1, flash ? C_WHT : KDColor::RGB24(0xE8E0D0)); // jambe qui frappe
+      fRect(cx - (int)(r * 0.85f), cy + (int)(r * 0.72f), (int)(r * 0.4f) + 1, (int)(r * 0.14f) + 1, flash ? C_WHT : KDColor::RGB24(0xE8E0D0));
+      break;
+    }
+    case 35: { // MAISIE : tenniswoman, couette rousse, raquette a trous
+      heroBody(cx, cy, r, flash, 0xE8E0D0, 0xC9C0B0, 0x3568B0, walk);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      KDColor red = KDColor::RGB24(flash ? 0xFFFFFF : 0xC9552A);
+      fRect(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.2f), 3, (int)(hr * 1.6f), red); // couette rousse
+      fCirc(cx + (int)(hr * 0.7f), hy - (int)(hr * 0.35f), (int)(hr * 0.5f), red);
+      fCirc(cx, hy - (int)(hr * 0.45f), (int)(hr * 0.72f), red);
+      fRect(cx + (int)(r * 0.45f), cy - (int)(r * 0.05f), (int)(r * 0.12f) + 1, (int)(r * 0.5f), C_GRE); // manche raquette
+      fCirc(cx + (int)(r * 0.55f), cy - (int)(r * 0.2f), (int)(r * 0.22f), flash ? C_WHT : KDColor::RGB24(0x9A9AA8)); // tamis
+      break;
+    }
+    case 36: { // SQUEAK : alien rose, grandes oreilles, balle orange
+      fRect(cx - (int)(r * 0.18f), cy + (int)(r * 0.2f), (int)(r * 0.36f) + 1, (int)(r * 0.7f), flash ? C_WHT : KDColor::RGB24(0xE87AB8)); // petit corps
+      fRect(cx - (int)(r * 0.3f), cy + (int)(r * 0.8f), (int)(r * 0.16f) + 1, (int)(r * 0.14f) + 1, KDColor::RGB24(0xC94B6E)); // pieds
+      fRect(cx + (int)(r * 0.14f), cy + (int)(r * 0.8f), (int)(r * 0.16f) + 1, (int)(r * 0.14f) + 1, KDColor::RGB24(0xC94B6E));
+      KDColor pink = KDColor::RGB24(flash ? 0xFFFFFF : 0xE87AB8);
+      fCirc(cx - (int)(hr * 0.85f), hy, (int)(hr * 0.5f), pink);            // grandes oreilles
+      fCirc(cx + (int)(hr * 0.85f), hy, (int)(hr * 0.5f), pink);
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xF2A0C8));         // tete rose clair
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_BLK);
+      fCirc(cx + (int)(r * 0.55f), cy + (int)(r * 0.2f), (int)(r * 0.18f), flash ? C_WHT : KDColor::RGB24(0xE8552A)); // balle orange
+      break;
+    }
+    case 37: { // HANK : maitre-nageur, grande bouee rose, sifflet dore
+      heroBody(cx, cy, r, flash, 0x3A8AC9, 0x2A6AA8, 0x2A3A5A, walk);
+      fCirc(cx, cy + (int)(r * 0.35f), (int)(r * 0.55f), flash ? C_WHT : KDColor::RGB24(0xE855A8)); // grande bouee rose
+      fCirc(cx, cy + (int)(r * 0.35f), (int)(r * 0.42f), KDColor::RGB24(0x2A6AA8)); // trou (torse au travers)
+      fCirc(cx - (int)(r * 0.6f), cy + (int)(r * 0.15f), (int)(r * 0.2f), flash ? C_WHT : KDColor::RGB24(0x9A6844)); // gros bras
+      fCirc(cx + (int)(r * 0.6f), cy + (int)(r * 0.15f), (int)(r * 0.2f), flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x9A6844));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_BLK);
+      fRect(cx + (int)(r * 0.5f), hy + (int)(hr * 0.3f), 3, (int)(r * 0.3f), C_GRE); // cordon du sifflet
+      fRect(cx + (int)(r * 0.42f), hy - (int)(hr * 0.5f), 5, 4, flash ? C_WHT : C_GOLD); // sifflet dore
+      break;
+    }
+    case 38: { // PEARL : boulangere, toque blanche, tablier, poele
+      heroBody(cx, cy, r, flash, 0xE8552A, 0xC9402A, 0x3A2A2A, walk);
+      fRect(cx - (int)(r * 0.4f), cy + (int)(r * 0.25f), (int)(r * 0.8f) + 1, (int)(r * 0.45f), flash ? C_WHT : KDColor::RGB24(0xF2EAD8)); // tablier
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0xD8A878));
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 8) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 1, C_BLK);
+      KDColor white = flash ? C_GRE : KDColor::RGB24(0xF2EAD8);
+      fCirc(cx, hy - (int)(hr * 0.55f), (int)(hr * 0.8f), white);          // toque de chef
+      fRect(cx - (int)(hr * 0.8f), hy - (int)(hr * 1.2f), (int)(hr * 1.6f) + 1, (int)(hr * 0.7f), white);
+      fRect(cx - hr, hy - (int)(hr * 0.2f), hr * 2, 2, flash ? C_WHT : KDColor::RGB24(0xE8552A)); // foulard orange
+      fRect(cx + (int)(r * 0.45f), cy + (int)(r * 0.2f), (int)(r * 0.12f) + 1, (int)(r * 0.4f), C_GRE); // manche poele
+      fCirc(cx + (int)(r * 0.6f), cy + (int)(r * 0.35f), (int)(r * 0.2f), KDColor::RGB24(0x2A2A3A)); // poele noire
+      break;
+    }
+    case 39: { // SPIKE : cactus vert, epines jaunes, fleur rose
+      fRect(cx - (int)(r * 0.2f), cy + (int)(r * 0.25f), (int)(r * 0.4f) + 1, (int)(r * 0.65f), flash ? C_WHT : KDColor::RGB24(0x3AA05C)); // corps cactus
+      fRect(cx - (int)(r * 0.32f), cy + (int)(r * 0.8f), (int)(r * 0.18f) + 1, (int)(r * 0.14f) + 1, KDColor::RGB24(0x2A6A3A)); // pieds
+      fRect(cx + (int)(r * 0.14f), cy + (int)(r * 0.8f), (int)(r * 0.18f) + 1, (int)(r * 0.14f) + 1, KDColor::RGB24(0x2A6A3A));
+      fCirc(cx, hy, hr, flash ? C_WHT : KDColor::RGB24(0x3AA05C));         // tete cactus
+      heroEyes(cx + ex, hy + fy / 2, hr, fx, false);
+      if (r >= 6) fRect(cx - 2, hy + (int)(hr * 0.5f), 5, 2, C_BLK);
+      for (int a = 0; a < 8; a++) {                                        // epines tout autour de la tete
+        float an = a * 0.7854f;
+        px(cx + (int)(cosf(an) * (hr + 2)), hy + (int)(sinf(an) * (hr + 2)), flash ? C_WHT : KDColor::RGB24(0xFFE05A));
+      }
+      fCirc(cx + (int)(hr * 0.5f), hy - (int)(hr * 0.9f), (int)(r * 0.2f), flash ? C_WHT : KDColor::RGB24(0xE87AB8)); // fleur rose
+      fCirc(cx + (int)(hr * 0.5f), hy - (int)(hr * 0.9f), (int)(r * 0.12f), flash ? C_GRE : KDColor::RGB24(0xF2EAD8));
+      break;
+    }
+  }
+  // flash de bouche pendant l'attaque
+  if (attackT > 0 && r >= 4) {
+    int mx = (int)(cosf(fa) * (r + 6)), my = (int)(sinf(fa) * (r + 6));
+    fCirc(cx + mx, cy + my, attackT > 120 ? 3 : 2, attackT > 120 ? C_WHT : C_YEL);
+    fCirc(cx + mx, cy + my, 1, C_ORG);
+  }
+}
 
 // dessine le sprite complet d'un brawler (corps + traits uniques)
 // walk : phase d'animation de marche (0 = immobile)
 static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0, int attackT = 0) {
+  // les 40 premiers brawlers ont un sprite dessine a la main (V5.7b)
+  if (bIdx >= 0 && bIdx < 40) {
+    if (attackT > 0) { // recul du corps pendant l'attaque, comme les autres
+      int kick = (attackT > 120) ? 2 : 1;
+      cx -= (int)(cosf(faceAng * 0.01745f) * kick);
+      cy -= (int)(sinf(faceAng * 0.01745f) * kick);
+    }
+    drawHeroSprite(cx, cy, r, bIdx, faceAng, flash, walk, attackT);
+    return;
+  }
   const BrawlerDef &d = BRAWLERS[bIdx];
   Look L; brawlerLook(bIdx, L);
   // recul du corps pendant l'attaque (petit kick oppose a la visee)

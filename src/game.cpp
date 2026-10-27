@@ -221,7 +221,7 @@ static const MapTheme THEMES[8] = {
 
 // ------------------------- Definitions brawlers ----------------------
 enum AtkType { ATK_SHOT, ATK_SPREAD, ATK_LOB };
-enum SuperType { SUP_BURST, SUP_DASH, SUP_HEAL, SUP_BARRAGE, SUP_MEGASHOT };
+enum SuperType { SUP_BURST, SUP_DASH, SUP_HEAL, SUP_BARRAGE, SUP_MEGASHOT, SUP_WAVE };
 enum GadType { GAD_HEAL, GAD_SPEED, GAD_AMMO, GAD_BLAST };
 enum StarType { STAR_DMG, STAR_HP, STAR_SPEED, STAR_REGEN };
 
@@ -242,7 +242,7 @@ struct BrawlerDef {
 
 static const BrawlerDef BRAWLERS[50] = {
   {"Shelly",   5600, 1280, 170, 1500, 340, 3, 24, ATK_SPREAD, SUP_BURST,    GAD_SPEED, STAR_DMG,    0,     0, 0x8A4BE0, 0x5C2BA0, 0},
-  {"Nita",     5400, 1320, 160, 1400, 330, 1,  0, ATK_SHOT,   SUP_BURST,    GAD_HEAL,  STAR_HP,    0,     0, 0xC98A3B, 0x8A5C22, 1},
+  {"Nita",     5400, 1320, 160, 1400, 330, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_HEAL,  STAR_HP,    0,     0, 0xC98A3B, 0x8A5C22, 1},
   {"Colt",     4000,  940, 240, 1600, 420, 6,  8, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   0,     0, 0x3B9AC9, 0x22628A, 1},
   {"Bull",     6600, 1750, 100, 1900, 300, 5, 30, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    1,    60, 0xC9973B, 0x8A6622, 0},
   {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
@@ -252,7 +252,7 @@ static const BrawlerDef BRAWLERS[50] = {
   {"Rosa",     6400, 1250, 120, 1500, 340, 3, 12, ATK_SPREAD, SUP_HEAL,     GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
   {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
-  {"Tick",     3000, 1120, 260, 1500, 260, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
+  {"Tick",     3000, 1120, 260, 1500, 260, 3, 14, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
   {"8-Bit",    5800, 1350, 260, 2000, 330, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   2,   880, 0xC9A03B, 0x8A6E22, 1},
   {"Rico",     4200, 1010, 260, 1500, 400, 5,  6, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   2,  1000, 0x3BC9B0, 0x228A78, 1},
   {"Darryl",   6300, 1460, 130, 1400, 380, 2, 14, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    2,  1150, 0xC96B3B, 0x8A4822, 0},
@@ -263,7 +263,7 @@ static const BrawlerDef BRAWLERS[50] = {
   {"Emz",      4800, 1180, 200, 1600, 280, 2, 18, ATK_SPREAD, SUP_BURST,    GAD_HEAL,  STAR_REGEN, 3,  2100, 0xE03B8A, 0xA02258, 1},
   {"Stu",      3800, 1080, 220, 1300, 420, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_DMG,   3,  2350, 0xC93BA0, 0x8A2270, 2},
   {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
-  {"Frank",    7400, 1800, 140, 2400, 260, 1,  0, ATK_SHOT,   SUP_BURST,    GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
+  {"Frank",    7400, 1800, 140, 2400, 260, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
   {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_DASH,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
   {"Bea",      3600,  960, 270, 1500, 380, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   3,  3500, 0xE0C93B, 0xA08A22, 2},
   {"Nani",     3400, 1420, 260, 1900, 340, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
@@ -656,6 +656,8 @@ struct Ent {
   int aiThinkT, aiWx, aiWy;
   float aiSkill, stuckT;
   uint8_t aiRole; // 0 = attaquant/buteur, 1 = defenseur, 2 = tueur
+  int burstLeft, burstTickT; // rafale type Colt : balles qui partent l'une apres l'autre
+  float burstAng, burstMul;
   int walkT, lastHitT, attackT;
   bool drawDone;
 };
@@ -663,11 +665,13 @@ static Ent ents[MAX_ENT]; static int entCount = 0;
 static int humanIdx = -1;
 
 struct Proj {
-  bool active, lob, fromSuper;
+  bool active, lob, fromSuper, pierce;
   float x, y, vx, vy, dmg, travelled, range;
   int team, owner, radius, shape, spin;
+  uint8_t hitIds[8]; int nHits; // pour les projectiles perforants : touche chaque cible une fois
 };
 static Proj projs[MAX_PROJ];
+static bool gPierceProj = false; // le prochain projectile perce tout (SUP_WAVE)
 static float gLobRangeMul = -1.0f; // <0 = portee max ; sinon le lob atterrit sur sa cible
 
 struct Pop { bool active; float x, y; int life, val; };
@@ -835,6 +839,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
   e.aiThinkT = rnd(500); e.aiWx = x; e.aiWy = y;
   e.aiSkill = aiSkill; e.stuckT = 0; e.aiRole = 0;
+  e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
 }
 
@@ -930,6 +935,8 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     if (p.lob && gLobRangeMul > 0) p.range = p.range * fminf(1.0f, gLobRangeMul); // atterrit sur la cible
     p.travelled = 0; p.team = e.team; p.owner = (&e - ents);
     p.radius = isSuper ? 4 : 2;
+    p.pierce = gPierceProj; if (p.pierce) p.radius = 7;
+    p.nHits = 0;
     p.shape = d.projShape; p.spin = 0;
     return;
   }
@@ -943,9 +950,16 @@ static void doAttack(Ent &e, float ang) {
   if (e.hyperT > 0) mul *= 1.25f;
   if (e.accIdx >= 0 && acc.b[e.accIdx].starPower && d.star == STAR_DMG) mul *= 1.1f;
   int n = d.projCount, spread = d.spreadDeg;
-  for (int i = 0; i < n; i++) {
-    float a = ang + ((n > 1) ? (spread * 0.01745f * (i - (n - 1) / 2.0f)) : 0);
-    fireProj(e, a, false, mul, 1.0f, 1.0f);
+  if (n > 1 && d.atk == ATK_SHOT) {
+    // tir en rafale (Colt, Rico, Bo...) : les balles partent l'une apres l'autre,
+    // pas toutes d'un coup en eventail. La premiere part maintenant.
+    fireProj(e, ang, false, mul, 1.0f, 1.0f);
+    e.burstLeft = n - 1; e.burstAng = ang; e.burstMul = mul; e.burstTickT = 70;
+  } else {
+    for (int i = 0; i < n; i++) {
+      float a = ang + ((n > 1) ? (spread * 0.01745f * (i - (n - 1) / 2.0f)) : 0);
+      fireProj(e, a, false, mul, 1.0f, 1.0f);
+    }
   }
   e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
 }
@@ -985,6 +999,12 @@ static void doSuper(Ent &e, float ang) {
     }
     case SUP_MEGASHOT: { // volée perceuse qui defonce les murs (Colt, Brock, Rico...)
       for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.06f, true, mul * 0.75f, 1.3f, 1.6f);
+      break;
+    }
+    case SUP_WAVE: { // onde de choc perforante qui traverse tout (Nita, Frank)
+      gPierceProj = true;
+      fireProj(e, ang, true, mul * 1.5f, 0.9f, 1.4f);
+      gPierceProj = false;
       break;
     }
   }
@@ -1278,6 +1298,14 @@ static void updateMatch(float dt) {
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
     if (e.attackT > 0) e.attackT -= (int)(dt * 1000);
+    // rafale en cours (Colt, Rico...) : la balle suivante part apres un court delai
+    if (e.burstLeft > 0) {
+      e.burstTickT -= (int)(dt * 1000);
+      if (e.burstTickT <= 0) {
+        fireProj(e, e.burstAng, false, e.burstMul, 1.0f, 1.0f);
+        e.burstLeft--; e.burstTickT = 70;
+      }
+    }
     if (e.dashT > 0) {
       e.dashT -= dt;
       breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
@@ -1323,7 +1351,7 @@ static void updateMatch(float dt) {
     float nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
-    if (p.travelled > p.range) { p.active = false; continue; }
+    if (!p.lob && p.travelled > p.range) { p.active = false; continue; } // le lob, lui, explose (voir plus bas)
     // anti-tunneling : milieu du pas teste aussi. Les supers perceurs cassent
     // les murs a l'impact (Colt, Brock, Rico...), les tirs normaux s'y arretent.
     if (!p.lob) {
@@ -1376,8 +1404,16 @@ static void updateMatch(float dt) {
       if (!t.alive || t.team == p.team) continue;
       float ddx = t.x - p.x, ddy = t.y - p.y;
       if (ddx * ddx + ddy * ddy < (p.radius + 7) * (p.radius + 7)) {
-        damageEnt(t, p.dmg, ents[p.owner]);
-        p.active = false; break;
+        if (p.pierce) { // onde perforante : chaque cible touchee une seule fois
+          bool already = false;
+          for (int k = 0; k < p.nHits; k++) if (p.hitIds[k] == j) { already = true; break; }
+          if (already) continue;
+          if (p.nHits < 8) p.hitIds[p.nHits++] = j;
+          damageEnt(t, p.dmg, ents[p.owner]);
+        } else {
+          damageEnt(t, p.dmg, ents[p.owner]);
+          p.active = false; break;
+        }
       }
     }
   }

@@ -221,7 +221,7 @@ static const MapTheme THEMES[8] = {
 
 // ------------------------- Definitions brawlers ----------------------
 enum AtkType { ATK_SHOT, ATK_SPREAD, ATK_LOB };
-enum SuperType { SUP_BURST, SUP_DASH, SUP_HEAL, SUP_BARRAGE, SUP_MEGASHOT, SUP_WAVE };
+enum SuperType { SUP_BURST, SUP_DASH, SUP_HEAL, SUP_BARRAGE, SUP_MEGASHOT, SUP_WAVE, SUP_SUMMON };
 enum GadType { GAD_HEAL, GAD_SPEED, GAD_AMMO, GAD_BLAST };
 enum StarType { STAR_DMG, STAR_HP, STAR_SPEED, STAR_REGEN };
 
@@ -242,7 +242,7 @@ struct BrawlerDef {
 
 static const BrawlerDef BRAWLERS[50] = {
   {"Shelly",   5600, 1280, 170, 1500, 340, 3, 24, ATK_SPREAD, SUP_BURST,    GAD_SPEED, STAR_DMG,    0,     0, 0x8A4BE0, 0x5C2BA0, 0},
-  {"Nita",     5400, 1320, 160, 1400, 330, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_HEAL,  STAR_HP,    0,     0, 0xC98A3B, 0x8A5C22, 1},
+  {"Nita",     5400, 1320, 160, 1400, 330, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_HEAL,  STAR_HP,    0,     0, 0xC98A3B, 0x8A5C22, 1},
   {"Colt",     4000,  940, 240, 1600, 420, 6,  8, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   0,     0, 0x3B9AC9, 0x22628A, 1},
   {"Bull",     6600, 1750, 100, 1900, 300, 5, 30, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    1,    60, 0xC9973B, 0x8A6622, 0},
   {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
@@ -250,19 +250,19 @@ static const BrawlerDef BRAWLERS[50] = {
   {"Barley",   3600, 1160, 240, 1700, 260, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 1,   240, 0x7BC93B, 0x4F8A22, 3},
   {"Poco",     5600, 1100, 200, 1400, 300, 3, 16, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 1,   300, 0xB03BE0, 0x7822A0, 1},
   {"Rosa",     6400, 1250, 120, 1500, 340, 3, 12, ATK_SPREAD, SUP_HEAL,     GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
-  {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
+  {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
   {"Tick",     3000, 1120, 260, 1500, 260, 3, 14, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_REGEN, 2,   750, 0x8AC93B, 0x5C8A22, 3},
-  {"8-Bit",    5800, 1350, 260, 2000, 330, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_AMMO,  STAR_DMG,   2,   880, 0xC9A03B, 0x8A6E22, 1},
+  {"8-Bit",    5800, 1350, 260, 2000, 330, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_DMG,   2,   880, 0xC9A03B, 0x8A6E22, 1},
   {"Rico",     4200, 1010, 260, 1500, 400, 5,  6, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   2,  1000, 0x3BC9B0, 0x228A78, 1},
   {"Darryl",   6300, 1460, 130, 1400, 380, 2, 14, ATK_SPREAD, SUP_DASH,     GAD_BLAST, STAR_HP,    2,  1150, 0xC96B3B, 0x8A4822, 0},
-  {"Penny",    4600, 1290, 230, 1700, 340, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_HEAL,  STAR_REGEN, 2,  1300, 0xE07B3B, 0xA05222, 0},
+  {"Penny",    4600, 1290, 230, 1700, 340, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_HEAL,  STAR_REGEN, 2,  1300, 0xE07B3B, 0xA05222, 0},
   {"Carl",     5500, 1250, 190, 1200, 320, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_HP,    3,  1500, 0x7B9BC9, 0x50688A, 3},
   {"Jacky",    6000, 1300, 110, 1500, 320, 4, 22, ATK_SPREAD, SUP_BURST,    GAD_BLAST, STAR_HP,    3,  1700, 0xE0B03B, 0xA07822, 0},
   {"Bo",       5000, 1200, 250, 1800, 310, 3,  9, ATK_SHOT,   SUP_BARRAGE,  GAD_SPEED, STAR_REGEN, 3,  1900, 0x3B7AC9, 0x224F8A, 2},
   {"Emz",      4800, 1180, 200, 1600, 280, 2, 18, ATK_SPREAD, SUP_BURST,    GAD_HEAL,  STAR_REGEN, 3,  2100, 0xE03B8A, 0xA02258, 1},
   {"Stu",      3800, 1080, 220, 1300, 420, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_DMG,   3,  2350, 0xC93BA0, 0x8A2270, 2},
-  {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
+  {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_SUMMON,   GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
   {"Frank",    7400, 1800, 140, 2400, 260, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
   {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_DASH,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
   {"Bea",      3600,  960, 270, 1500, 380, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   3,  3500, 0xE0C93B, 0xA08A22, 2},
@@ -635,7 +635,7 @@ static const char *MODE_DESC[MODE_COUNT] = {
 static uint8_t tileMap[MAPW][MAPH];
 
 // ------------------------- Entites ----------------------------------
-#define MAX_ENT 8
+#define MAX_ENT 14 // place pour les pets invoques (ours, tourelles, stations)
 #define MAX_PROJ 64
 #define MAX_POP 16
 #define MAX_SAFE 4
@@ -660,6 +660,7 @@ struct Ent {
   float burstAng, burstMul;
   int walkT, lastHitT, attackT;
   bool drawDone;
+  bool isPet; int petOwner; uint8_t petKind; float petLife; // creature invoquee (0=ours 1=tourelle 2=station de soin)
 };
 static Ent ents[MAX_ENT]; static int entCount = 0;
 static int humanIdx = -1;
@@ -841,6 +842,30 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.aiSkill = aiSkill; e.stuckT = 0; e.aiRole = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
+  e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0;
+}
+
+// invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
+static void spawnPet(Ent &owner, int kind) {
+  if (entCount >= MAX_ENT) return;
+  // une seule creature vivante par proprietaire : l'ancienne disparait
+  for (int i = 0; i < entCount; i++)
+    if (ents[i].isPet && ents[i].petOwner == (&owner - ents) && ents[i].alive) { ents[i].hp = 0; ents[i].petLife = 0; }
+  Ent &e = ents[entCount++];
+  e.brawlerIdx = owner.brawlerIdx; e.accIdx = -1; e.team = owner.team;
+  e.x = owner.x + cosf(owner.aimAng) * 22; e.y = owner.y + sinf(owner.aimAng) * 22;
+  e.maxHP = (kind == 0) ? 4200 : ((kind == 1) ? 3200 : 2800);
+  e.hp = e.maxHP; e.ammo = 3; e.superCharge = 0; e.gadgetUses = 0;
+  e.isHuman = false; e.alive = true; e.respawnT = 0;
+  e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0;
+  e.aimAng = e.faceAng = owner.aimAng;
+  e.gems = 0; e.hasBall = false; e.goals = 0; e.stars = 0; e.kills = 0;
+  e.aiThinkT = 0; e.aiWx = e.x; e.aiWy = e.y;
+  e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0;
+  e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
+  e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
+  e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind; e.petLife = 25.0f;
+  spawnParts(e.x, e.y, 1, 6);
 }
 
 static void setupMatch(int selMode, int myBrawler) {
@@ -1001,10 +1026,17 @@ static void doSuper(Ent &e, float ang) {
       for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.06f, true, mul * 0.75f, 1.3f, 1.6f);
       break;
     }
-    case SUP_WAVE: { // onde de choc perforante qui traverse tout (Nita, Frank)
+    case SUP_WAVE: { // onde de choc perforante qui traverse tout (Frank)
       gPierceProj = true;
       fireProj(e, ang, true, mul * 1.5f, 0.9f, 1.4f);
       gPierceProj = false;
+      break;
+    }
+    case SUP_SUMMON: { // creature invoquee (Nita ours, Jessie/8-Bit/Penny tourelle, Pam station de soin)
+      int kind = 1;
+      if (e.brawlerIdx == 1) kind = 0; // Nita : ours
+      else if (e.brawlerIdx == 21) kind = 2; // Pam : station de soin
+      spawnPet(e, kind);
       break;
     }
   }
@@ -1217,6 +1249,43 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
   spawnParts(e.x, e.y, 0, 3);
 }
 
+// IA des creatures invoquees : ours melee, tourelle tireuse, station de soin
+static void updatePet(Ent &e, float dt) {
+  e.petLife -= dt;
+  if (e.petLife <= 0) { e.hp = 0; return; } // expiration : part en particules via le bloc de mort
+  if (e.petKind == 0) { // ours de Nita : traque et tape au corps a corps
+    Ent *t = nullptr; nearestEnemyDist(e, &t);
+    if (t) {
+      float dx = t->x - e.x, dy = t->y - e.y, l = sqrtf(dx * dx + dy * dy);
+      if (l > 26) { moveEnt(e, dx / l * 150 * dt, dy / l * 150 * dt); e.walkT += (int)(dt * 1000); }
+      else if (e.attackT <= 0) {
+        e.aimAng = e.faceAng = atan2f(dy, dx);
+        damageEnt(*t, 950, ents[e.petOwner]);
+        e.attackT = 500;
+      }
+    }
+  } else if (e.petKind == 1) { // tourelle (Jessie, Penny, 8-Bit) : immobile, canarde l'ennemi le plus proche
+    Ent *t = nullptr; float ed = nearestEnemyDist(e, &t);
+    if (t && ed < 260 && e.attackT <= 0 && e.ammo >= 1) {
+      float ang = atan2f(t->y - e.y, t->x - e.x);
+      e.aimAng = e.faceAng = ang;
+      fireProj(e, ang, false, 1.0f, 1.0f, 0.7f);
+      e.attackT = 600;
+    }
+  } else { // station de soin de Pam : regenere les allies proches
+    for (int i = 0; i < entCount; i++) {
+      Ent &a = ents[i];
+      if (!a.alive || a.team != e.team || a.isPet) continue;
+      float dx = a.x - e.x, dy = a.y - e.y;
+      if (dx * dx + dy * dy < 90 * 90) {
+        float before = a.hp;
+        a.hp = fminf(a.maxHP, a.hp + a.maxHP * 0.10f * dt);
+        if ((int)(a.hp / 200) != (int)(before / 200) && a.hp > before) addPop(a.x, a.y - 12, (int)(a.hp - before));
+      }
+    }
+  }
+}
+
 static void updateMatch(float dt) {
   if (startCountdown > -800) {
     // phase 3-2-1-GO : le temps tourne uniquement pour l'anim
@@ -1293,7 +1362,8 @@ static void updateMatch(float dt) {
       }
       continue;
     }
-    if (!e.isHuman) updateAI(e, dt);
+    if (!e.isHuman && !e.isPet) updateAI(e, dt);
+    else if (e.isPet) updatePet(e, dt);
     if (e.speedBuffT > 0) e.speedBuffT -= dt;
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
@@ -1324,7 +1394,13 @@ static void updateMatch(float dt) {
     if (e.regenT > regenDelay) e.hp = fminf(e.maxHP, e.hp + e.maxHP * 0.12f * dt);
     if (e.hyperT > 0) e.superCharge = fminf(100, e.superCharge + 6 * dt);
     if (e.hp <= 0) {
-      e.alive = false; e.respawnT = respawnMs;
+      e.alive = false;
+      if (e.isPet) { // une creature morte ne respawn pas et ne rapporte rien
+        e.respawnT = 99999999;
+        spawnParts(e.x, e.y, 1, 8);
+        continue;
+      }
+      e.respawnT = respawnMs;
       if (e.gems > 0)
         for (int g = 0; g < 10 && e.gems > 0; g++)
           if (!gems[g].active) { gems[g].active = true; gems[g].x = e.x + rnd(20) - 10; gems[g].y = e.y + rnd(20) - 10; e.gems--; }
@@ -1424,7 +1500,7 @@ static void updateMatch(float dt) {
     for (int g = 0; g < 10; g++) {
       if (!gems[g].active) continue;
       for (int i = 0; i < entCount; i++)
-        if (ents[i].alive && fabsf(ents[i].x - gems[g].x) < 12 && fabsf(ents[i].y - gems[g].y) < 12) {
+        if (!ents[i].isPet && ents[i].alive && fabsf(ents[i].x - gems[g].x) < 12 && fabsf(ents[i].y - gems[g].y) < 12) {
           gems[g].active = false; ents[i].gems++;
           if (i == humanIdx) gemCounter++;
           break;
@@ -1456,7 +1532,7 @@ static void updateMatch(float dt) {
     if (!carried) {
       for (int i = 0; i < entCount; i++) {
         Ent &e = ents[i];
-        if (!e.alive || e.hasBall) continue;
+        if (e.isPet || !e.alive || e.hasBall) continue;
         if (fabsf(e.x - ballX) < 12 && fabsf(e.y - ballY) < 12) { e.hasBall = true; break; }
       }
       if (!carried) {
@@ -1515,7 +1591,7 @@ static void updateMatch(float dt) {
     for (int z = 0; z < MAX_ZONE; z++) {
       int myTeamHere = 0, enTeamHere = 0;
       for (int i = 0; i < entCount; i++) {
-        if (!ents[i].alive) continue;
+        if (!ents[i].alive || ents[i].isPet) continue; // les tourelles ne capturent pas
         if (fabsf(ents[i].x - zones[z].x) < 24 && fabsf(ents[i].y - zones[z].y) < 24) {
           if (ents[i].team == 0) myTeamHere++; else enTeamHere++;
         }
@@ -1545,7 +1621,7 @@ static void updateMatch(float dt) {
     if (mode == MODE_KO) {
       int alive0 = 0, alive1 = 0;
       for (int i = 0; i < entCount; i++)
-        if (ents[i].alive) { if (ents[i].team == 0) alive0++; else alive1++; }
+        if (ents[i].alive && !ents[i].isPet) { if (ents[i].team == 0) alive0++; else alive1++; }
       if (alive0 == 0) matchResult = -1;
       if (alive1 == 0) matchResult = 1;
     } else {
@@ -1553,7 +1629,7 @@ static void updateMatch(float dt) {
       // reste quelqu'un de ton equipe (toi OU ton coequipier), defaite sinon
       bool myTeam = false, otherTeam = false;
       for (int i = 0; i < entCount; i++)
-        if (ents[i].alive) { if (ents[i].team == 0) myTeam = true; else otherTeam = true; }
+        if (ents[i].alive && !ents[i].isPet) { if (ents[i].team == 0) myTeam = true; else otherTeam = true; }
       if (!myTeam) matchResult = -1;        // equipe du joueur eliminee
       else if (!otherTeam) matchResult = 1; // tous les ennemis morts : on gagne
     }
@@ -1741,11 +1817,34 @@ static void drawEnt(Ent &e, int sx, int sy) {
   KDColor tCol = teamRed ? C_RED : C_BLUE;
   KDColor tColD = teamRed ? C_REDD : C_BLUED;
   bool flash = e.lastHitT > 0 && (e.lastHitT / 50) % 2 == 0;
+  int bob = ((e.walkT / 40) % 2) * (e.dashT > 0 ? 2 : 1);
+  int by = sy - bob;
+
+  if (e.isPet) { // rendu des creatures invoquees
+    shadow(sx, sy + 6, 6, 3);
+    if (e.petKind == 0) { // ours de Nita
+      fCirc(sx - 5, by - 9, 3, tColD); fCirc(sx + 5, by - 9, 3, tColD);
+      fCirc(sx, by - 4, 8, flash ? C_WHT : tCol); fCirc(sx, by - 2, 8, tColD);
+      fCirc(sx - 3, by - 6, 1, C_BLK); fCirc(sx + 3, by - 6, 1, C_BLK);
+      fRect(sx - 2, by - 2, 4, 2, C_BLK);
+    } else if (e.petKind == 1) { // tourelle (Jessie, Penny, 8-Bit)
+      fRect(sx - 7, by, 14, 5, tColD);
+      fRect(sx - 5, by - 6, 10, 7, flash ? C_WHT : tCol);
+      fRect(sx + (int)(cosf(e.aimAng) * 5) - 1, by - 3 + (int)(sinf(e.aimAng) * 4), 5, 2, C_BLK);
+      fCirc(sx - 3, by - 4, 1, C_YEL); fCirc(sx + 3, by - 4, 1, C_YEL);
+    } else { // station de soin de Pam
+      int r = 7 + (animT / 200) % 2;
+      fCirc(sx, by - 2, r, flash ? C_WHT : C_GREEN);
+      fRect(sx - 1, by - 6, 2, 8, C_WHT); fRect(sx - 4, by - 3, 8, 2, C_WHT);
+      fRing(sx, by - 2, r + 2 + (animT / 300) % 3, C_GREEN);
+    }
+    if (e.petLife < 5 && (e.petLife * 2) - (int)(e.petLife * 2) < 0.5f) return; // clignote avant de disparaitre
+    drawHPBar(sx, by - 16, e.hp, e.maxHP, e.team == ents[humanIdx].team ? C_GREEN : tCol, tColD);
+    return;
+  }
 
   shadow(sx, sy + 7, 7, 3);
   if (e.hyperT > 0) { fRing(sx, sy, 12, C_MAG); fRing(sx, sy, 13 + (animT / 80) % 2, C_PUR); }
-  int bob = ((e.walkT / 40) % 2) * (e.dashT > 0 ? 2 : 1);
-  int by = sy - bob;
   drawBrawlerSprite(sx, by, 7, e.brawlerIdx, (int)e.faceAng, flash, e.walkT, e.attackT);
   arc(sx, by, 8, 3.34f, 6.08f, 2, tCol);
   int gx = (int)(cosf(e.aimAng) * 9), gy = (int)(sinf(e.aimAng) * 9);

@@ -660,7 +660,8 @@ static const char *MODE_DESC[MODE_COUNT] = {
   "DETROUISE LE COFFRE", "20 ETOILES DE KILLS", "ELIMINE L'EQUIPE !", "CAPTURE LES ZONES"
 };
 
-static uint8_t tileMap[MAPW][MAPH];
+static uint8_t tileMap[44][32]; // taille MAX : la vraie taille (mapW, mapH) depend du mode
+static int mapW = MAPW, mapH = MAPH;
 
 // ------------------------- Entites ----------------------------------
 #define MAX_ENT 14 // place pour les pets invoques (ours, tourelles, stations)
@@ -712,15 +713,15 @@ struct Proj {
 static Proj projs[MAX_PROJ];
 
 // zones au sol persistantes (cocktails de Barley) : degats toutes les 0.66 s pendant 2 s
-struct FireZone { bool active; float x, y, life, tickT, dmg; int team, owner; };
+struct FireZone { bool active; float x, y, life, tickT, dmg, r; int team, owner; };
 static FireZone fireZones[8];
-static void spawnFireZone(float x, float y, float dmg, int team, int owner, float life = 2.0f) {
+static void spawnFireZone(float x, float y, float dmg, int team, int owner, float life = 2.0f, float rad = 40.0f) {
   for (int i = 0; i < 8; i++)
     if (!fireZones[i].active) {
       fireZones[i].active = true;
       fireZones[i].x = x; fireZones[i].y = y; fireZones[i].dmg = dmg;
       fireZones[i].team = team; fireZones[i].owner = owner;
-      fireZones[i].life = life; fireZones[i].tickT = 0.0f;
+      fireZones[i].life = life; fireZones[i].tickT = 0.0f; fireZones[i].r = rad;
       return;
     }
 }
@@ -783,18 +784,18 @@ static void addPop(float x, float y, int val) {
 // ------------------------- Utilitaires monde ------------------------
 static bool solidAt(float x, float y) {
   int tx = (int)(x / TILE), ty = (int)(y / TILE);
-  if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) return true;
+  if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) return true;
   return tileMap[tx][ty] == 1;
 }
 static bool inBush(float x, float y) {
   int tx = (int)(x / TILE), ty = (int)(y / TILE);
-  if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) return false;
+  if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) return false;
   return tileMap[tx][ty] == 2;
 }
 // destruction de murs par les supers (Shelly, Bull, El Primo, Colt... comme dans BS)
 static void breakWalls(float cx, float cy, float r) {
-  int t0x = (int)fmaxf(0, (cx - r) / TILE), t1x = (int)fminf(MAPW - 1, (cx + r) / TILE);
-  int t0y = (int)fmaxf(0, (cy - r) / TILE), t1y = (int)fminf(MAPH - 1, (cy + r) / TILE);
+  int t0x = (int)fmaxf(0, (cx - r) / TILE), t1x = (int)fminf(mapW - 1, (cx + r) / TILE);
+  int t0y = (int)fmaxf(0, (cy - r) / TILE), t1y = (int)fminf(mapH - 1, (cy + r) / TILE);
   for (int tx = t0x; tx <= t1x; tx++)
     for (int ty = t0y; ty <= t1y; ty++) {
       float wx = tx * TILE + TILE / 2.0f, wy = ty * TILE + TILE / 2.0f;
@@ -809,8 +810,8 @@ static void moveEnt(Ent &e, float dx, float dy) {
   if (solidAt(e.x + dx, e.y)) dx = 0;
   if (solidAt(e.x, e.y + dy)) dy = 0;
   e.x += dx; e.y += dy;
-  e.x = fmaxf(8, fminf(MAPW * TILE - 8, e.x));
-  e.y = fmaxf(8, fminf(MAPH * TILE - 8, e.y));
+  e.x = fmaxf(8, fminf(mapW * TILE - 8, e.x));
+  e.y = fmaxf(8, fminf(mapH * TILE - 8, e.y));
   if (dx || dy) { e.faceAng = (int)(atan2f(dy, dx) * 57.2957795f) & 255; e.walkT += (int)(fabsf(dx) + fabsf(dy)); }
 }
 
@@ -823,45 +824,49 @@ static int mapDayIndex() {
   return matchCounter % 3;
 }
 static void genMap() {
+  // on nettoie TOUT le tableau max : au-dela de la zone de jeu, tout est mur
+  for (int x = 0; x < 44; x++)
+    for (int y = 0; y < 32; y++)
+      tileMap[x][y] = 1;
   int variant = mapDayIndex();
   uint16_t savedSeed = seed;
   seed = (uint16_t)(12345 + variant * 7919 + mode * 104729); // carte fixe du jour
-  for (int x = 0; x < MAPW; x++)
-    for (int y = 0; y < MAPH; y++) {
+  for (int x = 0; x < mapW; x++)
+    for (int y = 0; y < mapH; y++) {
       tileMap[x][y] = 0;
-      if (x == 0 || y == 0 || x == MAPW - 1 || y == MAPH - 1) tileMap[x][y] = 1;
+      if (x == 0 || y == 0 || x == mapW - 1 || y == mapH - 1) tileMap[x][y] = 1;
     }
   // densite et motif selon la variante du jour
   int density = 95 + variant * 25;        // variante 0 : aeree, 2 : tres bourree
   for (int t = 0; t < density; t++) {
-    int x = 1 + rnd(MAPW / 2), y = 1 + rnd(MAPH - 2);
+    int x = 1 + rnd(mapW / 2), y = 1 + rnd(mapH - 2);
     int v = rnd(10) < (variant == 1 ? 5 : 4) ? 2 : 1;
-    if (x < 5 || abs((int)(y - MAPH / 2)) < 2) continue;
+    if (x < 5 || abs((int)(y - mapH / 2)) < 2) continue;
     if (variant == 2 && (x % 3 == 0)) continue;   // couloirs alignes
     tileMap[x][y] = v;
-    tileMap[MAPW - 1 - x][MAPH - 1 - y] = v;
+    tileMap[mapW - 1 - x][mapH - 1 - y] = v;
   }
   // structures symetriques propres a chaque variante
   if (variant >= 1) {
-    for (int y = 4; y < MAPH - 4; y++) {          // colonnes laterales
-      tileMap[3][y] = 1; tileMap[MAPW - 4][y] = 1;
+    for (int y = 4; y < mapH - 4; y++) {          // colonnes laterales
+      tileMap[3][y] = 1; tileMap[mapW - 4][y] = 1;
     }
     for (int i = 0; i < 4; i++) {                 // blocs centraux
-      tileMap[MAPW / 2 - 3 + i][3] = 2;
-      tileMap[MAPW / 2 - 3 + i][MAPH - 4] = 2;
+      tileMap[mapW / 2 - 3 + i][3] = 2;
+      tileMap[mapW / 2 - 3 + i][mapH - 4] = 2;
     }
   }
   if (variant == 2) {                             // buissons protecteurs aux spawn
     for (int i = 0; i < 3; i++) {
-      tileMap[5][MAPH / 2 - 3 + i * 3] = 2;
-      tileMap[MAPW - 6][MAPH / 2 - 3 + i * 3] = 2;
+      tileMap[5][mapH / 2 - 3 + i * 3] = 2;
+      tileMap[mapW - 6][mapH / 2 - 3 + i * 3] = 2;
     }
   }
   if (mode == MODE_BALL || mode == MODE_HEIST || mode == MODE_ZONE)
-    for (int x = 1; x < MAPW - 1; x++)
-      for (int y = MAPH / 2 - 1; y <= MAPH / 2 + 1; y++) tileMap[x][y] = 0;
+    for (int x = 1; x < mapW - 1; x++)
+      for (int y = mapH / 2 - 1; y <= mapH / 2 + 1; y++) tileMap[x][y] = 0;
   if (mode == MODE_BALL) // bouches de but ouvertes dans le mur de bord : entre les poteaux uniquement
-    for (int y = MAPH / 2 - 2; y <= MAPH / 2 + 1; y++) { tileMap[0][y] = 0; tileMap[MAPW - 1][y] = 0; }
+    for (int y = mapH / 2 - 2; y <= mapH / 2 + 1; y++) { tileMap[0][y] = 0; tileMap[mapW - 1][y] = 0; }
   seed = savedSeed; // restaure la graine du match pour l'aléa en jeu
 }
 
@@ -941,6 +946,9 @@ static void setupMatch(int selMode, int myBrawler) {
   for (int i = 0; i < 8; i++) fireZones[i].active = false;
   for (int i = 0; i < MAX_SAFE; i++) { safes[i].hp = 0; safes[i].maxHP = 0; }
   for (int i = 0; i < MAX_ZONE; i++) zones[i].prog = 0;
+  // map plus grande en survivant duo (et solo) : 44x32 au lieu de 32x24
+  mapW = (mode == MODE_SOLO || mode == MODE_DUO) ? 44 : MAPW;
+  mapH = (mode == MODE_SOLO || mode == MODE_DUO) ? 32 : MAPH;
   genMap();
   for (int i = 0; i < 5; i++) { teamGems[i] = 0; teamStars[i] = 0; }
   gemCountdown = -1; matchTimeMs = 0; shakeT = 0; poisonWaveT = 0;
@@ -953,14 +961,14 @@ static void setupMatch(int selMode, int myBrawler) {
 
   if (mode == MODE_SOLO || mode == MODE_DUO) {
     if (mode == MODE_SOLO) {
-      static const float pos[6][2] = {{40,40},{MAPW*TILE-40,40},{40,MAPH*TILE-40},{MAPW*TILE-40,MAPH*TILE-40},{MAPW*TILE/2,30},{MAPW*TILE/2,MAPH*TILE-30}};
+      const float pos[6][2] = {{40,40},{mapW*TILE-40,40},{40,mapH*TILE-40},{mapW*TILE-40,mapH*TILE-40},{mapW*TILE/2,30},{mapW*TILE/2,mapH*TILE-30}};
       for (int i = 0; i < 6; i++) {
         int bIdx = (i == 0) ? myBrawler : pick();
         addEnt(bIdx, (i == 0) ? myBrawler : -1, i, pos[i][0], pos[i][1], i == 0, skill);
         if (i == 0) humanIdx = 0;
       }
     } else {
-      static const float pos[4][2] = {{40,40},{MAPW*TILE-40,40},{40,MAPH*TILE-40},{MAPW*TILE-40,MAPH*TILE-40}};
+      const float pos[4][2] = {{40,40},{mapW*TILE-40,40},{40,mapH*TILE-40},{mapW*TILE-40,mapH*TILE-40}};
       addEnt(myBrawler, myBrawler, 0, pos[0][0], pos[0][1] - 25, true, skill); humanIdx = 0;
       addEnt(pick(), -1, 0, pos[0][0], pos[0][1] + 25, false, skill);
       for (int t = 1; t < 4; t++) {
@@ -968,34 +976,34 @@ static void setupMatch(int selMode, int myBrawler) {
         addEnt(pick(), -1, t, pos[t][0], pos[t][1] + 25, false, skill);
       }
     }
-    soloShrink = (MAPW + MAPH) * TILE / 2 + 200;
+    soloShrink = (mapW + mapH) * TILE / 2 + 200;
     poisonWaveT = 60000; // le poison n'arrive qu'apres 1 minute de partie
   } else {
-    addEnt(myBrawler, myBrawler, 0, 40, MAPH * TILE / 2, true, skill); humanIdx = 0;
+    addEnt(myBrawler, myBrawler, 0, 40, mapH * TILE / 2, true, skill); humanIdx = 0;
     int a1 = pick(); if (a1 == myBrawler) a1 = pick();
     int a2 = pick(); if (a2 == myBrawler || a2 == a1) a2 = pick();
-    addEnt(a1, -1, 0, 40, MAPH * TILE / 2 - 70, false, skill);
-    addEnt(a2, -1, 0, 40, MAPH * TILE / 2 + 70, false, skill);
+    addEnt(a1, -1, 0, 40, mapH * TILE / 2 - 70, false, skill);
+    addEnt(a2, -1, 0, 40, mapH * TILE / 2 + 70, false, skill);
     int e1 = pick(), e2 = pick(), e3 = pick();
-    addEnt(e1, -1, 1, MAPW * TILE - 40, MAPH * TILE / 2, false, skill);
-    addEnt(e2, -1, 1, MAPW * TILE - 40, MAPH * TILE / 2 - 70, false, skill);
-    addEnt(e3, -1, 1, MAPW * TILE - 40, MAPH * TILE / 2 + 70, false, skill);
+    addEnt(e1, -1, 1, mapW * TILE - 40, mapH * TILE / 2, false, skill);
+    addEnt(e2, -1, 1, mapW * TILE - 40, mapH * TILE / 2 - 70, false, skill);
+    addEnt(e3, -1, 1, mapW * TILE - 40, mapH * TILE / 2 + 70, false, skill);
 
     if (mode == MODE_GEM)
       for (int i = 0; i < 6; i++) {
         gems[i].active = true;
-        gems[i].x = MAPW * TILE / 2 + (rnd(3) - 1) * 30;
-        gems[i].y = MAPH * TILE / 2 + (rnd(3) - 1) * 30;
+        gems[i].x = mapW * TILE / 2 + (rnd(3) - 1) * 30;
+        gems[i].y = mapH * TILE / 2 + (rnd(3) - 1) * 30;
       }
-    else if (mode == MODE_BALL) { ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0; }
+    else if (mode == MODE_BALL) { ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0; }
     else if (mode == MODE_HEIST) {
-      safes[0].team = 0; safes[0].x = 30; safes[0].y = MAPH * TILE / 2; safes[0].maxHP = 26000; safes[0].hp = safes[0].maxHP;
-      safes[1].team = 1; safes[1].x = MAPW * TILE - 30; safes[1].y = MAPH * TILE / 2; safes[1].maxHP = 26000; safes[1].hp = safes[1].maxHP;
+      safes[0].team = 0; safes[0].x = 30; safes[0].y = mapH * TILE / 2; safes[0].maxHP = 26000; safes[0].hp = safes[0].maxHP;
+      safes[1].team = 1; safes[1].x = mapW * TILE - 30; safes[1].y = mapH * TILE / 2; safes[1].maxHP = 26000; safes[1].hp = safes[1].maxHP;
     }
     else if (mode == MODE_ZONE) {
-      zones[0].x = MAPW * TILE / 2; zones[0].y = MAPH * TILE / 2 - 60;
-      zones[1].x = MAPW * TILE / 2 - 70; zones[1].y = MAPH * TILE / 2 + 50;
-      zones[2].x = MAPW * TILE / 2 + 70; zones[2].y = MAPH * TILE / 2 + 50;
+      zones[0].x = mapW * TILE / 2; zones[0].y = mapH * TILE / 2 - 60;
+      zones[1].x = mapW * TILE / 2 - 70; zones[1].y = mapH * TILE / 2 + 50;
+      zones[2].x = mapW * TILE / 2 + 70; zones[2].y = mapH * TILE / 2 + 50;
     }
   }
   // roles IA : dans chaque equipe, le 1er attaque l'objectif, le 2e defend, le 3e chasse
@@ -1319,7 +1327,7 @@ static void doSuper(Ent &e, float ang) {
       int tx = (int)(wx / TILE), ty = (int)(wy / TILE);
       for (int cx2 = tx - 1; cx2 <= tx + 1; cx2++)
         for (int cy2 = ty - 2; cy2 <= ty + 2; cy2++)
-          if (cx2 >= 1 && cy2 >= 1 && cx2 < MAPW - 1 && cy2 < MAPH - 1 && tileMap[cx2][cy2] == 0)
+          if (cx2 >= 1 && cy2 >= 1 && cx2 < mapW - 1 && cy2 < mapH - 1 && tileMap[cx2][cy2] == 0)
             tileMap[cx2][cy2] = 1;
       spawnParts(wx, wy, 2, 10);
       break;
@@ -1424,18 +1432,18 @@ static void updateAI(Ent &e, float dt) {
           if (dd < bestD) { bestD = dd; tx = gems[i].x; ty = gems[i].y; }
         }
       // compte a rebours : on protege son butin en reculant dans son camp
-      if (gemCountdown > 0 && bestD > 100 * 100) { tx = (e.team == 0) ? 60 : MAPW * TILE - 60; ty = MAPH * TILE / 2; }
-      else if (bestD == 1e9) { tx = MAPW * TILE / 2; ty = MAPH * TILE / 2; }
+      if (gemCountdown > 0 && bestD > 100 * 100) { tx = (e.team == 0) ? 60 : mapW * TILE - 60; ty = mapH * TILE / 2; }
+      else if (bestD == 1e9) { tx = mapW * TILE / 2; ty = mapH * TILE / 2; }
       onObj = (bestD != 1e9);
     }
     else if (mode == MODE_BALL) {
       // roles Brawl Ball : 0 = buteur, 1 = defenseur, 2 = tueur
-      float goalX = (e.team == 0) ? MAPW * TILE - 12 : 12;
-      float ownX  = (e.team == 0) ? 20 : MAPW * TILE - 20;
-      if (e.hasBall) { tx = goalX; ty = MAPH * TILE / 2; } // porteur : fonce marquer, meuble rien
+      float goalX = (e.team == 0) ? mapW * TILE - 12 : 12;
+      float ownX  = (e.team == 0) ? 20 : mapW * TILE - 20;
+      if (e.hasBall) { tx = goalX; ty = mapH * TILE / 2; } // porteur : fonce marquer, meuble rien
       else if (e.aiRole == 1) { // defenseur : veille devant son but
         tx = ownX + ((e.team == 0) ? 45 : -45);
-        ty = MAPH * TILE / 2 + ((e.walkT / 600) % 2 ? 50 : -50);
+        ty = mapH * TILE / 2 + ((e.walkT / 600) % 2 ? 50 : -50);
       }
       else if (e.aiRole == 2) { /* tueur : cible l'ennemi via tgt plus bas */ }
       else if (ballVX == 0 && ballVY == 0) { tx = ballX; ty = ballY; } // ballon libre : on va le prendre
@@ -1470,7 +1478,7 @@ static void updateAI(Ent &e, float dt) {
     }
     else { // RECOMPENSE, KO, SURVIVANT : chasse active vers le centre ou l'ennemi connu
       if (tgt) { tx = tgt->x; ty = tgt->y; }
-      else { tx = MAPW * TILE / 2; ty = MAPH * TILE / 2; }
+      else { tx = mapW * TILE / 2; ty = mapH * TILE / 2; }
       onObj = (tgt != nullptr);
     }
     // anti-embouteillage : si un coequipier vise deja ce point, on se decale
@@ -1489,13 +1497,13 @@ static void updateAI(Ent &e, float dt) {
   float wx = e.aiWx, wy = e.aiWy;
   if (low && tgt && ed < 240) {
     // repli vers son coin de depart en tirant en reculant si possible
-    wx = (e.team == 0) ? 30 : MAPW * TILE - 30;
-    wy = MAPH * TILE / 2 + (rnd(120) - 60);
+    wx = (e.team == 0) ? 30 : mapW * TILE - 30;
+    wy = mapH * TILE / 2 + (rnd(120) - 60);
   }
 
   // fuir la zone de poison : retour vers le centre
   if (mode == MODE_SOLO || mode == MODE_DUO || mode == MODE_KO) {
-    int cx = MAPW * TILE / 2, cy = MAPH * TILE / 2;
+    int cx = mapW * TILE / 2, cy = mapH * TILE / 2;
     int ddx = e.x - cx, ddy = e.y - cy;
     if (ddx * ddx + ddy * ddy > (soloShrink - 40) * (soloShrink - 40)) { wx = cx; wy = cy; }
   }
@@ -1531,11 +1539,17 @@ static void updateAI(Ent &e, float dt) {
       wx = e.x + cosf(angT + side) * 80; wy = e.y + sinf(angT + side) * 80;
     }
   }
-  // IA porteuse du ballon : fonce au but ET shoote sur les defenseurs proches
+  // IA porteuse du ballon : fonce au but, TIRE vers le but des qu'elle est a portee, et shoote les defenseurs
   if (mode == MODE_BALL && e.hasBall) {
-    wx = (e.team == 0) ? MAPW * TILE - 20 : 20; wy = MAPH * TILE / 2;
-    if (tgt && ed < d.range * 0.8f && e.ammo >= 1 && e.attackT <= 0)
+    wx = (e.team == 0) ? mapW * TILE - 20 : 20; wy = mapH * TILE / 2;
+    float goalX = (e.team == 0) ? mapW * TILE - 10 : 10;
+    float gd = fabsf(e.x - goalX) + fabsf(e.y - mapH * TILE / 2) * 0.5f;
+    if (gd < 300 && e.attackT <= 0 && rnd(100) < 60) {
+      // assez proche du but : on degage le ballon vers les poteaux (comme un vrai joueur)
+      shootBall(e, atan2f(mapH * TILE / 2 - e.y, goalX - e.x));
+    } else if (tgt && ed < d.range * 0.8f && e.ammo >= 1 && e.attackT <= 0) {
       doAttack(e, atan2f(tgt->y - e.y, tgt->x - e.x));
+    }
   }
 
   // ---------- 4) SUPER : au bon moment et au bon endroit ----------
@@ -1604,7 +1618,7 @@ static void teamGoal(int team) {
   for (int i = 0; i < entCount; i++)
     if (ents[i].team == team && (rec < 0 || i == humanIdx)) rec = i;
   if (rec >= 0) ents[rec].goals++;
-  ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0;
+  ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
   shakeT = 400; shakeMag = 5;
 }
 static void damageEnt(Ent &e, float dmg, Ent &src) {
@@ -1771,8 +1785,8 @@ static void updateMatch(float dt) {
       e.respawnT -= (int)(dt * 1000);
       if (e.respawnT <= 0 && !noRespawn) {
         e.alive = true; e.hp = e.maxHP; e.ammo = 3;
-        e.x = (e.team == 0) ? 40 : MAPW * TILE - 40;
-        e.y = MAPH * TILE / 2 + (rnd(3) - 1) * 60;
+        e.x = (e.team == 0) ? 40 : mapW * TILE - 40;
+        e.y = mapH * TILE / 2 + (rnd(3) - 1) * 60;
       }
       continue;
     }
@@ -1842,7 +1856,7 @@ static void updateMatch(float dt) {
       spawnParts(e.x, e.y, 1, 8);
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team && fabsf(ents[j].x - e.x) < 140 && fabsf(ents[j].y - e.y) < 140) { addKill((&e - ents), j); break; }
-      if (ffa && e.isHuman) matchResult = -1;
+      if (ffa && e.isHuman && mode == MODE_SOLO) matchResult = -1; // en solo : mort = fini. En duo : tant que le coequipier vit, on continue
       if (mode == MODE_BOUNTY) {
         int killer = 1;
         for (int j = 0; j < entCount; j++)
@@ -1967,17 +1981,17 @@ static void updateMatch(float dt) {
           p.active = false;
           continue;
         }
-        // Barley : le cocktail explose ET laisse une flaque qui brule 2 s
+        // Barley : le cocktail explose ET laisse une PETITE flaque qui brule 2 s
         if (ents[p.owner].brawlerIdx == 6 && !ents[p.owner].isPet)
-          spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner);
+          spawnFireZone(p.x, p.y, p.dmg * 0.5f, p.team, p.owner, 2.0f, 24.0f);
         // Amber : flaque enflammee RENFORCEE mais qui disparait vite (1 s)
         else if (ents[p.owner].brawlerIdx == 43 && !ents[p.owner].isPet)
-          spawnFireZone(p.x, p.y, p.dmg * 0.7f, p.team, p.owner, 1.0f);
+          spawnFireZone(p.x, p.y, p.dmg * 0.7f, p.team, p.owner, 1.0f, 26.0f);
         int R = p.fromSuper ? 40 : 30;
         spawnParts(p.x, p.y, 0, 10);
         shakeT = 100; shakeMag = 2;
-        if (p.fromSuper && ents[p.owner].brawlerIdx == 10) { // giga-dynamite : rayon double + gros screen shake
-          R = 80; shakeT = 200; shakeMag = 4; spawnParts(p.x, p.y, 0, 20);
+        if (p.fromSuper && ents[p.owner].brawlerIdx == 10) { // giga-dynamite : zone ET plus large, ET qui defonce les murs
+          R = 100; breakWalls(p.x, p.y, 80); shakeT = 200; shakeMag = 4; spawnParts(p.x, p.y, 0, 20);
         }
         for (int j = 0; j < entCount; j++) {
           Ent &t = ents[j];
@@ -2042,7 +2056,7 @@ static void updateMatch(float dt) {
         Ent &t = ents[j];
         if (!t.alive || t.team == z.team || t.isPet) continue;
         float ddx = t.x - z.x, ddy = t.y - z.y;
-        if (ddx * ddx + ddy * ddy < 40 * 40) damageEnt(t, z.dmg, ents[z.owner]);
+        if (ddx * ddx + ddy * ddy < z.r * z.r) damageEnt(t, z.dmg, ents[z.owner]);
       }
       if (mode == MODE_HEIST)
         for (int s = 0; s < MAX_SAFE; s++) {
@@ -2068,8 +2082,8 @@ static void updateMatch(float dt) {
       for (int q = 0; q < 10; q++) actives += gems[q].active;
       if (actives == 0 && rnd(300) < 6) {
         gems[g].active = true;
-        gems[g].x = MAPW * TILE / 2 + (rnd(3) - 1) * 40;
-        gems[g].y = MAPH * TILE / 2 + (rnd(3) - 1) * 40;
+        gems[g].x = mapW * TILE / 2 + (rnd(3) - 1) * 40;
+        gems[g].y = mapH * TILE / 2 + (rnd(3) - 1) * 40;
       }
     }
     if (teamGems[0] >= 10 || teamGems[1] >= 10) {
@@ -2099,29 +2113,29 @@ static void updateMatch(float dt) {
         ballVX *= 0.95f; ballVY *= 0.95f;
         if (solidAt(ballX, ballY)) { ballX -= ballVX * dt * 2; ballY -= ballVY * dt * 2; ballVX = ballVY = 0; }
         // ballon libre qui entre dans un but (entre les poteaux) : but pour l'equipe qui attaque ce cote
-        int goalCY = MAPH * TILE / 2;
+        int goalCY = mapH * TILE / 2;
         if (fabsf(ballY - goalCY) < 2.2f * TILE) {
-          if (ballX > MAPW * TILE - 14) { teamGoal(0); }
+          if (ballX > mapW * TILE - 14) { teamGoal(0); }
           else if (ballX < 14) { teamGoal(1); }
         } else {
-          if (ballX > MAPW * TILE - 14) { ballX = MAPW * TILE - 14; ballVX = 0; }
+          if (ballX > mapW * TILE - 14) { ballX = mapW * TILE - 14; ballVX = 0; }
           if (ballX < 14) { ballX = 14; ballVX = 0; }
         }
       }
     } else {
-      int goalCY = MAPH * TILE / 2;
+      int goalCY = mapH * TILE / 2;
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].hasBall) {
           ballX = ents[i].x; ballY = ents[i].y;
           bool inGoalMouth = fabsf(ballY - goalCY) < 2.2f * TILE; // dans les poteaux, pas au-dessus/dessous
-          if ((ents[i].team == 0 && ballX > MAPW * TILE - 26) ||
+          if ((ents[i].team == 0 && ballX > mapW * TILE - 26) ||
               (ents[i].team == 1 && ballX < 26)) {
             if (inGoalMouth) {
               ents[i].goals++; ents[i].hasBall = false;
-              ballX = MAPW * TILE / 2; ballY = MAPH * TILE / 2; ballVX = ballVY = 0;
+              ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
               shakeT = 400; shakeMag = 5;
             } else { // hors des poteaux : on reste dans le terrain
-              ballX = ents[i].x = (ents[i].team == 0) ? MAPW * TILE - 26 : 26;
+              ballX = ents[i].x = (ents[i].team == 0) ? mapW * TILE - 26 : 26;
             }
           }
         }
@@ -2147,6 +2161,7 @@ static void updateMatch(float dt) {
   }
 
   if (mode == MODE_ZONE) {
+    int all0 = 1, all1 = 1; // il faut TOUTES les zones prises pour gagner
     for (int z = 0; z < MAX_ZONE; z++) {
       int myTeamHere = 0, enTeamHere = 0;
       for (int i = 0; i < entCount; i++) {
@@ -2157,9 +2172,11 @@ static void updateMatch(float dt) {
       }
       if (myTeamHere > 0 && enTeamHere == 0) zones[z].prog = fminf(100, zones[z].prog + 9 * dt);
       if (enTeamHere > 0 && myTeamHere == 0) zones[z].prog = fmaxf(-100, zones[z].prog - 9 * dt);
-      if (zones[z].prog >= 100) matchResult = 1;
-      if (zones[z].prog <= -100) matchResult = -1;
+      if (zones[z].prog < 100) all0 = 0;
+      if (zones[z].prog > -100) all1 = 0;
     }
+    if (all0) matchResult = 1;   // toutes les zones chaudes prises : victoire
+    if (all1) matchResult = -1;
   }
 
   if (mode == MODE_KO || ffa) {
@@ -2170,7 +2187,7 @@ static void updateMatch(float dt) {
       soloShrink -= (mode == MODE_KO) ? 50 : 35;
       if (soloShrink < 80) soloShrink = 80; // toute la map empoisonnee : ca reste jusqu'au gagnant
     }
-    int cx = MAPW * TILE / 2, cy = MAPH * TILE / 2;
+    int cx = mapW * TILE / 2, cy = mapH * TILE / 2;
     for (int i = 0; i < entCount; i++) {
       Ent &e = ents[i];
       if (!e.alive) continue;
@@ -2246,6 +2263,7 @@ static void drawNum(int x, int y, int v, KDColor c) {
 static void drawText(int x, int y, const char *s, KDColor c) {
   while (*s) {
     char ch = *s++;
+    if (ch >= 'a' && ch <= 'z') ch -= 32; // minuscules acceptees : dessinees en majuscules
     if (ch == ' ') { x += 10; continue; }
     if (ch == '-') { fRect(x, y + 4, 8, 2, c); x += 10; continue; }
     if (ch == '!') { fRect(x, y, 2, 10, c); x += 8; continue; }
@@ -2503,20 +2521,20 @@ static void renderMatch() {
   const MapTheme &T = THEMES[mode];
   Ent &me = ents[humanIdx];
   int camX = (int)me.x - SW / 2, camY = (int)me.y - SH / 2;
-  camX = fmaxf(0, fminf(MAPW * TILE - SW, camX));
-  camY = fmaxf(0, fminf(MAPH * TILE - SH, camY));
+  camX = fmaxf(0, fminf(mapW * TILE - SW, camX));
+  camY = fmaxf(0, fminf(mapH * TILE - SH, camY));
   if (shakeT > 0) { camX += rnd(shakeMag * 2) - shakeMag; camY += rnd(shakeMag * 2) - shakeMag; }
 
-  for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < MAPH; ty++) {
+  for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < mapH; ty++) {
     int sy = ty * TILE - camY;
     // perf : fond en 2 pushes par ligne de tuiles au lieu de 23
     fRect(0, sy, SW, TILE, KDColor::RGB24(T.gr1));
-    for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < MAPW; tx++)
+    for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < mapW; tx++)
       if ((tx + ty) & 1) {
         int sx = tx * TILE - camX;
         fRect(sx, sy, TILE, TILE, KDColor::RGB24(T.gr2));
       }
-    for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < MAPW; tx++) {
+    for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < mapW; tx++) {
       int sx = tx * TILE - camX;
       drawGroundDecor(sx, sy, tx, ty);
       if (tileMap[tx][ty] == 1) drawWallThemed(sx, sy);
@@ -2525,9 +2543,9 @@ static void renderMatch() {
   }
 
   if (mode == MODE_BALL)
-    for (int ty = MAPH / 2 - 2; ty <= MAPH / 2 + 2; ty++) {
+    for (int ty = mapH / 2 - 2; ty <= mapH / 2 + 2; ty++) {
       fRect(2 - camX, ty * TILE - camY + 2, TILE - 4, TILE - 4, C_BLUED);
-      fRect(MAPW * TILE - TILE - camX + 2, ty * TILE - camY + 2, TILE - 4, TILE - 4, C_REDD);
+      fRect(mapW * TILE - TILE - camX + 2, ty * TILE - camY + 2, TILE - 4, TILE - 4, C_REDD);
     }
 
   if (mode == MODE_HEIST)
@@ -2555,7 +2573,7 @@ static void renderMatch() {
     }
 
   if (mode == MODE_SOLO || mode == MODE_DUO || mode == MODE_KO) {
-    int cx = MAPW * TILE / 2 - camX, cy = MAPH * TILE / 2 - camY;
+    int cx = mapW * TILE / 2 - camX, cy = mapH * TILE / 2 - camY;
     for (int a = 0; a < 360; a += 6) {
       int ex = cx + (int)(soloShrink * cosf(a * 0.01745f));
       int ey = cy + (int)(soloShrink * sinf(a * 0.01745f));
@@ -2595,8 +2613,8 @@ static void renderMatch() {
     int zx = (int)z.x - camX, zy = (int)z.y - camY;
     if (zx < -50 || zx > SW + 50 || zy < -50 || zy > SH + 50) continue;
     KDColor fc = (z.team == ents[humanIdx].team) ? C_YEL : C_ORG;
-    oCirc(zx, zy, 40, KDColor::RGB24(0x9A4A00), KDColor::RGB24(0x6A3200)); // flaque orange foncee
-    if ((animT / 200) % 2 == 0) fCirc(zx + rnd(60) - 30, zy + rnd(60) - 30, 2, fc); // flammes
+    oCirc(zx, zy, (int)z.r, KDColor::RGB24(0x9A4A00), KDColor::RGB24(0x6A3200)); // flaque orange foncee (taille reelle)
+    if ((animT / 200) % 2 == 0) fCirc(zx + rnd((int)z.r) - (int)z.r / 2, zy + rnd((int)z.r) - (int)z.r / 2, 2, fc); // flammes
   }
 
   for (int i = 0; i < MAX_PROJ; i++)
@@ -2634,24 +2652,24 @@ static void renderMatch() {
     fRect(mx - 1, my - 1, mw + 2, mh + 2, C_BLK);
     fRect(mx, my, mw, mh, KDColor::RGB24(0x1E2A38));
     // murs en runs (1 push par ligne au lieu de ~200 pushes par pixel)
-    for (int ty = 0; ty < MAPH; ty += 2) {
+    for (int ty = 0; ty < mapH; ty += 2) {
       rowClear(mx, mx + mw - 1);
-      for (int tx = 0; tx < MAPW; tx += 2)
-        if (tileMap[tx][ty] == 1) rowPut(mx + tx * mw / MAPW, C_GRE);
-      rowFlush(my + ty * mh / MAPH, mx, mx + mw - 1);
+      for (int tx = 0; tx < mapW; tx += 2)
+        if (tileMap[tx][ty] == 1) rowPut(mx + tx * mw / mapW, C_GRE);
+      rowFlush(my + ty * mh / mapH, mx, mx + mw - 1);
     }
     if (mode == MODE_GEM)
       for (int g = 0; g < 10; g++)
-        if (gems[g].active) px(mx + (int)(gems[g].x * mw / (MAPW * TILE)), my + (int)(gems[g].y * mh / (MAPH * TILE)), C_GEM);
-    if (mode == MODE_BALL) px(mx + (int)(ballX * mw / (MAPW * TILE)), my + (int)(ballY * mh / (MAPH * TILE)), C_WHT);
+        if (gems[g].active) px(mx + (int)(gems[g].x * mw / (mapW * TILE)), my + (int)(gems[g].y * mh / (mapH * TILE)), C_GEM);
+    if (mode == MODE_BALL) px(mx + (int)(ballX * mw / (mapW * TILE)), my + (int)(ballY * mh / (mapH * TILE)), C_WHT);
     if (mode == MODE_HEIST)
       for (int s = 0; s < MAX_SAFE; s++)
-        if (safes[s].maxHP > 0) px(mx + (int)(safes[s].x * mw / (MAPW * TILE)), my + (int)(safes[s].y * mh / (MAPH * TILE)), C_GOLD);
+        if (safes[s].maxHP > 0) px(mx + (int)(safes[s].x * mw / (mapW * TILE)), my + (int)(safes[s].y * mh / (mapH * TILE)), C_GOLD);
     for (int i = 0; i < entCount; i++)
       if (ents[i].alive) {
         KDColor c = (i == humanIdx) ? C_GREEN : (ents[i].team == me.team ? C_BLUE : C_RED);
-        px(mx + (int)(ents[i].x * mw / (MAPW * TILE)), my + (int)(ents[i].y * mh / (MAPH * TILE)), c);
-        if (i == humanIdx) { px(mx + (int)(ents[i].x * mw / (MAPW * TILE)) + 1, my + (int)(ents[i].y * mh / (MAPH * TILE)), c); }
+        px(mx + (int)(ents[i].x * mw / (mapW * TILE)), my + (int)(ents[i].y * mh / (mapH * TILE)), c);
+        if (i == humanIdx) { px(mx + (int)(ents[i].x * mw / (mapW * TILE)) + 1, my + (int)(ents[i].y * mh / (mapH * TILE)), c); }
       }
   }
 
@@ -2682,12 +2700,18 @@ static void renderMatch() {
     if (n > 0) drawNum(SW / 2 - 12, 104, n, C_YEL);
     else drawTextC(104, "GO!", C_GREEN);
   }
-  // ecran de reaparition du joueur
+  // ecran de reaparition du joueur (en solo/duo/KO sans respawn : on regarde son equipe jouer)
   if (!me.alive) {
+    bool ffaMode = (mode == MODE_SOLO || mode == MODE_DUO || mode == MODE_KO);
     fRect(SW / 2 - 96, 90, 192, 44, C_BLK);
     fRect(SW / 2 - 94, 92, 188, 40, C_PANEL);
-    drawTextC(96, "REAPPARITION", C_WHT);
-    drawNum(SW / 2 - 12, 114, (me.respawnT + 999) / 1000, C_YEL);
+    if (ffaMode) {
+      drawTextC(96, "ELIMINE!", C_RED);
+      drawTextC(112, "TON COEQUIPIER JOUE...", C_GRE);
+    } else {
+      drawTextC(96, "REAPPARITION", C_WHT);
+      drawNum(SW / 2 - 12, 114, (me.respawnT + 999) / 1000, C_YEL);
+    }
   }
   // bandeau bas : rappel des touches a gauche, score du mode a droite
   fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
@@ -2962,8 +2986,9 @@ static int brawlerPicker(int myBrawler) {
       drawNum(248, 163, acc.b[sel].level, C_BLK);
     } else {
       shCircRGB(232, 80 - bob, 30, 0x444444, 0x222222, C_GRE);
-      drawText(150 + (164 - textW("? ? ?")) / 2, 90, "? ? ?", C_GRE);
-      drawText(150 + (164 - textW("A DEBLOQUER A")) / 2, 120, "A DEBLOQUER A", C_WHT);
+      drawBrawlerSprite(232, 80 - bob, 18, sel, 90, false); // silhouette du brawler quand meme
+      drawText(150 + (164 - textW(d.name)) / 2, 136, d.name, C_GRE); // nom TOUJOURS affiche, meme bloque
+      drawText(150 + (164 - textW("A DEBLOQUER")) / 2, 120, "A DEBLOQUER", C_WHT);
       char buf[24];
       int n = d.unlockTroph, pos = 0;
       buf[pos++] = 'A'; buf[pos++] = ' '; buf[pos++] = ' ';

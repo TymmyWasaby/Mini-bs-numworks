@@ -1002,6 +1002,8 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
   }
 }
 
+static void damageEnt(Ent &e, float dmg, Ent &src); // declaree ici car appelee par doSuper avant sa definition
+
 static void doAttack(Ent &e, float ang) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   if (e.ammo < 1) return;

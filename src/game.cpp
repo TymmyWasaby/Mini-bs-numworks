@@ -28,6 +28,7 @@ extern "C" {
 
 #define SW 320
 #define SH 240
+#define RNG(r) ((r) * 0.75f) // V5.13 : portees raccourcies de 25% (tout le monde tirait trop loin)
 #define TILE 14
 #define MAPW 32
 #define MAPH 24
@@ -326,20 +327,6 @@ static const BrawlerDef BRAWLERS[55] = {
 // ------------- Traits visuels uniques par brawler --------------------
 // Derives deterministes de l'index : chaque brawler a sa coiffure,
 // son chapeau/accessoire et sa couleur d'accent. 50 looks differents.
-// Noms des gadgets et pouvoirs star pour chaque brawler (style BS).
-static const char *GADGET_NAMES[55] = {
-  "BANDANA VELOCE","OURSON SURPRISE","BALLES PERCUTANTES","MURAILLE","ROQUETTES TANDEM",
-  "SUPLEX AERIEN","TISSU REPARATEUR","JINGLE TRISTE","GANTS DURCIS","SCRAPPIES FURIEUX",
-  "SAUTECARABINES","MINE ANTI-CHAR","TETE HURLANTE","PING BALLE AVIDE","BARIL DOUBLE",
-  "SAC DE POUDRE","ROUE SECOURS","SECOUSSES","OISEAU ECLAIRE","SPRAY EMOUVANT",
-  "VROUM TURBO","SOIN INTENSIF","ETONNEMENT","BONBON GOMME","RAYON AFFAME",
-  "PEUGEOT PROTEGE","VOL PORTE-CLE","PORTAIL TORDU","COFFRE PIEGE","RAFALE GLACEE",
-  "FACTURE IMPOSEE","BALLE CHAINOT","BOUCLIER BOB","POUBELLE PLEINE","LILAS CHERO",
-  "COUP SAVATE","FRAPPE ARDENTE","PUSTULE ADHESIVE","GONFLETTE","PERLE DOUCE",
-  "TERRAIN SABLEUX","TOXINE RALENTIE","FUMEE FANTOME","SABLE TROUBLE","HUILE ECLAIRANTE",
-  "LAMPADAIRE","MELANGE CAFE","BOUSSOLE OR","BLAST RONFANT","SURGE ALTERNATIF",
-  "PARACHUTE PERCUT","TABLETTE ENERGIE","TAROT PIEGE","GRAINES DURCIES","VALISE COURSE"
-};
 static const char *STAR_NAMES[55] = {
   "COQUILLE DURE","AMITIE FEROCE","TIR VELOCE","PEAUX DURES","ROQUETTES LONGUES",
   "MUAY PRIMO","SIROP EPAIS","GUERISON DAIRY","GANTS FERTILES","SURCHARGE",
@@ -380,41 +367,6 @@ static const char *SUPER_NAMES[55] = {
   "BAIN DE SANG","SERUM VITAL","MEGA ROBOTS","CLOCHE FURIEUSE","SURGE SUPREME",
   "ESCAPE FUMANT","PARTANCE ECLAIR","TROU NOIR","MUR NATUREL","PORTAGE RAPIDE"
 };
-static const char *SUPER_DESC[55] __attribute__((unused)) = { // reserve pour l'affichage des super (V5.12 : silencieux tant que non branche)
-  "RAFALE LARGE ET DEMOLITION","INVOQUE UN OURSON FURIEUX","PLUIE DE BALLES PERCUTANTES",
-  "CHARGE QUI EJECTE LES MURS","CARPETTE DE ROQUETTES","SAUT QUI ECRASE",
-  "PLUIE DE BOUTEILLES","SOIGNE TOUTE L EQUIPE","CARAPACE MOINS DE DEGATS",
-  "INVOQUE LA TOURELLE SCRAPPY","BARRAGE DE DYNAMITE","GROSSE MINE TUEUSE",
-  "INVOQUE UNE TOURELLE","BALLES REBONDISSANTES","ROULE ET DEGONFLE",
-  "INVOQUE UN CANON","CHARGE TOURNOYANTE","ASPIRE ET FRAPPE AUTOUR",
-  "POSE TROIS MINES","SPRAY QUI RALENTIT","DASH VELOCE",
-  "STATION QUI SOIGNE","ONDE SEISMIQUE PERCENTE","BALLE GOMME QUI TRAVERSE TOUT",
-  "ESSAIM PERCENT","BOMBE GUIDEE PEPP","SAUT SUR L ENNEMI",
-  "PLUIE DE PIECES","BLIZZARD QUI REPOUSSE","CHARGE PERFIDE",
-  "TIR MARQUEUR","SAISIT UN ENNEMI","INVOQUE DEUX RATS",
-  "EGO QUI TIRE AVEC VOUS","SAVATE QUI FRAPPE","TIR QUI REPOUSSE",
-  "BLOB QUI SE DIVISE","BALLON GIGANTESQUE","FLAMME EN ZONE",
-  "CHAMP RALENTI","DASH DE DAGUES","INVISIBILITE TOTALE",
-  "TEMPETE CACHE L EQUIPE","FLAQUE DE FEU","MAIN QUI ASPIRE",
-  "CHAUVES-SOURIS VAMPIRES","SOIN ET POISON","TRANSFORME EN MECHA",
-  "SURPRISE EXPLOSIVE","PALIER PLUS DE BALLES","BOND ARRIERE GRENADES",
-  "VITESSE D EQUIPE","ASPIRE TOUT AUTOUR","POUSSE UN MUR",
-  "PINGOUIN PORTEUR"
-};
-// Gadget n2 pour chaque brawler (choix entre les deux, comme dans BS)
-static const char *GADGET2_NAMES[55] = {
-  "REVOLVER PESANT","REGLAGE MECANIQUE","ARGENT MAGIQUE","TASSE CAFE","DEUX ROQUETTES",
-  "METEOR RETOUR","BARIL ROULANT","HARMONICA","CROISSIERE","SURCHARGE SUPREME",
-  "BARRIL CHARGE","CARAPACE RAPEE","ARCADE BONUS","MUNITIONS DOREES","TONNEAU RAPIDE",
-  "MORTIER COURT","TONNERRE CHIRURGICAL","TROU NOIR","TIR PERCENT","RESEAU SOCIAL",
-  "COURSE BOOSTEE","MUNITIONS INFINIES","FRAPPE D ECLAIR","BALLE RAPIDE","ESSAIM PROTEGE",
-  "DISTRACTION","PIEGE OURLI","GRIFFES RETOUR","RAFALE LONGUE","GELEE SECHE",
-  "TIR TRANSVERBE","BALLE SOLIDAIRE","FRIGO FORT","RAT EN COLERE","BOUQUET FINAL",
-  "MARTEAU SEC","BRASIER PROTEGE","PUSTULE GONFLEE","GAGNE UN CHAT","PERLE CHAUDE",
-  "TIR D EPEINE","PLUME MAGIQUE","SILENCE TOTALE","SABLE COLLANT","FLACON RAPIDE",
-  "VŒU PROTEGE","GRAND SOIN","REPARATION LONGUE","CLOCHE PIRATE","SURGE GELE",
-  "PERLE PARACHUTE","ENERGIE PARTAGEE","TAROT TIRE","GRAINE FORTE","BAGAGE PERDU"
-};
 // Pouvoir star n2 pour chaque brawler
 static const char *STAR2_NAMES[55] = {
   "BANDE PLAISANTE","BONNE ETOILE","DEUXIEME CHARGE","PEAUX TRES DURES","ROQUETTE DOUBLE",
@@ -429,39 +381,6 @@ static const char *STAR2_NAMES[55] = {
   "LAMPE MAGIQUE","SOIN FINAL","MEGA PILOTAGE","CLOCHE DOUBLE","SURGE MAJEUR",
   "PORTEE ROSEE","CARDIO PINK","MAIN TELLURIQUE","PELLE SOLLIDE","PANIER LARGE"
 };
-// Descriptions des gadgets (une par brawler)
-static const char *GADGET_DESC[55] __attribute__((unused)) = { // reserve pour l'affichage des gadgets (V5.12 : silencieux tant que non branche)
-  "VITESSE +30 PENDANT 3S","SOIGNE 30 POURCENT","TIR +25 POURCENT","GAGNE UN BOUCLIER",
-  "RECHARGE INSTANTANEE","SOIGNE PAR SAUT","SOIGNE LES ALLIES","SOIGNE EN ZONE",
-  "REDUIT DEGATS SUBIS","REPARATION COMPLETE","SAUTE LES MURS","EXPLOSE EN ZONE",
-  "PETRIFIE UN ENNEMI","RECHARGE LES MUNITIONS","DEGAGE LES ENNEMIS","CAISSE DE POUDRE",
-  "INVINCIBLE 1S","REPOUSSE TOUS","REVEILLE UN ALLIE","RALENTIT EN ZONE",
-  "BOOST IMMEDIAT","SOIGNE EN ZONE","FRAPPE TOUS AUTOUR","BOOST VITESSE","PROJECTILE GEANT",
-  "PROTECTION TOTALE","SAUT LONGUE PORTEE","TELEPORTE","RAFALE DE VENT","GELE LES ENNEMIS",
-  "PIEGE EXPLOSIF","SAISIT UN ENNEMI","REPOUSSE AVEUGLE","INVOCHE UN RAT","FLEURS SOIGNANTES",
-  "REPARE UN MUR","BLESSE EN ZONE","COLLE UN ENNEMI","GEANT BOUCLIER","SURGE D EGOUT",
-  "INVOCHE UN CACTUS","RALENTIT LES TIRS","PAS DE TRACES","MAL DE SABLE","GLISSADE LONGUE",
-  "SOIN GROUPE","MARQUE LA CIBLE","REPARATION TOTALE","SURPRISE EXPLOSIVE","DECHARGE TOTALE",
-  "RECHARGE DU SNIPER","COURT VITE","PREVOIT L AVENIR","POUSSE MUR","TIP DE BAGAGE"
-};
-struct Look {
-  uint8_t hair;      // 0..5 : ras, epique, long, oiseau/ninja-faux, champignon, crete
-  uint8_t hat;       // 0..7 : aucun, casquette, chapeau melon, casque mineur,
-                     //        turban, toque, casquette arriere, couronne
-  uint32_t accent;   // couleur d'accent (cheveux/chapeau)
-  uint8_t eyes;      // 0..2 : ronds blancs, fendus, grands
-  uint8_t size;      // 0..2 : petit, normal, grand
-  uint8_t weapon;    // 0..4 : mains, fusil, lance, hache, baton
-};
-static void brawlerLook(int i, Look &L) {
-  uint32_t acc[] = {0x3B2A63,0x8A2A2A,0x2A5A8A,0x5A8A2A,0x8A5A2A,0x2A8A7A,0x8A2A6A,0x5A5A8A};
-  L.hair = (i * 7 + 3) % 6;
-  L.hat  = (i * 5 + 1) % 8;
-  L.accent = acc[i % 8];
-  L.eyes = (i * 3) % 3;
-  L.size = (i * 11 + 2) % 3;
-  L.weapon = (i * 13) % 5;
-}
 // ----------------- V5.10 : menus, skins, duel, carriere, perfs -----------------
 // Selection de brawlers en GRILLE de cartes facon Brawl Stars (5x4, 3 pages) ;
 // mode DUEL 3 BRAWLERS (on choisit ses 3 persos, le suivant entre a la mort) ;
@@ -1392,87 +1311,15 @@ static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool
     gSkinTint = 0;
     return;
   }
-  const BrawlerDef &d = BRAWLERS[bIdx];
-  Look L; brawlerLook(bIdx, L);
-  // recul du corps pendant l'attaque (petit kick oppose a la visee)
-  if (attackT > 0) {
-    int kick = (attackT > 120) ? 2 : 1;
-    cx -= (int)(fcosf(faceAng * 0.01745f) * kick);
-    cy -= (int)(fsinf(faceAng * 0.01745f) * kick);
-  }
-  int rr = r + (L.size == 2 ? 2 : (L.size == 0 ? -1 : 0));
-  KDColor acc = KDColor::RGB24(L.accent);
-  // cape derriere les mythiques et legendaires
-  if (d.rar >= 4 && r >= 6) {
-    int flap = (walk / 60) % 2;
-    for (int j = -rr; j < rr; j += 2)
-      fRect(cx - rr - 3 + flap, cy + j, 2, 2, acc);
-  }
-  // jambes animees (petits rectangles alternes sous le corps)
-  if (walk > 0 && r >= 6) {
-    int step = (walk / 40) % 2;
-    KDColor legC = KDColor::RGB24(d.colBot);
-    fRect(cx - 3, cy + rr - 1, 3, 3, legC);
-    fRect(cx + 1, cy + rr - 1 - (step ? 1 : 0), 3, 3, legC);
-    px(cx - 3, cy + rr + 2, C_BLK); px(cx + 1, cy + rr + 1 - (step ? 1 : 0), C_BLK);
-    px(cx - 1, cy + rr + 2, C_BLK); px(cx + 3, cy + rr + 1 - (step ? 1 : 0), C_BLK);
-  }
-  // corps degrade
-  shCircRGB(cx, cy, rr, flash ? 0xFFFFFF : d.colTop, flash ? 0x9A9A9A : d.colBot, C_BLK);
-  // bras oriente vers la visee
-  int gx = (int)(fcosf(faceAng * 0.01745f) * (rr + 3)), gy = (int)(fsinf(faceAng * 0.01745f) * (rr + 3));
-  KDColor wc = KDColor::RGB24(0x6A4A2A);
-  if (r >= 6) fRect(cx + gx / 2 - 1, cy + gy / 2 - 1, 3, 3, KDColor::RGB24(d.colBot));
-  // arme selon type
-  if (L.weapon == 1) { fRect(cx + gx - 2, cy + gy - 2, 6, 2, wc); fRect(cx + gx + 3, cy + gy - 1, 2, 3, C_GRE); }
-  else if (L.weapon == 2) { fRect(cx + gx - 1, cy + gy - 3, 2, 7, wc); fCirc(cx + gx, cy + gy - 4, 2, C_GRE); }
-  else if (L.weapon == 3) { fRect(cx + gx - 1, cy + gy - 3, 2, 7, wc); fRect(cx + gx - 3, cy + gy - 4, 6, 2, C_GRE); }
-  else if (L.weapon == 4) { fRect(cx + gx - 1, cy + gy - 3, 2, 8, wc); fCirc(cx + gx, cy + gy + 4, 2, acc); }
-  // yeux
-  int ex = (int)(fcosf(faceAng * 0.01745f) * 2), ey = (int)(fsinf(faceAng * 0.01745f) * 2);
-  if (L.eyes == 0) { fRect(cx + ex - 3, cy + ey - 2, 2, 3, C_WHT); fRect(cx + ex + 1, cy + ey - 2, 2, 3, C_WHT); }
-  else if (L.eyes == 1) { fRect(cx + ex - 3, cy + ey - 1, 2, 1, C_WHT); fRect(cx + ex + 1, cy + ey - 1, 2, 1, C_WHT); }
-  else { fRect(cx + ex - 4, cy + ey - 3, 3, 4, C_WHT); fRect(cx + ex + 1, cy + ey - 3, 3, 4, C_WHT); }
-  // bouche (sourire cartoon sur les grands sprites)
-  if (r >= 8) fRect(cx + ex - 2, cy + ey + 3, 5, 1, C_BLK);
-  // coiffure
-  switch (L.hair) {
-    case 1: fCirc(cx, cy - rr + 1, 3, acc); fCirc(cx - 2, cy - rr, 2, acc); break;   // mohawk
-    case 2: fRect(cx - rr, cy - 2, 3, rr + 1, acc); fRect(cx + rr - 3, cy - 2, 3, rr + 1, acc); break; // longue
-    case 3: fCirc(cx + rr - 1, cy - rr + 1, 2, acc); break;  // petit oiseau
-    case 4: fCirc(cx, cy - rr + 2, 4, acc); px(cx - 2, cy - rr, C_WHT); px(cx + 2, cy - rr, C_WHT); break; // champi
-    case 5: for (int s = -1; s <= 1; s++) fRect(cx + s * 3 - 1, cy - rr - 1, 2, 3, acc); break; // crete
-    default: break;
-  }
-  // chapeau par-dessus
-  switch (L.hat) {
-    case 1: fRect(cx - 4, cy - rr - 2, 8, 3, acc); fRect(cx + 2, cy - rr, 4, 2, acc); break; // casquette
-    case 2: fRect(cx - 5, cy - rr - 3, 10, 4, acc); fRect(cx - 7, cy - rr, 14, 2, acc); break; // melon
-    case 3: fRect(cx - 5, cy - rr - 2, 10, 3, C_YEL); fCirc(cx, cy - rr - 4, 2, C_WHT); break; // casque
-    case 4: fCirc(cx, cy - rr - 1, 4, acc); fRect(cx - 2, cy - rr + 2, 5, 2, C_WHT); break; // turban
-    case 5: fRect(cx - 5, cy - rr - 4, 10, 4, C_WHT); fRect(cx - 6, cy - rr, 12, 2, C_WHT); break; // toque
-    case 6: fRect(cx - 5, cy - rr - 2, 8, 3, acc); break; // casquette arriere
-    case 7: fRect(cx - 5, cy - rr - 3, 10, 3, C_GOLD); px(cx - 3, cy - rr - 5, C_MAG); px(cx, cy - rr - 6, C_MAG); px(cx + 3, cy - rr - 5, C_MAG); break; // couronne
-    default: break;
-  }
-  // flash de bouche au bout de l'arme pendant l'attaque
-  if (attackT > 0 && r >= 4) {
-    int fx = (int)(fcosf(faceAng * 0.01745f) * (rr + 6)), fy = (int)(fsinf(faceAng * 0.01745f) * (rr + 6));
-    fCirc(cx + fx, cy + fy, attackT > 120 ? 3 : 2, attackT > 120 ? C_WHT : C_YEL);
-    fCirc(cx + fx, cy + fy, 1, C_ORG);
-    px(cx + fx + 1, cy + fy - 1, C_WHT); px(cx + fx - 1, cy + fy + 1, C_WHT);
-  }
+  // V5.14 : l'ancien rendu generique (placeholder + brawlerLook/Look) a ete SUPPRIME :
+  // les 55 sprites dessines a la main couvrent tout, ce code ne servait plus a rien.
 }
 
 // ------------------------- Compte / progression ----------------------
 // V5.12 : struct BrawlerAccount/Account et la globale acc definis plus haut (avant drawBrawlerSprite)
 static int unlockedBrawlers = 0;
 
-// gadget/star equipe selon le choix du joueur
-static const char* curGadgetName(int i) __attribute__((unused)); // V5.12 : reserve, non branche pour l'instant
-static const char* curGadgetName(int i) {
-  return acc.b[i].gadChoice == 1 ? GADGET2_NAMES[i] : GADGET_NAMES[i];
-}
+// pouvoir star equipe selon le choix du joueur (V5.13b : gadgets et hypercharge supprimes)
 static const char* curStarName(int i) {
   return acc.b[i].starChoice == 1 ? STAR2_NAMES[i] : STAR_NAMES[i];
 }
@@ -1483,9 +1330,11 @@ static const char* curStarName(int i) {
 struct Quest { int type; int goal; int prog; int reward; };
 static Quest quests[3];
 static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
-static const char SAVE_NAME[] = "minibs.sav";
+#define SAVE_NAME "minibs.sav"
+#define SAVE_BACKUP "minibs.bak" // V5.14 : double record anti-corruption
+static int gFps60 = 0; // V5.14 : option "60 FPS" (0 = 30 fps par defaut, plus fluide a 1 mais plus gourmand)
 static void saveAcc() {
-  uint8_t buf[452]; // 431 (V5.10) + 9 pseudo + 2 record survie = 442 octets
+  uint8_t buf[452]; // 444 octets reels (V5.13 FIX : 431/442 ettaient faux de 2/2 -> toute sauvegarde etait rejatee au chargement !)
   int p = 0;
   for (int i = 0; i < 55; i++) {
     buf[p++] = (uint8_t)acc.b[i].level;
@@ -1520,13 +1369,23 @@ static void saveAcc() {
   buf[p++] = acc.emoteP; buf[p++] = acc.emoteM;
   for (int i = 0; i < 9; i++) buf[p++] = (uint8_t)acc.name[i]; // V5.11 : pseudo
   buf[p++] = (uint8_t)(acc.bestWave >> 8); buf[p++] = (uint8_t)(acc.bestWave & 0xFF); // record survie
+  buf[p++] = gFps60 ? 1 : 0; // V5.14 : option 60 FPS (445 octets au total)
   ef_write(SAVE_NAME, buf, (uint32_t)p);
+  ef_write(SAVE_BACKUP, buf, (uint32_t)p); // V5.14 : sauvegarde de secours anti-corruption
 }
 static bool loadAcc() {
   uint32_t len = 0;
   const uint8_t *buf = ef_read(SAVE_NAME, &len);
-  if (!buf || (len != 231 && len != 331 && len != 361 && len != 431 && len != 442)) return false; // format inattendu : partie vierge
-  int nb = (len == 361) ? 55 : 50; // nombre de brawlers presents dans la sauvegarde
+  // V5.14 : double record anti-corruption — si le record principal est perdu/corrompu, on tente la copie de secours
+  bool bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445);
+  if (bad) {
+    buf = ef_read(SAVE_BACKUP, &len);
+    bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445);
+    if (bad) return false; // format inattendu : partie vierge
+  }
+  // V5.13 FIX : tailles REELLES ecrites par saveAcc au fil des versions.
+  // 445 = format actuel | 444 = V5.13 | 433 = V5.10/V5.11 (emotes, sans pseudo/record) | 361/331/231 = anciens.
+  int nb = (len == 331 || len == 231) ? 50 : 55; // nombre de brawlers presents dans la sauvegarde
   int p = 0;
   for (int i = 0; i < 55; i++) {
     if (i >= nb) { // brawlers ajoutes apres coup : compte vierge
@@ -1565,9 +1424,7 @@ static bool loadAcc() {
   winStreak   = (buf[p] << 8) | buf[p + 1];
   if (winStreak < 0) winStreak = 0;
   // ---- V5.10 : carriere, skins, emotes (absents des vieilles sauvegardes) ----
-  // V5.13 FIX : len == 442 doit AUSSI lire ce bloc (bug : sauvegarde 442 lue comme partie vierge
-  // => pseudo/carriere/skins perdus a chaque lancement depuis la V5.11)
-  if (len == 431 || len == 442) {
+  if (len == 433 || len == 444) {
     p += 2;
     acc.matches = (buf[p] << 8) | buf[p + 1]; p += 2;
     acc.wins = (buf[p] << 8) | buf[p + 1]; p += 2;
@@ -1582,13 +1439,15 @@ static bool loadAcc() {
     for (int i = 0; i < 7; i++) acc.skinOwned[i] = 0;
     acc.emoteP = acc.emoteM = 0;
   }
-  // ---- V5.11 : pseudo + record survie ----
-  if (len == 442) {
+  // ---- V5.11 : pseudo + record survie (444 = format actuel) ----
+  if (len == 444) {
     for (int i = 0; i < 9; i++) acc.name[i] = (char)buf[p++];
     acc.name[8] = 0;
     acc.bestWave = (buf[p] << 8) | buf[p + 1];
     if (acc.bestWave < 0 || acc.bestWave > 999) acc.bestWave = 0;
+    p += 2;
   } else { acc.name[0] = 0; acc.bestWave = 0; }
+  if (len == 445) gFps60 = (buf[p++] != 0); // V5.14 : option 60 FPS persistee
   for (int i = 0; i < 9; i++) if (acc.name[i] != 0 && (acc.name[i] < ' ' || acc.name[i] > 'z')) acc.name[i] = 0; // sanity
   return true;
 }
@@ -1653,13 +1512,12 @@ static int mapW = MAPW, mapH = MAPH;
 #define MAX_PROJ 64
 #define MAX_POP 16
 #define MAX_SAFE 4
-#define MAX_ZONE 3
+#define MAX_ZONE 2 // V5.13 : 2 zones comme dans Brawl Stars (au lieu de 3)
 
 struct Ent {
   int brawlerIdx, accIdx, team;
   float x, y, hp, maxHP;
   float ammo, superCharge;
-  int gadgetUses;
   bool isHuman, alive;
   int respawnT;
   float regenT;
@@ -1679,7 +1537,8 @@ struct Ent {
   bool drawDone;
   bool isPet; int petOwner; uint8_t petKind; float petLife; // creature invoquee (0=ours 1=tourelle 2=station de soin)
   float stealthT, shieldT; // invisibilite (Leon/Sandy) et bouclier (Rosa)
-  float slowT; // ralenti (drones de Bea, spray d'Emz)
+  float slowT; // ralenti (drones de Bea, spray d Emz, balles de Piper)
+  float blindT; // V5.13b : aveugle (super de Jacky) : ne voit plus rien, erre sans tirer
   float atkCharge; // charge de Hank : maintenir l'attaque pour gonfler le ballon
   float mechT; // Meg : temps restant en mega robot (super)
   float dmgDone;  // degats totaux infliges (stats de fin de match)
@@ -1719,6 +1578,7 @@ static void spawnFireZone(float x, float y, float dmg, int team, int owner, floa
 static bool gPierceProj = false; // le prochain projectile perce tout (SUP_WAVE)
 static float gLobRangeMul = -1.0f; // <0 = portee max ; sinon le lob atterrit sur sa cible
 static bool gForceLob = false;     // force le prochain tir en lob (mines de Bo, grenades de Piper)
+static float gFireOffX = 0, gFireOffY = 0; // V5.13 : decalage de spawn (rafales Colt/Rico : balles les unes derriere les autres)
 
 struct Pop { bool active; float x, y; int life, val; };
 static Pop pops[MAX_POP];
@@ -1729,7 +1589,7 @@ static Gem gems[10];
 struct Safe { float x, y; float hp, maxHP; int team; };
 static Safe safes[MAX_SAFE];
 
-struct HotZone { float x, y, prog; };
+struct HotZone { float x, y, prog; int owner; }; // V5.13 : owner = equipe qui a touche la zone en premier (progression verrouillee)
 static HotZone zones[MAX_ZONE];
 
 static float ballX, ballY, ballVX, ballVY;
@@ -1824,8 +1684,11 @@ static void breakWalls(float cx, float cy, float r) {
     }
 }
 static void moveEnt(Ent &e, float dx, float dy) {
-  if (solidAt(e.x + dx, e.y)) dx = 0;
-  if (solidAt(e.x, e.y + dy)) dy = 0;
+  // V5.13b : si l'entite est COINCEE DANS UN MUR (spawn rate, teleporteur...), on la laisse en sortir librement
+  if (!solidAt(e.x, e.y)) {
+    if (solidAt(e.x + dx, e.y)) dx = 0;
+    if (solidAt(e.x, e.y + dy)) dy = 0;
+  }
   e.x += dx; e.y += dy;
   e.x = fmaxf(8, fminf(mapW * TILE - 8, e.x));
   e.y = fmaxf(8, fminf(mapH * TILE - 8, e.y));
@@ -1839,6 +1702,19 @@ static void moveEnt(Ent &e, float dx, float dy) {
 static int matchCounter = 0;
 static int mapDayIndex() {
   return matchCounter % 6; // V5.11 : 6 variantes par mode (rotation par compteur de matchs)
+}
+// ---- V5.14 : saisons par compteur de matchs (3 parties par saison, aucune horloge) ----
+static int seasonIdx() { return (matchCounter / 3) % 3; } // 0 = normal, 1 = AUTOMNE, 2 = NEIGE
+static const char *SEASON_NAMES[3] = {"", "SAISON : AUTOMNE", "SAISON : NEIGE"};
+static uint32_t seasonTint(uint32_t c) { // teinte les couleurs du terrain selon la saison
+  int s = seasonIdx(); if (!s) return c;
+  int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+  if (s == 1) { // automne : plus chaud, plus orange
+    r = (r + 70 > 255) ? 255 : r + 70; if (g > 30) g -= 30; if (b > 40) b -= 40;
+  } else {      // neige : tout est plus clair et bleute
+    r = (r + 200) / 2; g = (g + 205) / 2; b = (b + 230) / 2;
+  }
+  return (r << 16) | (g << 8) | b;
 }
 static void genMap() {
   // on nettoie TOUT le tableau max : au-dela de la zone de jeu, tout est mur
@@ -1932,7 +1808,6 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.x = x; e.y = y;
   e.maxHP = d.baseHP * mul; e.hp = e.maxHP;
   e.ammo = 3; e.superCharge = 0;
-  e.gadgetUses = 0; // gadgets supprimes
   e.isHuman = human; e.alive = true; e.respawnT = 0;
   e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = (team == 0) ? 0 : 180;
@@ -1942,7 +1817,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0;
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
 }
 
 // invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
@@ -1962,7 +1837,6 @@ static void spawnPet(Ent &owner, int kind) {
   e.brawlerIdx = owner.brawlerIdx; e.accIdx = -1; e.team = owner.team;
   e.x = owner.x + fcosf(owner.aimAng) * 22; e.y = owner.y + fsinf(owner.aimAng) * 22;
   e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 900 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
-  e.hp = e.maxHP; e.ammo = 3; e.superCharge = 0; e.gadgetUses = 0;
   e.isHuman = false; e.alive = true; e.respawnT = 0;
   e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = owner.aimAng;
@@ -1971,7 +1845,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0; e.aiOnObj = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
   e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
@@ -1986,7 +1860,7 @@ static void setupMatch(int selMode, int myBrawler) {
   for (int i = 0; i < 10; i++) gems[i].active = false;
   for (int i = 0; i < 8; i++) fireZones[i].active = false;
   for (int i = 0; i < MAX_SAFE; i++) { safes[i].hp = 0; safes[i].maxHP = 0; }
-  for (int i = 0; i < MAX_ZONE; i++) zones[i].prog = 0;
+  for (int i = 0; i < MAX_ZONE; i++) { zones[i].prog = 0; zones[i].owner = -1; }
   // map plus grande en survivant duo (et solo) : 44x32 au lieu de 32x24
   mapW = (mode == MODE_SOLO || mode == MODE_DUO) ? 44 : MAPW;
   mapH = (mode == MODE_SOLO || mode == MODE_DUO) ? 32 : MAPH;
@@ -2020,6 +1894,9 @@ static void setupMatch(int selMode, int myBrawler) {
     soloShrink = (mapW + mapH) * TILE / 2 + 200;
     poisonWaveT = 60000; // le poison n'arrive qu'apres 1 minute de partie
   } else {
+    // V5.13 FIX : le poison du mode A-MORT (KO) n'etait jamais initialise (soloShrink=0 ->
+    // cercle casse des la 1re seconde). Il arrive maintenant comme en Survivant : apres 1 min.
+    if (mode == MODE_KO) { soloShrink = (mapW + mapH) * TILE / 2 + 200; poisonWaveT = 60000; }
     addEnt(myBrawler, myBrawler, 0, 40, mapH * TILE / 2, true, skill); humanIdx = 0;
     if (mode == MODE_SURVIE) { // SURVIE : seul contre des vagues de bots de plus en plus fortes
       waveN = 0; waveBreakT = 1600; gWaveBannerT = 0;
@@ -2056,12 +1933,24 @@ static void setupMatch(int selMode, int myBrawler) {
       safes[0].team = 0; safes[0].x = 30; safes[0].y = mapH * TILE / 2; safes[0].maxHP = 26000; safes[0].hp = safes[0].maxHP;
       safes[1].team = 1; safes[1].x = mapW * TILE - 30; safes[1].y = mapH * TILE / 2; safes[1].maxHP = 26000; safes[1].hp = safes[1].maxHP;
     }
-    else if (mode == MODE_ZONE) {
-      zones[0].x = mapW * TILE / 2; zones[0].y = mapH * TILE / 2 - 60;
-      zones[1].x = mapW * TILE / 2 - 70; zones[1].y = mapH * TILE / 2 + 50;
-      zones[2].x = mapW * TILE / 2 + 70; zones[2].y = mapH * TILE / 2 + 50;
+    else if (mode == MODE_ZONE) { // V5.13 : 2 zones placees a gauche/droite du centre
+      zones[0].x = mapW * TILE / 2 - 100; zones[0].y = mapH * TILE / 2;
+      zones[1].x = mapW * TILE / 2 + 100; zones[1].y = mapH * TILE / 2;
+      for (int z = 0; z < MAX_ZONE; z++) // on degage les murs/buissons autour des zones
+        for (int dy = -2; dy <= 2; dy++)
+          for (int dx = -2; dx <= 2; dx++) {
+            int tx = (int)(zones[z].x / TILE) + dx, ty = (int)(zones[z].y / TILE) + dy;
+            if (tx >= 0 && tx < mapW && ty >= 0 && ty < mapH) tileMap[tx][ty] = 0;
+          }
     }
   }
+  // V5.13b FIX : personne ne doit apparaitre DANS un mur (les bots s'y terraient et devenaient intouchables)
+  for (int i = 0; i < entCount; i++)
+    for (int dy = -1; dy <= 1; dy++)
+      for (int dx = -1; dx <= 1; dx++) {
+        int tx = (int)(ents[i].x / TILE) + dx, ty = (int)(ents[i].y / TILE) + dy;
+        if (tx >= 0 && tx < mapW && ty >= 0 && ty < mapH) tileMap[tx][ty] = 0;
+      }
   // ---- V5.9 : evenement du match + placement des objets (cubes, teleporteurs, tonneaux) ----
   matchMod = (rnd(100) < 45) ? 1 + rnd(4) : 0; // rotation par partie : aucune horloge requise
   for (int i = 0; i < MAX_BOX; i++) boxes[i].active = false;
@@ -2113,16 +2002,16 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     if (projs[i].active) continue;
     Proj &p = projs[i];
     p.active = true; p.lob = (d.atk == ATK_LOB) || gForceLob; p.fromSuper = isSuper;
-    p.x = e.x; p.y = e.y;
+    p.x = e.x + gFireOffX; p.y = e.y + gFireOffY; // V5.13 : decalage de rafale
     float sp = d.projSpeed * spdMul;
     p.vx = fcosf(ang) * sp; p.vy = fsinf(ang) * sp;
     p.dmg = d.baseDmg * dmgMul;
-    p.range = d.range * rangeMul;
+    p.range = RNG(d.range) * rangeMul;
     if (p.lob && gLobRangeMul > 0) p.range = p.range * fminf(1.0f, gLobRangeMul); // atterrit sur la cible
     p.travelled = 0; p.team = e.team; p.owner = (&e - ents);
     p.radius = isSuper ? 4 : 2;
     p.boomer = (!isSuper && e.brawlerIdx == 16); p.ret = false; // Carl : pic-boomerang
-    p.pierce = gPierceProj || p.boomer; if (p.pierce) p.radius = 7; // le pic de Carl traverse tout, aller et retour
+    p.pierce = gPierceProj || p.boomer; if (p.pierce) p.radius = p.boomer ? 7 : 3; // pic de Carl grand, balles perceuses petites
     p.nHits = 0;
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     p.bIdx = e.brawlerIdx; // V5.13 : graphisme du projectile selon le brawler
@@ -2230,7 +2119,10 @@ static void doSuper(Ent &e, float ang) {
       for (int i = 0; i < entCount; i++)
         if (ents[i].alive && ents[i].team != e.team) {
           float dx = ents[i].x - e.x, dy = ents[i].y - e.y;
-          if (dx * dx + dy * dy < 80 * 80) { ents[i].hp -= d.baseDmg * 1.6f * mul; ents[i].regenT = 0; ents[i].lastHitT = 150; }
+          if (dx * dx + dy * dy < 80 * 80) {
+            ents[i].hp -= d.baseDmg * 1.6f * mul; ents[i].regenT = 0; ents[i].lastHitT = 150;
+            if (e.brawlerIdx == 17 && !ents[i].isPet) ents[i].blindT = 2.5f; // V5.13b : super de JACKY = AVEUGLE 2.5 s
+          }
         }
       for (int a = 0; a < 16; a++) fireProj(e, a * 0.3927f, true, mul * 0.6f, 1.2f, 0.5f);
       break;
@@ -2317,8 +2209,19 @@ static void doSuper(Ent &e, float ang) {
       }
       break;
     }
-    case SUP_MEGASHOT: { // volée perceuse qui defonce les murs (Colt, Brock, Rico...)
-      for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.06f, true, mul * 0.75f, 1.3f, 1.6f);
+    case SUP_MEGASHOT: { // ULTI Colt/Rico : RAFALE de balles les unes derriere les autres, perce et defonce les murs
+      if (e.brawlerIdx == 2 || e.brawlerIdx == 13) {
+        gPierceProj = true; // les balles traversent tout et cassent les murs au passage
+        int n = (e.brawlerIdx == 2) ? 8 : 6; // Colt : longue rafale ; Rico : rafale rebondissante
+        for (int i = 0; i < n; i++) {
+          gFireOffX = -fcosf(ang) * i * 9; gFireOffY = -fsinf(ang) * i * 9; // chaque balle part DERRIERE la precedente
+          fireProj(e, ang, true, mul, 1.3f, 1.7f);
+        }
+        gFireOffX = 0; gFireOffY = 0;
+        gPierceProj = false;
+      } else { // Brock & autres : eventail perceur
+        for (int i = 0; i < 5; i++) fireProj(e, ang + (i - 2) * 0.06f, true, mul * 0.75f, 1.3f, 1.6f);
+      }
       break;
     }
     case SUP_WAVE: { // onde de choc perforante qui traverse tout (Frank)
@@ -2455,7 +2358,7 @@ static void doSuper(Ent &e, float ang) {
       break;
     }
     case SUP_WALL: { // Sprout : fait pousser un mur de buissons a la visee
-      float wx = e.x + fcosf(ang) * fminf(d.range, 200), wy = e.y + fsinf(ang) * fminf(d.range, 200);
+      float wx = e.x + fcosf(ang) * fminf(RNG(d.range), 200), wy = e.y + fsinf(ang) * fminf(RNG(d.range), 200);
       int tx = (int)(wx / TILE), ty = (int)(wy / TILE);
       for (int cx2 = tx - 1; cx2 <= tx + 1; cx2++)
         for (int cy2 = ty - 2; cy2 <= ty + 2; cy2++)
@@ -2467,34 +2370,8 @@ static void doSuper(Ent &e, float ang) {
   }
 }
 
-static void doGadget(Ent &e) __attribute__((unused)); // V5.12 : garde le code (futurs gadgets jouables), silencieux
-static void doGadget(Ent &e) {
-  const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
-  if (e.gadgetUses <= 0) return;
-  e.gadgetUses--;
-  switch (d.gad) {
-    case GAD_HEAL: e.hp = fminf(e.maxHP, e.hp + e.maxHP * 0.25f); addPop(e.x, e.y - 12, (int)(e.maxHP * 0.25f)); break;
-    case GAD_SPEED: e.speedBuffT = 4.0f; break;
-    case GAD_AMMO: e.ammo = 3; break;
-    case GAD_BLAST:
-      shakeT = 150; shakeMag = 2;
-      for (int i = 0; i < entCount; i++)
-        if (ents[i].alive && ents[i].team != e.team) {
-          float dx = ents[i].x - e.x, dy = ents[i].y - e.y;
-          if (dx * dx + dy * dy < 90 * 90) { ents[i].hp -= 900; ents[i].regenT = 0; ents[i].lastHitT = 150; addPop(ents[i].x, ents[i].y - 12, 900); }
-        }
-      break;
-  }
-}
 
-static void doHypercharge(Ent &e) __attribute__((unused)); // V5.12 : garde le code (futur hypercharge jouable), silencieux
-static void doHypercharge(Ent &e) {
-  if (e.accIdx < 0 || !acc.b[e.accIdx].hyper) return;
-  if (e.superCharge < 100) return;
-  e.superCharge = 0;
-  e.hyperT = 8.0f; e.speedBuffT = 8.0f;
-  shakeT = 300; shakeMag = 4;
-}
+
 
 // ------------------------- Clavier ------------------------------------
 // Commandes (V5.3, nouveau schema) :
@@ -2547,9 +2424,17 @@ static float nearestEnemyDist(Ent &e, Ent **out) {
 static void shootBall(Ent &e, float ang); // declaree ici : updateAI l'utilise avant sa definition
 
 static void updateAI(Ent &e, float dt) {
+  // V5.13b : AVEUGLE (super de Jacky) : le bot ne voit plus rien, erre au hasard et ne tire plus
+  if (e.blindT > 0) {
+    if (e.aiThinkT <= 0) {
+      e.aiWx = (int)e.x + rnd(160) - 80; e.aiWy = (int)e.y + rnd(160) - 80; e.aiThinkT = 600;
+    }
+    e.aimAng = e.faceAng = (float)(rnd(360));
+    return;
+  }
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   float sk = e.aiSkill;
-  bool melee = d.range < 130;
+  bool melee = RNG(d.range) < 130;
   Ent *tgt = nullptr;
   float ed = nearestEnemyDist(e, &tgt);
 
@@ -2591,7 +2476,7 @@ static void updateAI(Ent &e, float dt) {
       for (int s = 0; s < MAX_SAFE; s++)
         if (safes[s].maxHP > 0 && safes[s].hp > 0 && safes[s].team != e.team) {
           float ddx = safes[s].x - e.x, ddy = safes[s].y - e.y, dd = sqrtf(ddx * ddx + ddy * ddy);
-          float back = fmaxf(0, dd - d.range * 0.8f);
+          float back = fmaxf(0, dd - RNG(d.range) * 0.8f);
           tx = safes[s].x - (dd > 1 ? ddx / dd * back : 0);
           ty = safes[s].y - (dd > 1 ? ddy / dd * back : 0);
         }
@@ -2658,15 +2543,15 @@ static void updateAI(Ent &e, float dt) {
   float angT = e.aimAng;
   // distance de confort selon la classe : un Tick ne FONCE pas sur une Shelly
   bool lobber = (d.atk == ATK_LOB);                            // Barley, Dynamike, Tick... : bombardent de loin
-  bool sniper = (!lobber && d.atk == ATK_SHOT && d.projCount <= 1 && d.range >= 250); // Piper, Brock, Bea...
-  float keepDist = d.range * 0.55f;                           // par defaut : mi-distance
-  if (lobber) keepDist = d.range * 0.85f;                     // les lanceurs restent en arriere et arrosent
-  if (sniper) keepDist = d.range * 0.92f;                      // les snipers tirent de TRES loin
-  if (e.brawlerIdx == 50) keepDist = d.range * 0.97f;         // Piper : la reine du combat a distance
-  if (e.brawlerIdx == 47 && e.mechT > 0) keepDist = d.range * 0.35f; // Meg en mecha : colle pour ecraser
+  bool sniper = (!lobber && d.atk == ATK_SHOT && d.projCount <= 1 && RNG(d.range) >= 250); // Piper, Brock, Bea...
+  float keepDist = RNG(d.range) * 0.55f;                           // par defaut : mi-distance
+  if (lobber) keepDist = RNG(d.range) * 0.85f;                     // les lanceurs restent en arriere et arrosent
+  if (sniper) keepDist = RNG(d.range) * 0.92f;                      // les snipers tirent de TRES loin
+  if (e.brawlerIdx == 50) keepDist = RNG(d.range) * 0.97f;         // Piper : la reine du combat a distance
+  if (e.brawlerIdx == 47 && e.mechT > 0) keepDist = RNG(d.range) * 0.35f; // Meg en mecha : colle pour ecraser
   if (e.aiPers == 0) keepDist *= 0.75f;      // personnalite agressive
   else if (e.aiPers == 1) keepDist *= 1.25f; // personnalite defensive
-  if (melee) keepDist = d.range * 0.35f;                      // les melees doivent coller pour exister
+  if (melee) keepDist = RNG(d.range) * 0.35f;                      // les melees doivent coller pour exister
   if (d.baseHP >= 6000 && !lobber) keepDist *= 0.85f;         // les tanks osent s'approcher
   if (d.baseHP <= 4200) keepDist = fmaxf(keepDist, 175.0f);   // les fragiles gardent AU MOINS 175 px (Tick, Shelly...)
   if (tgt) {
@@ -2676,17 +2561,17 @@ static void updateAI(Ent &e, float dt) {
     float tvx = fcosf(tgt->faceAng * 0.017453f) * 88.0f, tvy = fsinf(tgt->faceAng * 0.017453f) * 88.0f;
     angT = atan2f(tgt->y + tvy * lead - e.y, tgt->x + tvx * lead - e.x);
     float err = (1.0f - sk) * 12.0f;
-    if (ed < d.range * 0.95f && e.ammo >= 1 && e.attackT <= 0 && !(mode == MODE_BALL && e.hasBall)) {
+    if (ed < RNG(d.range) * 0.95f && e.ammo >= 1 && e.attackT <= 0 && !(mode == MODE_BALL && e.hasBall)) {
       if (e.brawlerIdx == 37 || e.brawlerIdx == 32) e.atkCharge = 0.4f + rnd(70) / 100.0f; // l'IA (Hank/Ash) charge un peu au hasard
-      if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
+      if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / RNG(d.range));
       doAttack(e, angT + (rnd(100) / 100.0f - 0.5f) * err * 0.01745f);
       gLobRangeMul = -1.0f;
     }
     // placement par classe : trop pres pour NOTRE style -> on decroche en tirant
-    if (!melee && !low && ed < keepDist * 0.8f && ed < d.range) {
+    if (!melee && !low && ed < keepDist * 0.8f && ed < RNG(d.range)) {
       float l = fmaxf(ed, 1);
       wx = e.x - (tgt->x - e.x) / l * 90; wy = e.y - (tgt->y - e.y) / l * 90;
-    } else if (tgt && ed < d.range * 0.9f && !low) {
+    } else if (tgt && ed < RNG(d.range) * 0.9f && !low) {
       // a bonne distance : on canarde en strafant, comme un joueur qui juke
       float side = ((e.walkT / 800) % 2) ? 1.5708f : -1.5708f;
       wx = e.x + fcosf(angT + side) * 80; wy = e.y + fsinf(angT + side) * 80;
@@ -2701,7 +2586,7 @@ static void updateAI(Ent &e, float dt) {
     if (gd < 300 && e.attackT <= 0 && rnd(100) < 60) {
       // assez proche du but : on degage le ballon vers les poteaux (comme un vrai joueur)
       shootBall(e, atan2f(mapH * TILE / 2 - e.y, goalX - e.x));
-    } else if (tgt && ed < d.range * 0.8f && e.ammo >= 1 && e.attackT <= 0) {
+    } else if (tgt && ed < RNG(d.range) * 0.8f && e.ammo >= 1 && e.attackT <= 0) {
       doAttack(e, atan2f(tgt->y - e.y, tgt->x - e.x));
     }
   }
@@ -2718,14 +2603,14 @@ static void updateAI(Ent &e, float dt) {
       case SUP_STEALTH: case SUP_MECH: case SUP_LEAP:
         if (low) { doSuper(e, angT); done = true; } break;
       case SUP_SHIELD:
-        if (tgt && ed < d.range * 1.2f) { doSuper(e, angT); done = true; } break;
+        if (tgt && ed < RNG(d.range) * 1.2f) { doSuper(e, angT); done = true; } break;
       case SUP_UPGRADE: case SUP_HEAL:
         if (rnd(100) < 25) { doSuper(e, angT); done = true; } break;
       case SUP_HASTE: // Max : boost de vitesse pour chasser ou s'echapper
-        if (low || (tgt && ed < d.range * 1.3f)) { doSuper(e, angT); done = true; } break;
+        if (low || (tgt && ed < RNG(d.range) * 1.3f)) { doSuper(e, angT); done = true; } break;
       default: // supers d'attaque : seulement a portee d'une cible, et pas claques a la va-vite
-        if (tgt && ed < d.range && rnd(100) < 55 + 35 * sk) {
-          if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / d.range);
+        if (tgt && ed < RNG(d.range) && rnd(100) < 55 + 35 * sk) {
+          if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / RNG(d.range));
           doSuper(e, angT); gLobRangeMul = -1.0f; done = true;
         }
         break;
@@ -2788,6 +2673,8 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
     if (bx * bx + by * by < 220 * 220) { dmg *= 1.3f; break; }
   }
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
+  // V5.13b : effet de statut — les balles de PIPER ralentissent la cible 1.5 s
+  if (&src != &e && !src.isPet && src.brawlerIdx == 50) e.slowT = fmaxf(e.slowT, 1.5f);
   src.dmgDone += dmg; // stats de fin de match
   float chg = (src.hyperT > 0) ? 20.0f : 14.0f;
   if (matchMod == 3) chg *= 2.0f; // evenement du match : supers x2
@@ -2915,8 +2802,9 @@ static void updateMatch(float dt) {
     //     RETOUR = ulti, HOME = quitter (sans ecran de resultat) ---
     bool shotUlti = keyBack && !prevBack;
     bool shotAtk = (keyOK && !prevOK) || (kVar && !prevVar) || (kExp && !prevExp);
-    // maintien de OK/var/menu = tir continu (respecte le cooldown d'attaque)
-    if (me.attackT <= 0 && me.ammo >= 1 && (keyOK || kVar || kExp)) shotAtk = true;
+    // maintien de OK/var/menu = tir continu, meme en marchant (V5.13b : PAS quand on porte le ballon :
+    // avec la balle, OK = degager le ballon, un appui = un tir, comme dans BS)
+    if (me.attackT <= 0 && me.ammo >= 1 && (keyOK || kVar || kExp) && !(mode == MODE_BALL && me.hasBall)) shotAtk = true;
     // Hank : maintenir OK gonfle son ballon, relacher (ou charge max) pour tirer
     if (me.brawlerIdx == 37 || me.brawlerIdx == 32) { // Hank / Ash : maintenir pour charger
       if ((keyOK || kVar || kExp) && me.ammo >= 1) {
@@ -2938,7 +2826,7 @@ static void updateMatch(float dt) {
         shootBall(me, ang); // on tire le ballon au lieu d'attaquer
       } else {
         // lanceur : le tir atterrit sur l'ennemi le plus proche si on est a l'arret
-        if (d.atk == ATK_LOB && !(dx || dy) && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / d.range);
+        if (d.atk == ATK_LOB && !(dx || dy) && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / RNG(d.range));
         doAttack(me, ang);
         gLobRangeMul = -1.0f;
       }
@@ -2967,6 +2855,7 @@ static void updateMatch(float dt) {
     if (e.isBoss) e.mechT = 1.0f; // le boss du Siege reste en mega robot
     e.tpCd -= dt; // recharge du teleporteur
     if (e.slowT > 0) e.slowT -= dt;
+    if (e.blindT > 0) e.blindT -= dt; // V5.13b : aveuglement (super de Jacky)
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
     if (e.attackT > 0) e.attackT -= (int)(dt * 1000);
@@ -3146,7 +3035,11 @@ static void updateMatch(float dt) {
     // anti-tunneling : milieu du pas teste aussi. Les supers perceurs cassent
     // les murs a l'impact (Colt, Brock, Rico...), les tirs normaux s'y arretent.
     if (!p.lob && !p.boomer) {
-      bool hitWall = solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f);
+      // V5.13b FIX : on teste AUSSI les croisements d'axes — plus moyen de glisser
+      // dans l'interstice de deux murs en diagonale (le coin bloque, comme dans BS)
+      float ox = p.x - p.vx * dt, oy = p.y - p.vy * dt; // position d'origine du pas
+      bool hitWall = solidAt(p.x, p.y) || solidAt(p.x - p.vx * dt * 0.5f, p.y - p.vy * dt * 0.5f)
+                  || solidAt(p.x, oy) || solidAt(ox, p.y); // tuiles croisees horizontalement/verticalement
       if (hitWall) {
         if (p.bounce > 0) { // Rico : demi-tour sur le mur, la balle continue
           p.bounce--;
@@ -3386,8 +3279,16 @@ static void updateMatch(float dt) {
           if (ents[i].team == 0) myTeamHere++; else enTeamHere++;
         }
       }
-      if (myTeamHere > 0 && enTeamHere == 0) zones[z].prog = fminf(100, zones[z].prog + 9 * dt);
-      if (enTeamHere > 0 && myTeamHere == 0) zones[z].prog = fmaxf(-100, zones[z].prog - 9 * dt);
+      // V5.13 : capture VERROUILLEE — la premiere equipe seule dans la zone s'en approprie la
+      // progression, l'adversaire ne peut plus la faire redescendre (il peut juste la bloquer)
+      if (myTeamHere > 0 && enTeamHere == 0) {
+        if (zones[z].owner == -1) zones[z].owner = 0;
+        if (zones[z].owner == 0) zones[z].prog = fminf(100, zones[z].prog + 9 * dt);
+      }
+      if (enTeamHere > 0 && myTeamHere == 0) {
+        if (zones[z].owner == -1) zones[z].owner = 1;
+        if (zones[z].owner == 1) zones[z].prog = fmaxf(-100, zones[z].prog - 9 * dt);
+      }
       if (zones[z].prog < 100) all0 = 0;
       if (zones[z].prog > -100) all1 = 0;
     }
@@ -3605,16 +3506,16 @@ static void drawWallThemed(int sx, int sy) {
 }
 static void drawBushThemed(int sx, int sy) {
   const MapTheme &T = THEMES[mode];
-  KDColor b1 = KDColor::RGB24(T.bush1), b2 = KDColor::RGB24(T.bush2);
+  KDColor b1 = KDColor::RGB24(seasonTint(T.bush1)), b2 = KDColor::RGB24(seasonTint(T.bush2));
   fRect(sx, sy, TILE, TILE, b1);
   fCirc(sx + 4, sy + 4, 4, b2);
   fCirc(sx + 10, sy + 5, 4, b2);
   fCirc(sx + 7, sy + 10, 4, b2);
-  px(sx + 5, sy + 3, KDColor::RGB24(T.grDecor)); px(sx + 11, sy + 4, KDColor::RGB24(T.grDecor));
+  px(sx + 5, sy + 3, KDColor::RGB24(seasonTint(T.grDecor))); px(sx + 11, sy + 4, KDColor::RGB24(seasonTint(T.grDecor)));
 }
 static void drawGroundDecor(int sx, int sy, int tx, int ty) {
   const MapTheme &T = THEMES[mode];
-  KDColor dec = KDColor::RGB24(T.grDecor);
+  KDColor dec = KDColor::RGB24(seasonTint(T.grDecor));
   switch (T.decoStyle) {
     case 0: px(sx + (tx * 5 + ty * 3) % 12, sy + (tx * 3 + ty * 7) % 12, dec); break;
     case 1: // fleurs
@@ -3736,9 +3637,11 @@ static void drawEnt(Ent &e, int sx, int sy) {
   int gx = (int)(fcosf(e.aimAng) * 9), gy = (int)(fsinf(e.aimAng) * 9);
   fCirc(sx + gx, by + gy, 2, C_GRE);
   for (int a = 0; a < 3; a++) {
-    int filled = (int)(fmaxf(0, fminf(1, e.ammo - a)) * 4);
-    fRect(sx - 8 + a * 6, by + 9, 5, 2, C_BLK);
-    fRect(sx - 8 + a * 6, by + 9, filled, 2, C_ORG);
+    // V5.13b : munitions façon BS — 3 barres plus LARGES sous le joueur, petites sous les autres
+    int bw = e.isHuman ? 8 : 5, bh = e.isHuman ? 4 : 2, gap = e.isHuman ? 10 : 6, bx0 = e.isHuman ? -14 : -8;
+    int filled = (int)(fmaxf(0, fminf(1, e.ammo - a)) * bw);
+    fRect(sx + bx0 + a * gap, by + 9, bw, bh, C_BLK);
+    fRect(sx + bx0 + a * gap, by + 9, filled, bh, C_ORG);
   }
   if (e.superCharge >= 100) {
     int r = 10 + (animT / 150) % 2;
@@ -3948,11 +3851,11 @@ static void renderMatch() {
   for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < mapH; ty++) {
     int sy = ty * TILE - camY;
     // perf : fond en 2 pushes par ligne de tuiles au lieu de 23
-    fRect(0, sy, SW, TILE, KDColor::RGB24(T.gr1));
+    fRect(0, sy, SW, TILE, KDColor::RGB24(seasonTint(T.gr1)));
     for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < mapW; tx++)
       if ((tx + ty) & 1) {
         int sx = tx * TILE - camX;
-        fRect(sx, sy, TILE, TILE, KDColor::RGB24(T.gr2));
+        fRect(sx, sy, TILE, TILE, KDColor::RGB24(seasonTint(T.gr2)));
       }
     for (int tx = camX / TILE; tx <= (camX + SW) / TILE && tx < mapW; tx++) {
       int sx = tx * TILE - camX;
@@ -4095,10 +3998,10 @@ static void renderMatch() {
       else { px(sx, sy, C_ORG); px(sx - 1, sy + 1, C_RED); px(sx + 1, sy - 1, C_YEL); }
     }
 
-  // killfeed (coin haut droit, sous le HUD)
+  // killfeed (coin haut droit, plus de HUD au-dessus depuis la V5.13)
   for (int i = 0; i < KILLFEED; i++)
     if (killfeed[i].alive) {
-      int y = 28 + i * 14;
+      int y = 4 + i * 14;
       fRect(SW - 118, y, 118, 12, C_BLK);
       drawBrawlerSprite(SW - 110, y + 6, 4, killfeed[i].killer, 90, false);
       if (killfeed[i].killer == ents[humanIdx].brawlerIdx && acc.name[0]) // ton pseudo pour tes kills (V5.11)
@@ -4143,25 +4046,14 @@ static void renderMatch() {
       }
   }
 
-  // ---- HUD (texte 10px : tout tient sur une barre de 26px) ----
-  fRect(0, 0, SW, 26, C_PANEL);
-  fRect(0, 24, SW, 2, C_PANEL2);
-  const BrawlerDef &d = BRAWLERS[me.brawlerIdx];
-  drawBrawlerSprite(14, 13, 8, me.brawlerIdx, 90, false);
-  drawText(28, 3, d.name, C_WHT);
-  int lvl = (me.accIdx >= 0) ? acc.b[me.accIdx].level : 1;
-  fRect(32 + textW(d.name), 1, 24, 20, C_YEL);
-  fRect(32 + textW(d.name), 15, 24, 6, C_BTND);
-  drawNum(36 + textW(d.name), 3, lvl, C_BLK);
-  // chrono du match (en SURVIE : numero de vague a la place)
-  if (mode == MODE_SURVIE) { drawText(150, 3, "VAGUE:", C_YEL); drawNum(200, 3, waveN, C_WHT); }
-  else drawNum(150, 3, fmaxf(0, 150 - matchTimeMs / 1000), C_WHT);
-  // indicateur ULTI prete (touche RETOUR)
-  if (mode == MODE_GEM && gemCountdown > 0) {
-    drawText(190, 3, "FIN!", C_YEL);
-    drawNum(244, 3, gemCountdown / 1000 + 1, C_YEL);
-    }
-  else if (me.superCharge >= 100) { drawText(190, 3, "ULTI!", C_YEL); } // ulti prete (touche RETOUR)
+  // V5.13 : plus de barre de HUD en haut (elle faisait mal aux yeux) :
+  // on garde UNIQUEMENT le killfeed (haut droit) et les objectifs du mode (bas droite).
+  // L'ulti prete = petit badge "S" jaune clignotant a cote du perso.
+  if (me.superCharge >= 100 && (animT / 200) % 2 == 0) {
+    int px2 = (int)me.x - camX + 12, py2 = (int)me.y - camY - 16;
+    fRect(px2 - 1, py2 - 4, 8, 8, C_YEL);
+    drawText(px2, py2 - 3, "S", C_BLK);
+  }
 
   // ---- V5.11 : bandeau "VAGUE N" au lancement d'une vague (mode SURVIE) ----
   if (mode == MODE_SURVIE && gWaveBannerT > 0) {
@@ -4170,6 +4062,22 @@ static void renderMatch() {
     fRect(SW / 2 - 58, 86, 116, 18, C_PANEL);
     drawTextC(92, "VAGUE", C_YEL);
     drawNum(SW / 2 + 18, 92, waveN, C_WHT);
+  }
+
+  // ---- V5.13b : AVEUGLE (super de Jacky) : ecran assombri en bandes pour le joueur ----
+  if (me.blindT > 0)
+    for (int yy = 0; yy < SH; yy += 3) fRect(0, yy, SW, 1, C_BLK);
+
+  // ---- V5.14 : particules de SAISON en match (feuilles en automne, flocons en neige) ----
+  if (seasonIdx()) {
+    KDColor sc1 = (seasonIdx() == 2) ? C_WHT : C_ORG;
+    KDColor sc2 = (seasonIdx() == 2) ? KDColor::RGB24(0xC8DCF0) : KDColor::RGB24(0xA05020);
+    int fall = (seasonIdx() == 2) ? 14 : 9; // la neige tombe plus vite
+    for (int i = 0; i < 12; i++) {
+      int fx = (i * 71 + animT / (seasonIdx() == 2 ? 30 : 55) + i * i * 3) % SW;
+      int fy = (i * 97 + animT / fall) % SH;
+      px(fx, fy, sc1); px(fx + 1, fy + 1, sc2);
+    }
   }
 
   // ---- V5.10 : bulle d'emote au-dessus du joueur (touche + ou -) ----
@@ -4240,6 +4148,9 @@ static void renderMatch() {
     for (int z = 0; z < MAX_ZONE; z++) if (zones[z].prog > 0) m++;
     drawText(SW - 72, SH - 12, "Z", C_WHT);
     drawNum(SW - 60, SH - 12, m, C_GREEN);
+  } else if (mode == MODE_SURVIE) { // V5.13 : vague affichee en bas a droite (plus de HUD haut)
+    drawText(SW - 78, SH - 12, "VAGUE:", C_YEL);
+    drawNum(SW - 20, SH - 12, waveN, C_WHT);
   } else if (mode == MODE_KO) {
     int a0 = 0, a1 = 0;
     for (int i = 0; i < entCount; i++)
@@ -4361,19 +4272,34 @@ static void updateQuests(int result) {
 
 // ------------------------- Menus --------------------------------------
 static const char **gMenuDesc = nullptr; // descriptions optionnelles des items du menu
+static int gPortrait = -1; // V5.14 : portrait du brawler affiche sur le menu principal (-1 = aucun)
 static bool gTitleAnim = false; // V5.11 : defile de brawlers derriere le menu principal
 static int menuPick(const char *title, const char **items, int n, int start) {
   int sel = start;
   bool pU = false, pD = false;
-  int drawn = -1;
+  int drawn = -1, lastPhase = -1;
   waitRelease();
   while (true) {
-    if (drawn != sel || gTitleAnim) { // redessine seulement quand la selection bouge (perf)
+    // V5.14 "framebuffer partiel" : l'ecran titre n'est redessine que quand l'anim
+    // avance vraiment d'un cran (animT/40) — les menus classiques ne redessinent que si sel bouge
+    int phase = gTitleAnim ? (int)(animT / 40) : 0;
+    if (drawn != sel || phase != lastPhase) { // redessine seulement quand la selection bouge (perf)
+      lastPhase = phase;
       bgPanel();
       if (gTitleAnim) { // V5.11 : defile de brawlers en bas de l'ecran titre
         for (int s = 0; s < 6; s++) {
           int sx = (animT / 12 + s * 70) % (SW + 80) - 40;
           drawBrawlerSprite(sx, SH - 10, 11, (s * 9 + animT / 400) % 55, 90, false, (int)(animT / 90));
+        }
+        // V5.14 : PORTRAIT du brawler du menu principal, en haut a droite
+        if (gPortrait >= 0) {
+          rRect(SW - 74, 26, 68, 74, 6, C_PANEL2);
+          rRect(SW - 72, 28, 64, 70, 4, KDColor::RGB24(0x2B3A55));
+          drawBrawlerSprite(SW - 40, 88, 17, gPortrait, 90, false, (int)(animT / 130));
+          const char *nm = BRAWLERS[gPortrait].name;
+          drawText(SW - 70 + (64 - textW(nm)) / 2, 32, nm, C_YEL);
+          int ssn = seasonIdx();
+          if (ssn) drawTextC(112, SEASON_NAMES[ssn], ssn == 1 ? C_ORG : C_WHT); // annonce la saison (V5.14)
         }
       }
       drawTextC(6, title, C_YEL);
@@ -4729,7 +4655,7 @@ static void brawlerMenu(int myBrawler) {
         drawText(90, 62, "DEG", C_WHT);
         drawNum(130, 62, (int)(d.baseDmg * mul * ((a.starPower && d.star == STAR_DMG) ? 1.1f : 1)), C_ORG);
         drawText(180, 62, "PORTEE", C_WHT);
-        drawNum(258, 62, d.range, C_CYN);
+        drawNum(258, 62, RNG(d.range), C_CYN);
         drawTextC(80, BRAWLER_BIOS[sel], C_GRE);
       }
       fRect(230, 28, 10, 6, C_GOLD); fRect(233, 35, 8, 3, C_GOLD); fRect(236, 39, 3, 6, C_GOLD);
@@ -4786,6 +4712,30 @@ static void brawlerMenu(int myBrawler) {
 }
 
 // ------------------------- Resultat + star drop -----------------------
+// V5.13b : ecran dedie quand un match (ou un star drop) debloque un NOUVEAU BRAWLER
+static void newBrawlerScreen(int bIdx) {
+  if (bIdx < 0 || bIdx >= 55) return;
+  const BrawlerDef &d = BRAWLERS[bIdx];
+  waitRelease();
+  while (true) {
+    bgPanel();
+    rRect(SW / 2 - 120, 12, 240, 30, 8, KDColor::RGB24(RAR_COL[d.rar]));
+    drawTextC(22, "NOUVEAU BRAWLER !", C_BLK);
+    drawBrawlerSprite(SW / 2, 100, 26, bIdx, 90, false, (int)(animT / 90)); // grand sprite anime
+    drawTextC(148, d.name, C_YEL);
+    drawTextC(168, "DISPONIBLE DANS LE MENU BRAWLERS", C_WHT);
+    rRect(SW / 2 - 70, 196, 140, 24, 8, C_YEL);
+    drawTextC(202, "OK CONTINUER", C_BLK);
+    blit();
+    animT += 50;
+    pollKeys();
+    if (keyOK && !prevOK) { prevOK = true; break; }
+    prevOK = keyOK;
+    Ion::Timing::msleep(60);
+  }
+  waitRelease();
+}
+
 static void resultScreen(int result, int myBrawler) {
   int coins = 0, troph = 0;
   if (result == 1) { coins = 50 + rnd(50); troph = 8; }
@@ -4885,11 +4835,33 @@ static void resultScreen(int result, int myBrawler) {
     }
     rRect(SW / 2 - 84, 190, 168, 24, 8, C_YEL);
     drawTextC(196, opened ? "OK CONTINUER  + REJOUER" : "OK OUVRIR", C_BLK);
+    // ---- V5.14 : FEUX D'ARTIFICE de particules quand on a GAGNE ----
+    if (result == 1) {
+      animT += 60;
+      for (int fw = 0; fw < 3; fw++) { // 3 fusees en decalage, tir indefiniment
+        int age = (animT + fw * 700) % 2100;
+        if (age >= 1400) continue; // pause entre deux tirs
+        int fx = 50 + (fw * 89 + (animT / 2100) * 47) % (SW - 100);
+        int fy = 30 + (fw * 61 + (animT / 2100) * 31) % 70;
+        int rad = age / 50;
+        KDColor fc = (fw == 0) ? C_YEL : ((fw == 1) ? C_MAG : C_CYN);
+        for (int a = 0; a < 360; a += 24) {
+          px(fx + (int)(rad * fcosf(a * 0.01745f)), fy + (int)(rad * fsinf(a * 0.01745f)), fc);
+          if (age < 800) px(fx + (int)(rad * 0.55f * fcosf((a + 12) * 0.01745f)), fy + (int)(rad * 0.55f * fsinf((a + 12) * 0.01745f)), C_WHT);
+        }
+      }
+    }
     blit();
     pollKeys();
     if (keyOK && !prevOK) {
       prevOK = true;
-      if (opened) { gReplay = kPlus; return; } // + maintenu = rejouer le meme mode tout de suite
+      if (opened) {
+        gReplay = kPlus;
+        // V5.13b : ecran dedie si ce match a debloque un nouveau brawler (star drop inclus)
+        if (newUnlock >= 0) newBrawlerScreen(newUnlock);
+        else if (dropUnlock >= 0) newBrawlerScreen(dropUnlock);
+        return; // + maintenu = rejouer le meme mode tout de suite
+      }
       acc.coins += starDrop; // recompense ajoutee seulement a l'ouverture
       // tres faible chance (4%) que le star drop debloque un brawleur
       if (rnd(100) < 4) {
@@ -4910,10 +4882,11 @@ static void playMatch(int myBrawler, int selMode) {
   prevOK = prevShift = prevMinus = prevBack = prevBacksp = false; keyBack = false; matchResult = -2;
   while (matchResult == -2) {
     int t0 = (int)Ion::Timing::millis();
-    updateMatch(1.0f / 30.0f);
+    updateMatch(1.0f / (gFps60 ? 60.0f : 30.0f)); // V5.14 : option 60 FPS
     renderMatch();
     int frameMs = (int)Ion::Timing::millis() - t0;
-    Ion::Timing::msleep(frameMs < 33 ? 33 - frameMs : 1);
+    int target = gFps60 ? 16 : 33;
+    Ion::Timing::msleep(frameMs < target ? target - frameMs : 1);
   }
   if (matchResult != 2) resultScreen(matchResult, myBrawler); // 2 = abandon via HOME
 }
@@ -4966,7 +4939,7 @@ static void trainingMode(int myBrawler) {
         if (!tp[i].active) {
           tp[i].active = true; tp[i].x = px_ + 10; tp[i].y = py_;
           tp[i].vx = fcosf(aim) * d.projSpeed; tp[i].vy = fsinf(aim) * d.projSpeed;
-          tp[i].travelled = 0; tp[i].range = d.range; tp[i].dmg = d.baseDmg;
+          tp[i].travelled = 0; tp[i].range = RNG(d.range); tp[i].dmg = d.baseDmg;
           break;
         }
     }
@@ -5055,6 +5028,7 @@ void ion_main(int argc, char *argv[]) {
   const char *mainItems[10] = {"JOUER", "ENTRAINEMENT", "BRAWLERS", "BOUTIQUE", "CARRIERE", "EMOTES", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
   while (true) {
     gTitleAnim = true; // brawlers qui defilent derriere le menu principal (V5.11)
+    gPortrait = myBrawler; // V5.14 : portrait du brawler courant au menu principal
     int choice = menuPick("BRAWL MICROSTARS", mainItems, 10, 0);
     gTitleAnim = false;
     if (choice < 0) return;
@@ -5110,12 +5084,15 @@ void ion_main(int argc, char *argv[]) {
     } else if (choice == 7) {
       trophyRoadScreen();
     } else if (choice == 8) {
-      // V5.13 : le pseudo se change des PARAMETRES
-      const char *setItems[2] = {"TOUCHES DU JEU", "CHANGER PSEUDO"};
+      // V5.13 : le pseudo se change des PARAMETRES ; V5.14 : option 60 FPS
+      static char fpsLbl[16];
+      fpsLbl[0] = 0; strcat(fpsLbl, gFps60 ? "60 FPS: OUI" : "60 FPS: NON");
+      const char *setItems[3] = {"TOUCHES DU JEU", "CHANGER PSEUDO", fpsLbl};
       waitRelease();
-      int sp = menuPick("PARAMETRES", setItems, 2, 0);
+      int sp = menuPick("PARAMETRES", setItems, 3, 0);
       if (sp == 0) settingsScreen();
       else if (sp == 1) { namePicker(); waitRelease(); } // BACK vide = pseudo inchangé
+      else if (sp == 2) { gFps60 = !gFps60; saveAcc(); waitRelease(); } // V5.14 : bascule 30/60 FPS persistee
     } else {
       bgPanel();
       drawTextC(8, "AIDE", C_YEL);

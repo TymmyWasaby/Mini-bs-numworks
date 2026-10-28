@@ -10,6 +10,14 @@
 //  V5 : menu style Brawl Stars, front montants (plus de double-appui),
 //       star drop a ouvrir manuellement, quetes persistantes, IA anti-blocage,
 //       but Brawl Ball seulement entre les poteaux, choix du brawler avant match.
+//  V5.16 : modes en TUILES, BOSS RUSH COOP (3 boss a patterns), KO mort subite
+//       eliminatoria, cubes en SURVIE, eventails Poco/Emz/Frank perceurs,
+//       Poco bot ne gaspille plus son soin, crits x1.4 jaunes + soins verts,
+//       screen shake directionnel fluide, mini explosion de style a la mort,
+//       arc de visee pointille pour lanceurs, stats PAR brawler (save 776 o,
+//       sauvee 1 fois par match), trophée d'or du plus joue, entrapinement+
+//       (cibles qui ripent + DPS), compteur FPS (option), saison discrete,
+//       arene circulaire + couloirs en H, boost foireux de debut SUPPRIMES.
 // ===================================================================
 
 #include <ion.h>
@@ -274,7 +282,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Brock",    3800, 1620, 280, 2000, 360, 1,  0, ATK_SHOT,   SUP_MEGASHOT, GAD_SPEED, STAR_DMG,   1,   120, 0xC93B3B, 0x8A2222, 2},
   {"El Primo", 6800, 1400,  90, 1300, 330, 4,  0, ATK_SHOT,   SUP_DASH,     GAD_HEAL,  STAR_HP,    1,   180, 0x3BA05C, 0x22663A, 0},
   {"Barley",   3600, 1160, 240, 1700, 260, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_AMMO,  STAR_REGEN, 1,   240, 0x7BC93B, 0x4F8A22, 3},
-  {"Poco",     5600, 1100, 200, 1400, 300, 3, 16, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 1,   300, 0xB03BE0, 0x7822A0, 1},
+  {"Poco",     5600, 1100, 200, 1400, 300, 5, 34, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 1,   300, 0xB03BE0, 0x7822A0, 1},
   {"Rosa",     6400, 1250, 120, 1500, 340, 3, 35, ATK_SPREAD, SUP_SHIELD,   GAD_SPEED, STAR_HP,    2,   400, 0x7AC96B, 0x4F8A46, 0},
   {"Jessie",   4600, 1180, 210, 1700, 300, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_AMMO,  STAR_REGEN, 2,   500, 0xA03BA0, 0x701F70, 2},
   {"Dynamike", 4000, 1330, 230, 1800, 280, 2, 12, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_DMG,   2,   620, 0xE0B03B, 0xA07822, 3},
@@ -286,10 +294,10 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Carl",     5500, 1250, 190, 1200, 320, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_HP,    3,  1500, 0x7B9BC9, 0x50688A, 3},
   {"Jacky",    6000, 1300, 110, 1500, 320, 4, 22, ATK_SPREAD, SUP_WHIRL,    GAD_BLAST, STAR_HP,    3,  1700, 0xE0B03B, 0xA07822, 0},
   {"Bo",       5000, 1200, 250, 1800, 310, 3,  9, ATK_SHOT,   SUP_MINES,    GAD_SPEED, STAR_REGEN, 3,  1900, 0x3B7AC9, 0x224F8A, 2},
-  {"Emz",      4800, 1180, 200, 1600, 280, 2, 18, ATK_SPREAD, SUP_BURST,    GAD_HEAL,  STAR_REGEN, 3,  2100, 0xE03B8A, 0xA02258, 1},
+  {"Emz",      4800, 1180, 200, 1600, 280, 4, 26, ATK_SPREAD, SUP_BURST,    GAD_HEAL,  STAR_REGEN, 3,  2100, 0xE03B8A, 0xA02258, 1},
   {"Stu",      3800, 1080, 220, 1300, 420, 1,  0, ATK_SHOT,   SUP_DASH,     GAD_SPEED, STAR_DMG,   3,  2350, 0xC93BA0, 0x8A2270, 2},
   {"Pam",      6200, 1150, 220, 1800, 300, 4, 10, ATK_SPREAD, SUP_SUMMON,   GAD_HEAL,  STAR_REGEN, 3,  2600, 0xB09B3B, 0x7A6A22, 2},
-  {"Frank",    7400, 1800, 140, 2400, 260, 1,  0, ATK_SHOT,   SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
+  {"Frank",    7400, 1800, 140, 2400, 260, 3, 30, ATK_SPREAD, SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
   {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_WAVE,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
   {"Bea",      3600,  960, 270, 1500, 380, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   3,  3500, 0xE0C93B, 0xA08A22, 2},
   {"Nani",     3400, 1420, 260, 1900, 340, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
@@ -1296,6 +1304,7 @@ struct Account { BrawlerAccount b[55]; int coins;
   uint8_t emoteP, emoteM; // emote assignee aux touches + et - (0 = aucune)
   char name[9];  // pseudo du joueur (V5.11)
   int bestWave;  // record du mode SURVIE (V5.11)
+  uint8_t pMatches[55], pWins[55]; uint16_t pKills[55], pDmg[55]; // V5.16 : stats PAR brawler (dmg en centaines)
 } acc;
 // walk : phase d'animation de marche (0 = immobile)
 static void drawBrawlerSprite(int cx, int cy, int r, int bIdx, int faceAng, bool flash, int walk = 0, int attackT = 0) {
@@ -1333,8 +1342,9 @@ static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
 #define SAVE_NAME "minibs.sav"
 #define SAVE_BACKUP "minibs.bak" // V5.14 : double record anti-corruption
 static int gFps60 = 0; // V5.14 : option "60 FPS" (0 = 30 fps par defaut, plus fluide a 1 mais plus gourmand)
+static int gFpsShow = 0; // V5.16 : afficher le compteur FPS en match
 static void saveAcc() {
-  uint8_t buf[452]; // 444 octets reels (V5.13 FIX : 431/442 ettaient faux de 2/2 -> toute sauvegarde etait rejatee au chargement !)
+  uint8_t buf[776]; // 776 octets reels (V5.16 : +330 stats par brawler + 1 fpsShow)
   int p = 0;
   for (int i = 0; i < 55; i++) {
     buf[p++] = (uint8_t)acc.b[i].level;
@@ -1369,7 +1379,13 @@ static void saveAcc() {
   buf[p++] = acc.emoteP; buf[p++] = acc.emoteM;
   for (int i = 0; i < 9; i++) buf[p++] = (uint8_t)acc.name[i]; // V5.11 : pseudo
   buf[p++] = (uint8_t)(acc.bestWave >> 8); buf[p++] = (uint8_t)(acc.bestWave & 0xFF); // record survie
-  buf[p++] = gFps60 ? 1 : 0; // V5.14 : option 60 FPS (445 octets au total)
+  buf[p++] = gFps60 ? 1 : 0; // V5.14 : option 60 FPS (445 octets)
+  for (int i = 0; i < 55; i++) { // V5.16 : stats par brawler (330 octets)
+    buf[p++] = acc.pMatches[i]; buf[p++] = acc.pWins[i];
+    buf[p++] = (uint8_t)(acc.pKills[i] >> 8); buf[p++] = (uint8_t)(acc.pKills[i] & 0xFF);
+    buf[p++] = (uint8_t)(acc.pDmg[i] >> 8);   buf[p++] = (uint8_t)(acc.pDmg[i] & 0xFF);
+  }
+  buf[p++] = gFpsShow ? 1 : 0; // V5.16 : compteur FPS (776 octets au total)
   ef_write(SAVE_NAME, buf, (uint32_t)p);
   ef_write(SAVE_BACKUP, buf, (uint32_t)p); // V5.14 : sauvegarde de secours anti-corruption
 }
@@ -1377,10 +1393,10 @@ static bool loadAcc() {
   uint32_t len = 0;
   const uint8_t *buf = ef_read(SAVE_NAME, &len);
   // V5.14 : double record anti-corruption — si le record principal est perdu/corrompu, on tente la copie de secours
-  bool bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445);
+  bool bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776);
   if (bad) {
     buf = ef_read(SAVE_BACKUP, &len);
-    bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445);
+    bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776);
     if (bad) return false; // format inattendu : partie vierge
   }
   // V5.13 FIX : tailles REELLES ecrites par saveAcc au fil des versions.
@@ -1424,7 +1440,7 @@ static bool loadAcc() {
   winStreak   = (buf[p] << 8) | buf[p + 1];
   if (winStreak < 0) winStreak = 0;
   // ---- V5.10 : carriere, skins, emotes (absents des vieilles sauvegardes) ----
-  if (len == 433 || len == 444) {
+  if (len == 433 || len == 444 || len == 445) {
     p += 2;
     acc.matches = (buf[p] << 8) | buf[p + 1]; p += 2;
     acc.wins = (buf[p] << 8) | buf[p + 1]; p += 2;
@@ -1440,14 +1456,23 @@ static bool loadAcc() {
     acc.emoteP = acc.emoteM = 0;
   }
   // ---- V5.11 : pseudo + record survie (444 = format actuel) ----
-  if (len == 444) {
+  if (len == 444 || len == 445) {
     for (int i = 0; i < 9; i++) acc.name[i] = (char)buf[p++];
     acc.name[8] = 0;
     acc.bestWave = (buf[p] << 8) | buf[p + 1];
     if (acc.bestWave < 0 || acc.bestWave > 999) acc.bestWave = 0;
     p += 2;
   } else { acc.name[0] = 0; acc.bestWave = 0; }
-  if (len == 445) gFps60 = (buf[p++] != 0); // V5.14 : option 60 FPS persistee
+  if (len == 445 || len == 776) gFps60 = (buf[p++] != 0); // V5.14 : option 60 FPS persistee
+  // ---- V5.16 : stats par brawler (seulement format 776) ----
+  if (len == 776) {
+    for (int i = 0; i < 55; i++) {
+      acc.pMatches[i] = buf[p++]; acc.pWins[i] = buf[p++];
+      acc.pKills[i] = (buf[p] << 8) | buf[p + 1]; p += 2;
+      acc.pDmg[i] = (buf[p] << 8) | buf[p + 1]; p += 2;
+    }
+    gFpsShow = (buf[p++] != 0);
+  }
   for (int i = 0; i < 9; i++) if (acc.name[i] != 0 && (acc.name[i] < ' ' || acc.name[i] > 'z')) acc.name[i] = 0; // sanity
   return true;
 }
@@ -1494,14 +1519,14 @@ static void initAcc() {
 }
 
 // ------------------------- Modes --------------------------------------
-enum GameMode { MODE_GEM = 0, MODE_BALL, MODE_SOLO, MODE_DUO, MODE_HEIST, MODE_BOUNTY, MODE_KO, MODE_ZONE, MODE_SIEGE, MODE_DUEL, MODE_SURVIE, MODE_COUNT };
+enum GameMode { MODE_GEM = 0, MODE_BALL, MODE_SOLO, MODE_DUO, MODE_HEIST, MODE_BOUNTY, MODE_KO, MODE_ZONE, MODE_SIEGE, MODE_DUEL, MODE_SURVIE, MODE_BOSSRUSH, MODE_COUNT };
 static const char *MODE_NAMES[MODE_COUNT] = {
   "RAMASSE-GEMMES 3V3", "BRAWL BALL 3V3", "SURVIVANT 6J", "SURVIVANT DUO 4X2",
-  "BRAQUAGE 3V3", "PRIME 3V3", "A-MORT 3V3", "ZONE CHAUDE 3V3", "SIEGE DU BOSS 3V1", "DUEL 3 BRAWLERS", "SURVIE : VAGUES"
+  "BRAQUAGE 3V3", "PRIME 3V3", "A-MORT 3V3", "ZONE CHAUDE 3V3", "SIEGE DU BOSS 3V1", "DUEL 3 BRAWLERS", "SURVIE : VAGUES", "BOSS RUSH COOP"
 };
 static const char *MODE_DESC[MODE_COUNT] = {
   "10 GEMMES + 15S", "2 BUTS POUR GAGNER", "DERNIER EN VIE", "DERNIERE EQUIPE",
-  "DETROUISE LE COFFRE", "20 ETOILES DE KILLS", "ELIMINE L'EQUIPE !", "CAPTURE LES ZONES", "TUEZ LE MEGA ROBOT !", "3 VIES, DUO A DUO", "COMBIEN DE VAGUES ?"
+  "DETROUISE LE COFFRE", "20 ETOILES DE KILLS", "ELIMINE L'EQUIPE !", "CAPTURE LES ZONES", "TUEZ LE MEGA ROBOT !", "3 VIES, DUO A DUO", "COMBIEN DE VAGUES ?", "3 BOSS A LA CHAINE !"
 };
 
 static uint8_t tileMap[44][32]; // taille MAX : la vraie taille (mapW, mapH) depend du mode
@@ -1580,7 +1605,7 @@ static float gLobRangeMul = -1.0f; // <0 = portee max ; sinon le lob atterrit su
 static bool gForceLob = false;     // force le prochain tir en lob (mines de Bo, grenades de Piper)
 static float gFireOffX = 0, gFireOffY = 0; // V5.13 : decalage de spawn (rafales Colt/Rico : balles les unes derriere les autres)
 
-struct Pop { bool active; float x, y; int life, val; };
+struct Pop { bool active; float x, y; int life, val; uint8_t kind; }; // kind 0 blanc, 1 CRIT jaune, 2 SOIN vert
 static Pop pops[MAX_POP];
 
 struct Gem { bool active; float x, y; };
@@ -1593,9 +1618,31 @@ struct HotZone { float x, y, prog; int owner; }; // V5.13 : owner = equipe qui a
 static HotZone zones[MAX_ZONE];
 
 static float ballX, ballY, ballVX, ballVY;
+static int ballCd = 0; // V5.15 : delai de remise en jeu apres un but (anti double-but)
+// V5.15 : BUT = ballon au centre + TOUT LE MONDE respawne a son camp, PV au max (comme BS)
+static void ballResetAfterGoal() {
+  ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
+  ballCd = 1500; // 1.5 s avant que le ballon redevienne jouable
+  int row = 0;
+  for (int i = 0; i < entCount; i++) {
+    Ent &e = ents[i];
+    if (e.isPet) { continue; }
+    e.hasBall = false;
+    e.hp = e.maxHP; e.regenT = 0; // remise a plat des deux equipes
+    e.x = (e.team == 0) ? 40 : mapW * TILE - 40; // retour au camp
+    e.y = mapH * TILE / 2 + ((row % 3) - 1) * 30;
+    row++;
+  }
+  shakeT = 400; shakeMag = 5;
+}
 static int mode, gemCountdown, teamGems[5], teamStars[5];
 static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
 static int shakeT = 0, shakeMag = 0, animT = 0;
+static float shakeDX = 0, shakeDY = 0; // V5.16 : direction du screen shake (recul opposé aux degats)
+static bool gSuddenDone = false; // V5.16 : KO elimination deja declenchee
+static int gKOBannerT = 0;      // V5.16 : banniere "ELIMINATOIRE !"
+static int gBossN = 0, gBossPattern = 0, gBossT = 0; // V5.16 : BOSS RUSH : boss n°, pattern, timer
+static float gFrameMs = 33.0f;  // V5.16 : EMA du temps de frame pour le compteur FPS
 static int matchResult = -2;
 static int startCountdown = 0; // 3-2-1-GO au debut du match
 
@@ -1613,8 +1660,7 @@ static LootBox boxes[MAX_BOX];
 static Cube cubes[MAX_CUBE];
 static Portal portals[MAX_TP];
 static Barrel barrels[MAX_BARREL];
-static int matchMod = 0; // modificateur du match : 0 aucun, 1 PV, 2 vitesse, 3 supers, 4 munitions
-static const char *MOD_NAMES[5] = { "", "PV RENFORCES +40%", "VITESSE +15%", "SUPERS RAPIDES x2", "MUNITIONS x1.5" };
+static int matchMod = 0; // V5.16 : les evenements de match ont ete SUPPRIMES (boosts "foireux")
 static float gAIDyn = 1.0f; // IA adaptative : ajustee apres chaque match selon le resultat
 // ---- V5.10 : duel 3 brawlers (relais a la mort), emotes, skins, rejouer ----
 static int duelQ[2][3] = {{0,0,0},{0,0,0}};   // les 3 brawlers de chaque equipe
@@ -1649,11 +1695,11 @@ static void addKill(int victim, int killer) {
   killfeed[0].life = 4000;
 }
 
-static void addPop(float x, float y, int val) {
+static void addPop(float x, float y, int val, int kind = 0) {
   for (int i = 0; i < MAX_POP; i++)
     if (!pops[i].active) {
       pops[i].active = true; pops[i].x = x; pops[i].y = y;
-      pops[i].life = 900; pops[i].val = val;
+      pops[i].life = 900; pops[i].val = val; pops[i].kind = (uint8_t)kind;
       return;
     }
 }
@@ -1705,7 +1751,7 @@ static int mapDayIndex() {
 }
 // ---- V5.14 : saisons par compteur de matchs (3 parties par saison, aucune horloge) ----
 static int seasonIdx() { return (matchCounter / 3) % 3; } // 0 = normal, 1 = AUTOMNE, 2 = NEIGE
-static const char *SEASON_NAMES[3] = {"", "SAISON : AUTOMNE", "SAISON : NEIGE"};
+static const char *SEASON_NAMES[3] = {"", "AUTOMNE", "NEIGE"}; // V5.16 : plus court, banniere discrete
 static uint32_t seasonTint(uint32_t c) { // teinte les couleurs du terrain selon la saison
   int s = seasonIdx(); if (!s) return c;
   int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
@@ -1778,6 +1824,27 @@ static void genMap() {
       if (abs((int)(y - mapH / 2)) < 2) continue;
       tileMap[x][y] = v;
     }
+  }
+  if (variant == 1) { // V5.16 : ARENE CIRCULAIRE — anneau de murs a 4 ouvertures autour du centre
+    int ccx = mapW / 2, ccy = mapH / 2;
+    for (int a = 0; a < 360; a += 3) {
+      int seg = (a / 45) % 8; // 8 segments, 4 ouverts (1 sur 2)
+      if (seg % 2 == 1) continue;
+      int wx = ccx + (int)(6.5f * fcosf(a * 0.01745f));
+      int wy = ccy + (int)(4.5f * fsinf(a * 0.01745f));
+      if (wx > 1 && wy > 1 && wx < mapW - 2 && wy < mapH - 2 && abs(wy - ccy) > 1)
+        tileMap[wx][wy] = 1;
+    }
+  }
+  if (variant == 2) { // V5.16 : COULOIRS EN H — deux lignes de murs a breches + colonne de buissons
+    for (int x = 3; x < mapW - 3; x++) {
+      if (x != mapW / 2 && x != mapW / 2 - 1 && x % 7 != 0) { // breches regulieres
+        tileMap[x][mapH / 4] = 1;
+        tileMap[x][mapH - mapH / 4 - 1] = 1;
+      }
+    }
+    for (int y = 2; y < mapH - 2; y++)
+      if (y != mapH / 2 && y != mapH / 2 - 1) tileMap[mapW / 2][y] = 2; // colonne centrale de buissons (passable)
   }
   if (mode == MODE_BALL || mode == MODE_HEIST || mode == MODE_ZONE)
     for (int x = 1; x < mapW - 1; x++)
@@ -1867,6 +1934,7 @@ static void setupMatch(int selMode, int myBrawler) {
   genMap();
   for (int i = 0; i < 5; i++) { teamGems[i] = 0; teamStars[i] = 0; }
   gemCountdown = -1; matchTimeMs = 0; shakeT = 0; poisonWaveT = 0;
+  gSuddenDone = false; gKOBannerT = 0; gBossN = 0; gBossPattern = 0; gBossT = 0; // V5.16
   startCountdown = 3000;
   float skill = aiSkillFromTrophies();
 
@@ -1908,11 +1976,12 @@ static void setupMatch(int selMode, int myBrawler) {
     int a2 = pick(); if (a2 == myBrawler || a2 == a1) a2 = pick();
     addEnt(a1, -1, 0, 40, mapH * TILE / 2 - 70, false, skill);
     addEnt(a2, -1, 0, 40, mapH * TILE / 2 + 70, false, skill);
-    if (mode == MODE_SIEGE) { // 3 heros contre le MEGA ROBOT (Meg definitivement transformee)
+    if (mode == MODE_SIEGE || mode == MODE_BOSSRUSH) { // V5.16 : BOSS RUSH = 3 boss a la chaine
       addEnt(47, -1, 1, mapW * TILE - 80, mapH * TILE / 2, false, 0.9f);
       Ent &bs = ents[entCount - 1];
       bs.isBoss = 1; bs.mechT = 1.0f;
-      bs.maxHP = 42000 + skill * 28000; bs.hp = bs.maxHP; // scale avec tes trophees
+      bs.maxHP = (mode == MODE_BOSSRUSH) ? (30000 + skill * 15000) : (42000 + skill * 28000);
+      bs.hp = bs.maxHP; // scale avec tes trophees
       tileMap[(int)(bs.x / TILE)][(int)(bs.y / TILE)] = 0; // le boss n'apparait jamais dans un mur
     } else {
     int e1 = pick(), e2 = pick(), e3 = pick();
@@ -1928,7 +1997,7 @@ static void setupMatch(int selMode, int myBrawler) {
         gems[i].x = mapW * TILE / 2 + (rnd(3) - 1) * 30;
         gems[i].y = mapH * TILE / 2 + (rnd(3) - 1) * 30;
       }
-    else if (mode == MODE_BALL) { ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0; }
+    else if (mode == MODE_BALL) { ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0; ballCd = 0; }
     else if (mode == MODE_HEIST) {
       safes[0].team = 0; safes[0].x = 30; safes[0].y = mapH * TILE / 2; safes[0].maxHP = 26000; safes[0].hp = safes[0].maxHP;
       safes[1].team = 1; safes[1].x = mapW * TILE - 30; safes[1].y = mapH * TILE / 2; safes[1].maxHP = 26000; safes[1].hp = safes[1].maxHP;
@@ -1952,7 +2021,7 @@ static void setupMatch(int selMode, int myBrawler) {
         if (tx >= 0 && tx < mapW && ty >= 0 && ty < mapH) tileMap[tx][ty] = 0;
       }
   // ---- V5.9 : evenement du match + placement des objets (cubes, teleporteurs, tonneaux) ----
-  matchMod = (rnd(100) < 45) ? 1 + rnd(4) : 0; // rotation par partie : aucune horloge requise
+  matchMod = 0; // V5.16 : plus d'evenement de match (boosts supprimes)
   for (int i = 0; i < MAX_BOX; i++) boxes[i].active = false;
   for (int i = 0; i < MAX_CUBE; i++) cubes[i].active = false;
   for (int i = 0; i < MAX_TP; i++) portals[i].active = false;
@@ -1982,8 +2051,6 @@ static void setupMatch(int selMode, int myBrawler) {
       tileMap[(int)(barrels[b].x / TILE)][(int)(barrels[b].y / TILE)] = 0;
     }
   }
-  if (matchMod == 1) // evenement PV renforces : tout le monde encaisse plus
-    for (int i = 0; i < entCount; i++) { ents[i].maxHP *= 1.4f; ents[i].hp = ents[i].maxHP; }
   // roles IA : dans chaque equipe, le 1er attaque l'objectif, le 2e defend, le 3e chasse
   {
     int memberCount[5] = {0, 0, 0, 0, 0};
@@ -2011,7 +2078,8 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.travelled = 0; p.team = e.team; p.owner = (&e - ents);
     p.radius = isSuper ? 4 : 2;
     p.boomer = (!isSuper && e.brawlerIdx == 16); p.ret = false; // Carl : pic-boomerang
-    p.pierce = gPierceProj || p.boomer; if (p.pierce) p.radius = p.boomer ? 7 : 3; // pic de Carl grand, balles perceuses petites
+    p.pierce = gPierceProj || p.boomer || (!isSuper && !e.isPet && (e.brawlerIdx == 7 || e.brawlerIdx == 19 || e.brawlerIdx == 22)); // V5.16 : eventail PERCEUR de Poco/Emz/Frank
+    if (p.pierce) p.radius = p.boomer ? 7 : 3; // pic de Carl grand, balles perceuses petites
     p.nHits = 0;
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     p.bIdx = e.brawlerIdx; // V5.13 : graphisme du projectile selon le brawler
@@ -2180,7 +2248,7 @@ static void doSuper(Ent &e, float ang) {
         if (ents[i].alive && ents[i].team == e.team) {
           float before = ents[i].hp;
           ents[i].hp = fminf(ents[i].maxHP, ents[i].hp + ents[i].maxHP * 0.4f);
-          if (ents[i].hp > before) addPop(ents[i].x, ents[i].y - 12, (int)(ents[i].hp - before));
+          if (ents[i].hp > before) addPop(ents[i].x, ents[i].y - 12, (int)(ents[i].hp - before), 2); // soin = vert
         }
       break;
     }
@@ -2605,7 +2673,13 @@ static void updateAI(Ent &e, float dt) {
       case SUP_SHIELD:
         if (tgt && ed < RNG(d.range) * 1.2f) { doSuper(e, angT); done = true; } break;
       case SUP_UPGRADE: case SUP_HEAL:
-        if (rnd(100) < 25) { doSuper(e, angT); done = true; } break;
+        // V5.16 : Poco ne gaspille plus son soin — seulement si lui ou un allie est blessé
+        {
+          bool allyLow = (e.hp < e.maxHP * 0.65f);
+          for (int j = 0; j < entCount && !allyLow; j++)
+            if (ents[j].alive && !ents[j].isPet && ents[j].team == e.team && ents[j].hp < ents[j].maxHP * 0.65f) allyLow = true;
+          if (allyLow && rnd(100) < 40) { doSuper(e, angT); done = true; }
+        } break;
       case SUP_HASTE: // Max : boost de vitesse pour chasser ou s'echapper
         if (low || (tgt && ed < RNG(d.range) * 1.3f)) { doSuper(e, angT); done = true; } break;
       default: // supers d'attaque : seulement a portee d'une cible, et pas claques a la va-vite
@@ -2623,7 +2697,6 @@ static void updateAI(Ent &e, float dt) {
   float len = sqrtf(dx * dx + dy * dy);
   if (len > 10) {
     float sp = 72 + 24 * sk;
-    if (matchMod == 2) sp *= 1.15f; // evenement du match : tout le monde va plus vite
     if (e.speedBuffT > 0) sp *= 1.3f; // boost de vitesse (super de Carl, Max, Stu...)
     if (e.boostT > 0) sp *= 1.7f; // super de Carl
     if (e.slowT > 0) sp *= 0.6f;
@@ -2658,10 +2731,9 @@ static void shootBall(Ent &e, float ang) {
 static void teamGoal(int team) {
   int rec = -1;
   for (int i = 0; i < entCount; i++)
-    if (ents[i].team == team && (rec < 0 || i == humanIdx)) rec = i;
+    if (ents[i].team == team && !ents[i].isPet && (rec < 0 || i == humanIdx)) rec = i;
   if (rec >= 0) ents[rec].goals++;
-  ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
-  shakeT = 400; shakeMag = 5;
+  ballResetAfterGoal(); // V5.15 : remise au centre + respawn des joueurs (plus de but en double)
 }
 static void damageEnt(Ent &e, float dmg, Ent &src) {
   if (e.shieldT > 0) dmg *= 0.35f; // carapace de Rosa active
@@ -2672,17 +2744,23 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
     float bx = b.x - src.x, by = b.y - src.y;
     if (bx * bx + by * by < 220 * 220) { dmg *= 1.3f; break; }
   }
+  int popKind = 0;
+  if (rnd(100) < 12) { dmg *= 1.4f; popKind = 1; } // V5.16 : CRITIQUE x1.4 (12%) en jaune gras
   e.hp -= dmg; e.regenT = 0; e.lastHitT = 150;
   // V5.13b : effet de statut — les balles de PIPER ralentissent la cible 1.5 s
   if (&src != &e && !src.isPet && src.brawlerIdx == 50) e.slowT = fmaxf(e.slowT, 1.5f);
   src.dmgDone += dmg; // stats de fin de match
   float chg = (src.hyperT > 0) ? 20.0f : 14.0f;
-  if (matchMod == 3) chg *= 2.0f; // evenement du match : supers x2
   if (!src.isPet && src.brawlerIdx == 10) chg = 7.0f; // Dynamike : la giga-dynamite est TRES cher (15 touches)
   if (!src.isPet && src.brawlerIdx == 20) chg = 100.0f; // Stu : UNE touche = super rechargee
   src.superCharge = fminf(100, src.superCharge + chg); // ~7 tirs reussis = ulti prete
-  addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg);
+  addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg, popKind);
   spawnParts(e.x, e.y, 0, 5); // etincelles d'impact plus visibles
+  // V5.16 : screen shake DIRECTIONNEL — la camera recule dans le sens du coup recu
+  if (&e == &ents[humanIdx] && &src != &e) {
+    float ddx = e.x - src.x, ddy = e.y - src.y, l = sqrtf(ddx * ddx + ddy * ddy);
+    if (l > 0.01f) { shakeDX = ddx / l; shakeDY = ddy / l; }
+  }
 }
 
 // IA des creatures invoquees : ours/rats/pingouins melee, tourelle/ego tireurs, station de soin
@@ -2761,7 +2839,7 @@ static void updateMatch(float dt) {
   animT += (int)(dt * 1000);
   if (shakeT > 0) shakeT -= (int)(dt * 1000);
   bool ffa = (mode == MODE_SOLO || mode == MODE_DUO);
-  bool noRespawn = ffa || mode == MODE_KO || mode == MODE_SIEGE || mode == MODE_DUEL || mode == MODE_SURVIE;
+  bool noRespawn = ffa || mode == MODE_KO || mode == MODE_SIEGE || mode == MODE_BOSSRUSH || mode == MODE_DUEL || mode == MODE_SURVIE;
 
   for (int i = 0; i < MAX_POP; i++)
     if (pops[i].active) { pops[i].life -= (int)(dt * 1000); pops[i].y -= dt * 22; if (pops[i].life <= 0) pops[i].active = false; }
@@ -2772,6 +2850,7 @@ static void updateMatch(float dt) {
       parts[i].vy += 60 * dt;
       if (parts[i].life <= 0) parts[i].active = false;
     }
+  if (gKOBannerT > 0) gKOBannerT -= (int)(dt * 1000); // V5.16 : bannieres eliminatoria / boss rush
   for (int i = 0; i < KILLFEED; i++)
     if (killfeed[i].alive) { killfeed[i].life -= (int)(dt * 1000); if (killfeed[i].life <= 0) killfeed[i].alive = 0; }
 
@@ -2792,7 +2871,6 @@ static void updateMatch(float dt) {
     if (me.boostT > 0) spd *= 1.7f; // super de Carl : vitesse spectaculaire
     if (me.hyperT > 0) spd *= 1.15f;
     if (me.slowT > 0) spd *= 0.6f;
-    if (matchMod == 2) spd *= 1.15f; // evenement du match : vitesse +15%
     const BrawlerDef &d = BRAWLERS[me.brawlerIdx];
     if (me.accIdx >= 0 && acc.b[me.accIdx].starPower && d.star == STAR_SPEED) spd *= 1.1f;
     float dx = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
@@ -2816,17 +2894,18 @@ static void updateMatch(float dt) {
         else me.atkCharge = 0;
       }
     }
-    // le tir va vers la direction du perso ; a l'arret, vers l'ennemi le plus proche
+    // V5.15 : le tir automatique VISE L'ENNEMI LE PLUS PROCHE meme quand on se deplace —
+    // les fleches servent a bouger, pas a viser (comme l'auto-visse de BS)
     Ent *tgt = nullptr; nearestEnemyDist(me, &tgt);
-    float ang = (dx || dy) ? atan2f(dy, dx)
-              : (tgt ? atan2f(tgt->y - me.y, tgt->x - me.x) : me.aimAng);
+    float ang = (tgt) ? atan2f(tgt->y - me.y, tgt->x - me.x)
+              : ((dx || dy) ? atan2f(dy, dx) : me.aimAng);
     if (shotUlti) { if (me.superCharge >= 100) doSuper(me, ang); }
     if (shotAtk) {
       if (mode == MODE_BALL && me.hasBall) {
         shootBall(me, ang); // on tire le ballon au lieu d'attaquer
       } else {
         // lanceur : le tir atterrit sur l'ennemi le plus proche si on est a l'arret
-        if (d.atk == ATK_LOB && !(dx || dy) && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / RNG(d.range));
+        if (d.atk == ATK_LOB && tgt) gLobRangeMul = fminf(1.0f, sqrtf((tgt->x-me.x)*(tgt->x-me.x)+(tgt->y-me.y)*(tgt->y-me.y)) / RNG(d.range));
         doAttack(me, ang);
         gLobRangeMul = -1.0f;
       }
@@ -2894,7 +2973,7 @@ static void updateMatch(float dt) {
         }
     }
     const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
-    e.ammo = fminf(3, e.ammo + dt * 1000.0f / d.reloadMs * (matchMod == 4 ? 1.5f : 1.0f));
+    e.ammo = fminf(3, e.ammo + dt * 1000.0f / d.reloadMs);
     e.regenT += dt;
     float regenDelay = 4.0f;
     if (e.accIdx >= 0 && acc.b[e.accIdx].starPower && d.star == STAR_REGEN) regenDelay = 2.0f;
@@ -2944,6 +3023,11 @@ static void updateMatch(float dt) {
           cubes[c].x = e.x + (rnd(40) - 20); cubes[c].y = e.y + (rnd(40) - 20);
           e.cubes--;
         }
+      if (mode == MODE_SURVIE && e.team != 0) // V5.16 : les bots de SURVIE droppent un power cube (+10% PV)
+        for (int c = 0; c < MAX_CUBE; c++) if (!cubes[c].active) {
+          cubes[c].active = true; cubes[c].x = e.x + (rnd(20) - 10); cubes[c].y = e.y + (rnd(20) - 10);
+          break;
+        }
       // DUEL : le brawler suivant de l'equipe entre immediatement en jeu
       if (mode == MODE_DUEL && !e.isPet && duelNext[e.team] < 3) {
         int nb = duelQ[e.team][duelNext[e.team]], na = duelAcc[e.team][duelNext[e.team]];
@@ -2954,7 +3038,7 @@ static void updateMatch(float dt) {
         spawnParts((e.team == 0) ? 40 : mapW * TILE - 40, mapH * TILE / 2, 2, 8);
       }
       shakeT = 200; shakeMag = 3;
-      spawnParts(e.x, e.y, 1, 8);
+      spawnParts(e.x, e.y, 1, 14); spawnParts(e.x, e.y, 0, 6); // V5.16 : mini explosion de STYLE (0 degat)
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team && fabsf(ents[j].x - e.x) < 140 && fabsf(ents[j].y - e.y) < 140) { addKill((&e - ents), j); ents[j].kills++; break; }
       if (ffa && e.isHuman && mode == MODE_SOLO) matchResult = -1; // en solo : mort = fini. En duo : tant que le coequipier vit, on continue
@@ -3209,9 +3293,10 @@ static void updateMatch(float dt) {
   }
 
   if (mode == MODE_BALL) {
+    if (ballCd > 0) ballCd -= (int)(dt * 1000); // V5.15 : delai anti double-but
     bool carried = false;
     for (int i = 0; i < entCount; i++) if (ents[i].alive && ents[i].hasBall) carried = true;
-    if (!carried) {
+    if (!carried && ballCd <= 0) { // V5.15 : ramassage impossible pendant la remise en jeu
       for (int i = 0; i < entCount; i++) {
         Ent &e = ents[i];
         if (e.isPet || !e.alive || e.hasBall) continue;
@@ -3223,7 +3308,7 @@ static void updateMatch(float dt) {
         if (solidAt(ballX, ballY)) { ballX -= ballVX * dt * 2; ballY -= ballVY * dt * 2; ballVX = ballVY = 0; }
         // ballon libre qui entre dans un but (entre les poteaux) : but pour l'equipe qui attaque ce cote
         int goalCY = mapH * TILE / 2;
-        if (fabsf(ballY - goalCY) < 2.2f * TILE) {
+        if (ballCd <= 0 && fabsf(ballY - goalCY) < 2.2f * TILE) { // V5.15 : aucun but pendant la remise en jeu
           if (ballX > mapW * TILE - 14) { teamGoal(0); }
           else if (ballX < 14) { teamGoal(1); }
         } else {
@@ -3239,10 +3324,9 @@ static void updateMatch(float dt) {
           bool inGoalMouth = fabsf(ballY - goalCY) < 2.2f * TILE; // dans les poteaux, pas au-dessus/dessous
           if ((ents[i].team == 0 && ballX > mapW * TILE - 26) ||
               (ents[i].team == 1 && ballX < 26)) {
-            if (inGoalMouth) {
+            if (inGoalMouth && ballCd <= 0) { // V5.15 : remise complete (centre + camps), pas de double-but
               ents[i].goals++; ents[i].hasBall = false;
-              ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
-              shakeT = 400; shakeMag = 5;
+              ballResetAfterGoal();
             } else { // hors des poteaux : on reste dans le terrain
               ballX = ents[i].x = (ents[i].team == 0) ? mapW * TILE - 26 : 26;
             }
@@ -3317,6 +3401,23 @@ static void updateMatch(float dt) {
         if (ents[i].alive && !ents[i].isPet) { if (ents[i].team == 0) alive0++; else alive1++; }
       if (alive0 == 0) matchResult = -1;
       if (alive1 == 0) matchResult = 1;
+      // V5.16 : A-MORT ELIMINATOIRE — apres 2 min, mort subite : tous teleportes face a face au centre
+      if (alive0 > 0 && alive1 > 0 && matchTimeMs > 120000 && !gSuddenDone) {
+        gSuddenDone = true;
+        int cx2 = mapW * TILE / 2, cy2 = mapH * TILE / 2;
+        breakWalls(cx2, cy2, 130);
+        int offs[2] = {0, 0};
+        for (int i = 0; i < entCount; i++) {
+          Ent &e2 = ents[i];
+          if (!e2.alive || e2.isPet) continue;
+          e2.hp = e2.maxHP; e2.regenT = 0; e2.gems = 0;
+          e2.x = cx2 + ((e2.team == 0) ? -70 : 70);
+          e2.y = cy2 + (offs[e2.team & 1]++ - 1) * 40;
+          tileMap[(int)(e2.x / TILE)][(int)(e2.y / TILE)] = 0;
+          spawnParts(e2.x, e2.y, 2, 8);
+        }
+        gKOBannerT = 1500;
+      }
     } else {
       // Survivant solo/duo : victoire si tous les ennemis sont morts ET qu'il
       // reste quelqu'un de ton equipe (toi OU ton coequipier), defaite sinon
@@ -3355,7 +3456,7 @@ static void updateMatch(float dt) {
       }
     } else waveBreakT = 2500;
   }
-  if (mode == MODE_SIEGE || mode == MODE_DUEL) { // Siege : boss a terre = victoire / Duel : equipe epuisee = fin
+  if (mode == MODE_SIEGE || mode == MODE_BOSSRUSH || mode == MODE_DUEL) { // Siege/BossRush : boss a terre / Duel : equipe epuisee
     bool bossAlive = false, t0 = false, t1 = false;
     for (int i = 0; i < entCount; i++) {
       if (!ents[i].alive || ents[i].isPet) continue;
@@ -3364,7 +3465,40 @@ static void updateMatch(float dt) {
       else t1 = true;
     }
     if (mode == MODE_SIEGE) { if (!bossAlive) matchResult = 1; else if (!t0) matchResult = -1; }
+    else if (mode == MODE_BOSSRUSH) {
+      if (!bossAlive) {
+        gBossN++;
+        if (gBossN >= 3) matchResult = 1; // les 3 robots sont tombes : victoire !
+        else { // V5.16 : boss suivant, plus costaud, avec un NOUVEAU pattern
+          gBossPattern = gBossN; gBossT = 2000;
+          addEnt(47, -1, 1, mapW * TILE - 80, mapH * TILE / 2, false, 0.9f);
+          Ent &bs = ents[entCount - 1];
+          bs.isBoss = 1; bs.mechT = 1.0f;
+          bs.maxHP = 30000 + gBossN * 15000 + (int)(aiSkillFromTrophies() * 15000); bs.hp = bs.maxHP;
+          if (gBossPattern == 2) bs.speedBuffT = 999.0f; // pattern 2 : le boss pieque le rythme
+          tileMap[(int)(bs.x / TILE)][(int)(bs.y / TILE)] = 0;
+          gKOBannerT = 1500; // banniere "BOSS n/3"
+        }
+      } else if (!t0) matchResult = -1;
+    }
     else { if (!t1) matchResult = 1; else if (!t0) matchResult = -1; }
+  }
+
+  if (mode == MODE_BOSSRUSH) { // V5.16 : patterns du mega robot : normal / rafales radiales / invocations
+    for (int i = 0; i < entCount; i++) {
+      Ent &b = ents[i];
+      if (!b.alive || !b.isBoss) continue;
+      gBossT -= (int)(dt * 1000);
+      if (gBossT > 0) continue;
+      if (gBossPattern == 1) { // pattern 1 : rafale RADIALE de 16 tirs
+        gBossT = 3500;
+        for (int a = 0; a < 16; a++) fireProj(b, a * 0.3927f, false, 0.4f, 0.8f, 0.6f);
+        spawnParts(b.x, b.y, 1, 8);
+      } else if (gBossPattern == 2) { // pattern 2 : INVOQUE 2 pingouins
+        gBossT = 9000;
+        spawnPet(b, 5); spawnPet(b, 5);
+      } else gBossT = 2000;
+    }
   }
   if (matchTimeMs > 150000) {
     if (mode == MODE_GEM) matchResult = (teamGems[0] > teamGems[1]) ? 1 : (teamGems[0] < teamGems[1] ? -1 : 0);
@@ -3846,7 +3980,10 @@ static void renderMatch() {
   int camX = (int)me.x - SW / 2, camY = (int)me.y - SH / 2;
   camX = fmaxf(0, fminf(mapW * TILE - SW, camX));
   camY = fmaxf(0, fminf(mapH * TILE - SH, camY));
-  if (shakeT > 0) { camX += rnd(shakeMag * 2) - shakeMag; camY += rnd(shakeMag * 2) - shakeMag; }
+  if (shakeT > 0) { // V5.16 : shake DIRECTIONNEL FLUIDE — decay lineaire, plus de tremblement aleatoire
+    float k = shakeT / 400.0f;
+    camX += (int)(shakeDX * shakeMag * k); camY += (int)(shakeDY * shakeMag * k);
+  }
 
   for (int ty = camY / TILE; ty <= (camY + SH) / TILE && ty < mapH; ty++) {
     int sy = ty * TILE - camY;
@@ -3987,8 +4124,13 @@ static void renderMatch() {
     }
 
   for (int i = 0; i < MAX_POP; i++)
-    if (pops[i].active)
-      drawNum((int)pops[i].x - camX - 6, (int)pops[i].y - camY, pops[i].val, C_WHT);
+    if (pops[i].active) {
+      int sx = (int)pops[i].x - camX - 6, sy = (int)pops[i].y - camY;
+      if (pops[i].kind == 1) { // CRIT : jaune, double trace = gras
+        drawNum(sx - 1, sy, pops[i].val, C_YEL); drawNum(sx + 1, sy, pops[i].val, C_YEL);
+      } else if (pops[i].kind == 2) drawNum(sx, sy, pops[i].val, C_GREEN); // SOIN : vert
+      else drawNum(sx, sy, pops[i].val, C_WHT);
+    }
 
   // particules
   for (int i = 0; i < MAX_PART; i++)
@@ -4080,6 +4222,18 @@ static void renderMatch() {
     }
   }
 
+  // V5.16 : ARC DE VISEE en pointilles pour les lanceurs (ATK_LOB) pendant l'attaque
+  if (me.alive && BRAWLERS[me.brawlerIdx].atk == ATK_LOB && keyOK) {
+    float rng = RNG(BRAWLERS[me.brawlerIdx].range);
+    for (int i = 1; i <= 8; i++) {
+      if (((i + animT / 100) & 1)) continue; // pointilles qui defilent
+      float dd = rng * i / 8.0f;
+      int ax = (int)(me.x + fcosf(me.aimAng) * dd) - camX;
+      int ay = (int)(me.y + fsinf(me.aimAng) * dd) - camY - (int)(fsinf((float)i / 8.0f * 3.14159f) * 14.0f);
+      if (ax > 0 && ax < SW && ay > 0 && ay < SH) { px(ax, ay, C_WHT); px(ax, ay + 1, C_GRE); }
+    }
+  }
+
   // ---- V5.10 : bulle d'emote au-dessus du joueur (touche + ou -) ----
   if (gEmoteT > 0 && ents[humanIdx].alive) {
     int ex = (int)ents[humanIdx].x - camX, ey = (int)ents[humanIdx].y - camY - 28;
@@ -4089,15 +4243,20 @@ static void renderMatch() {
   }
 
   // ---- HUD Siege : barre de vie geante du MEGA ROBOT ----
-  if (mode == MODE_SIEGE)
+  if (mode == MODE_SIEGE || mode == MODE_BOSSRUSH)
     for (int i = 0; i < entCount; i++) {
       Ent &b = ents[i];
       if (!b.alive || !b.isBoss) continue;
       fRect(SW / 2 - 100, 28, 200, 10, C_BLK);
       fRect(SW / 2 - 99, 30, (int)(198 * b.hp / b.maxHP), 6, C_REDD);
       fRect(SW / 2 - 99, 30, (int)(198 * b.hp / b.maxHP), 2, KDColor::RGB24(0xE8444E));
-      drawTextC(40, "MEGA ROBOT", C_WHT);
+      drawTextC(40, (mode == MODE_BOSSRUSH) ? ((gBossN >= 2) ? "MEGA ROBOT 3/3" : ((gBossN == 1) ? "MEGA ROBOT 2/3" : "MEGA ROBOT 1/3")) : "MEGA ROBOT", C_WHT);
     }
+  // V5.16 : bannieres "ELIMINATOIRE !" (A-MORT) et "BOSS SUIVANT !" (Boss Rush)
+  if (gKOBannerT > 0) {
+    if (mode == MODE_BOSSRUSH) drawTextC(50, (gBossN >= 2) ? "BOSS FINAL !" : "BOSS SUIVANT !", C_YEL);
+    else drawTextC(50, "ELIMINATOIRE !", C_RED);
+  }
 
   // compte a rebours 3-2-1-GO au lancement du match
   if (startCountdown > -800) {
@@ -4106,7 +4265,6 @@ static void renderMatch() {
     fRect(SW / 2 - 58, 86, 116, 56, C_PANEL);
     if (n > 0) drawNum(SW / 2 - 12, 104, n, C_YEL);
     else drawTextC(104, "GO!", C_GREEN);
-    if (matchMod > 0) drawTextC(150, MOD_NAMES[matchMod], C_CYN); // evenement du match (rotation par partie)
   }
   // ecran de reaparition du joueur (en solo/duo/KO sans respawn : on regarde son equipe jouer)
   if (!me.alive) {
@@ -4124,6 +4282,7 @@ static void renderMatch() {
   // bandeau bas : rappel des touches a gauche, score du mode a droite
   fRect(0, SH - 14, SW, 14, KDColor::RGB24(0x111827));
   drawText(4, SH - 12, "OK:ATK RET:ULTI HOME:QUIT", C_GRE);
+  if (gFpsShow) drawNum(SW / 2 - 24, SH - 12, (int)(1000.0f / fmaxf(1.0f, gFrameMs)), C_GRE); // V5.16 : compteur FPS discret
   if (mode == MODE_GEM) {
     drawNum(SW - 72, SH - 12, teamGems[0], C_BLUE);
     drawText(SW - 48, SH - 12, "-", C_WHT);
@@ -4299,8 +4458,12 @@ static int menuPick(const char *title, const char **items, int n, int start) {
           const char *nm = BRAWLERS[gPortrait].name;
           drawText(SW - 70 + (64 - textW(nm)) / 2, 32, nm, C_YEL);
           int ssn = seasonIdx();
-          if (ssn) drawTextC(112, SEASON_NAMES[ssn], ssn == 1 ? C_ORG : C_WHT); // annonce la saison (V5.14)
+          if (ssn) drawText(SW - textW(SEASON_NAMES[ssn]) - 4, 6, SEASON_NAMES[ssn], ssn == 1 ? C_ORG : C_WHT); // V5.16 : saison discrete en haut a droite
         }
+      }
+      { // V5.16 : la saison s'affiche meme sans portrait
+        int ssn2 = seasonIdx();
+        if (ssn2 && gPortrait < 0) drawText(SW - textW(SEASON_NAMES[ssn2]) - 4, 6, SEASON_NAMES[ssn2], ssn2 == 1 ? C_ORG : C_WHT);
       }
       drawTextC(6, title, C_YEL);
       fRect(SW / 2 - 60, 20, 120, 3, C_BTND);
@@ -4439,6 +4602,10 @@ static void namePicker() {
 
 static int brawlerPicker(int startSel, const char *title = "CHOISIS TON BRAWLER") {
   int sel = (startSel >= 0 && startSel < 55) ? startSel : 0;
+  int favB = -1; // V5.16 : trophée d'or anime sur le brawler le plus joué
+  { int best = 0;
+    for (int i = 0; i < 55; i++) if (acc.pMatches[i] > best) { best = acc.pMatches[i]; favB = i; }
+  }
   bool pU = false, pD = false, pL = false, pR = false;
   waitRelease();
   while (true) {
@@ -4465,6 +4632,9 @@ static int brawlerPicker(int startSel, const char *title = "CHOISIS TON BRAWLER"
       if (un) { // badge de rang (V5.11) : point de couleur, "P" dore si PRESTIGE
         if (acc.b[i].trophies >= 1000) drawText(bx + 4, by + 3, "P", C_GOLD);
         else if (acc.b[i].trophies >= 10) fRect(bx + 5, by + 5, 4, 4, rankCol(i));
+      }
+      if (i == favB && (animT / 350) % 2 == 0) { // V5.16 : TROPHEE D'OR anime sur le plus joue
+        fRect(bx + 52, by + 3, 5, 3, C_GOLD); fRect(bx + 53, by + 7, 3, 2, C_GOLD); fRect(bx + 54, by + 9, 2, 2, C_GOLD);
       }
     }
     // ---- bandeau du brawler selectionne ----
@@ -4672,6 +4842,11 @@ static void brawlerMenu(int myBrawler) {
         drawText(16, 139, "STAR", a.starPower ? C_WHT : C_GRE);
         drawText(70, 139, a.starPower ? curStarName(sel) : "NON", a.starPower ? C_WHT : C_GRE);
         if (a.starPower) drawNum(284, 139, a.starChoice + 1, C_WHT);
+        // V5.16 : stats de carriere AVEC CE brawler
+        drawText(16, 158, "MATCHS:", C_WHT); drawNum(80, 158, acc.pMatches[sel], C_WHT);
+        drawText(116, 158, "VICT:", C_GREEN); drawNum(156, 158, acc.pWins[sel], C_GREEN);
+        drawText(200, 158, "KILLS:", C_ORG); drawNum(248, 158, acc.pKills[sel], C_ORG);
+        drawText(16, 172, "DEGATS:", C_YEL); drawNum(84, 172, acc.pDmg[sel] * 100, C_YEL); // stockes en centaines
 
         // boutons d'achat
         cost = upgradeCost(a.level);
@@ -4756,6 +4931,13 @@ static void resultScreen(int result, int myBrawler) {
     if (result == 1) acc.wins++; else if (result == -1) acc.losses++;
     acc.killsTotal += myK;
     if (mode == MODE_SURVIE && waveN > acc.bestWave) acc.bestWave = waveN; // record de vagues (V5.11)
+    // V5.16 : stats PAR brawler (sauvees une seule fois, ici, a la fin du match)
+    if (myBrawler >= 0 && myBrawler < 55) {
+      if (acc.pMatches[myBrawler] < 255) acc.pMatches[myBrawler]++;
+      if (result == 1 && acc.pWins[myBrawler] < 255) acc.pWins[myBrawler]++;
+      acc.pKills[myBrawler] = (uint16_t)fminf(65535, acc.pKills[myBrawler] + myK);
+      acc.pDmg[myBrawler] = (uint16_t)fminf(65535, acc.pDmg[myBrawler] + (int)(myD / 100.0f)); // en centaines
+    }
   }
   acc.coins += coins; // le star drop ne s'ajoute qu'a l'ouverture du coffre
   acc.b[myBrawler].trophies += troph;
@@ -4885,6 +5067,7 @@ static void playMatch(int myBrawler, int selMode) {
     updateMatch(1.0f / (gFps60 ? 60.0f : 30.0f)); // V5.14 : option 60 FPS
     renderMatch();
     int frameMs = (int)Ion::Timing::millis() - t0;
+    gFrameMs = (gFrameMs * 3.0f + frameMs) / 4.0f; // V5.16 : EMA pour le compteur FPS
     int target = gFps60 ? 16 : 33;
     Ion::Timing::msleep(frameMs < target ? target - frameMs : 1);
   }
@@ -4893,6 +5076,55 @@ static void playMatch(int myBrawler, int selMode) {
 
 // ------------------------- Mode Entrainement ---------------------------
 // Terrain a cibles : tire sur les cibles qui bougent, mesure ta precision.
+// V5.16 : SELECTION DES MODES EN TUILES facon Brawl Stars (nom + description conserves)
+static int modeTileScreen() {
+  waitRelease();
+  int sel = 0;
+  bool pU = false, pD = false, pL = false, pR = false;
+  while (true) {
+    // ---- rendu ----
+    bgPanel();
+    drawTextC(6, "MODE DE JEU", C_YEL);
+    for (int i = 0; i < MODE_COUNT; i++) {
+      int bx = 8 + (i % 3) * 105, by = 22 + (i / 3) * 40;
+      bool on = (i == sel);
+      rRect(bx, by, 98, 36, 6, on ? C_YEL : KDColor::RGB24(0x2B3A55));
+      int ix = bx + 49, iy = by + 18;
+      KDColor ic = on ? C_BLK : C_WHT;
+      switch (i) { // icone du mode en primitives
+        case MODE_GEM: fRect(ix-5, iy-5, 10, 3, C_GEM); fRect(ix-3, iy-8, 6, 3, C_GEM); fRect(ix-3, iy-2, 6, 3, C_GEM); fRect(ix-1, iy+1, 2, 4, C_GEM); break;
+        case MODE_BALL: fCirc(ix, iy, 8, on ? C_BLK : C_WHT); fRect(ix-7, iy-1, 14, 2, on ? C_YEL : C_BLK); break;
+        case MODE_SOLO: fCirc(ix, iy, 7, ic); fRect(ix-4, iy-3, 2, 2, C_BLK); fRect(ix+2, iy-3, 2, 2, C_BLK); fRect(ix-2, iy+3, 4, 2, C_BLK); break;
+        case MODE_DUO: fCirc(ix-4, iy, 5, ic); fCirc(ix+4, iy, 5, ic); break;
+        case MODE_HEIST: fRect(ix-7, iy-6, 14, 12, on ? C_BLK : C_GOLD); fRect(ix-4, iy-2, 8, 5, on ? C_YEL : C_BLK); break;
+        case MODE_BOUNTY: fRect(ix-1, iy-8, 2, 16, C_GOLD); fRect(ix-8, iy-1, 16, 2, C_GOLD); fRect(ix-6, iy-6, 2, 2, C_GOLD); fRect(ix+4, iy-6, 2, 2, C_GOLD); fRect(ix-6, iy+4, 2, 2, C_GOLD); fRect(ix+4, iy+4, 2, 2, C_GOLD); break;
+        case MODE_KO: for (int s2 = -6; s2 <= 6; s2++) { px(ix + s2, iy + s2, C_RED); px(ix + s2, iy - s2, C_RED); } break;
+        case MODE_ZONE: oCirc(ix, iy, 8, C_ORG, on ? C_BLK : C_PANEL); fCirc(ix, iy, 3, C_ORG); break;
+        case MODE_SIEGE: case MODE_BOSSRUSH: fRect(ix-8, iy-6, 16, 10, KDColor::RGB24(0x8A8A9A)); fRect(ix-6, iy-3, 3, 3, C_RED); fRect(ix+3, iy-3, 3, 3, C_RED); fRect(ix-8, iy+4, 16, 2, KDColor::RGB24(0x5A5A6A)); break;
+        case MODE_DUEL: for (int s2 = -6; s2 <= 6; s2++) { px(ix + s2, iy + s2, ic); px(ix + s2, iy - s2, ic); } break;
+        case MODE_SURVIE: for (int s2 = -8; s2 <= 8; s2 += 4) { px(ix + s2, iy - 2, ic); px(ix + s2 + 1, iy + 2, ic); px(ix + s2 + 2, iy + 6, ic); } break;
+      }
+      if (i == MODE_BOSSRUSH) fRect(ix-6, iy-8, 4, 3, C_GOLD); // couronne du boss rush
+    }
+    // nom + description du mode selectionne
+    fRect(0, 186, SW, 34, KDColor::RGB24(0x1A2233));
+    fRect(0, 186, SW, 2, C_BTND);
+    drawTextC(192, MODE_NAMES[sel], C_YEL);
+    drawTextC(206, MODE_DESC[sel], C_WHT);
+    blit();
+    pollKeys();
+    if (keyBack && !prevBack) { prevBack = true; return -1; }
+    if (keyOK && !prevOK) { prevOK = true; return sel; }
+    if (kUp && !pU) sel = (sel + MODE_COUNT - 3) % MODE_COUNT;
+    if (kDown && !pD) sel = (sel + 3) % MODE_COUNT;
+    if (kLeft && !pL) sel = (sel + MODE_COUNT - 1) % MODE_COUNT;
+    if (kRight && !pR) sel = (sel + 1) % MODE_COUNT;
+    pU = kUp; pD = kDown; pL = kLeft; pR = kRight;
+    prevOK = keyOK; prevBack = keyBack;
+    Ion::Timing::msleep(60);
+  }
+}
+
 static void trainingMode(int myBrawler) {
   struct Target { float x, y, vx, hp, maxHP; bool alive; };
   Target tg[4];
@@ -4905,6 +5137,8 @@ static void trainingMode(int myBrawler) {
   const BrawlerDef &d = BRAWLERS[myBrawler];
   float px_ = 60, py_ = SH / 2;
   int shots = 0, hits = 0, dmgTotal = 0;
+  float myHP = d.baseHP * 2.0f; const float myMaxHP = myHP; // V5.16 : les cibles te blessent
+  int tgtFireT[4] = {1600, 1600, 1600, 1600};
   float ammo = 3, aim = 0;
   Ent dummy; memset(&dummy, 0, sizeof(dummy));
   // projectiles simplifies du mode entrainement
@@ -4952,6 +5186,21 @@ static void trainingMode(int myBrawler) {
         if (tg[i].x < 120 || tg[i].x > SW - 20) tg[i].vx = -tg[i].vx;
         if (tg[i].hp <= 0) { tg[i].alive = false; dmgTotal += tg[i].maxHP; }
       }
+    // V5.16 : ENTRAINEMENT+ — les cibles RIPLENT (250 degats toutes les 1.6 s si tu es a portee)
+    for (int i = 0; i < 4; i++)
+      if (tg[i].alive) {
+        float dx = px_ - tg[i].x, dy = py_ - tg[i].y;
+        if (dx * dx + dy * dy < 230 * 230) {
+          tgtFireT[i] -= 33;
+          if (tgtFireT[i] <= 0) {
+            tgtFireT[i] = 1600;
+            spawnParts(tg[i].x + 12, tg[i].y, 1, 5);
+            spawnParts(px_, py_, 0, 4);
+            myHP -= 250;
+          }
+        }
+      }
+    if (myHP <= 0) { myHP = myMaxHP; spawnParts(px_, py_, 2, 8); } // respawn
     for (int i = 0; i < 16; i++)
       if (tp[i].active) {
         tp[i].x += tp[i].vx * dt; tp[i].y += tp[i].vy * dt;
@@ -5013,6 +5262,12 @@ static void trainingMode(int myBrawler) {
     if (shots > 0) drawNum(132, 56, hits * 100 / shots, C_GREEN);
     else drawText(132, 56, "0", C_GREEN);
     drawText(8, 72, "DEGATS:", C_WHT); drawNum(96, 72, dmgTotal, C_ORG);
+    drawText(8, 88, "DPS:", C_GREEN);
+    if (trainT > 1500) drawNum(52, 88, dmgTotal / (trainT / 1000), C_GREEN); // V5.16 : compteur DPS
+    else drawText(52, 88, "...", C_GREEN);
+    // barre de vie du joueur (les cibles ripent)
+    fRect(8, 104, 80, 8, C_BLK);
+    fRect(9, 105, (int)(78 * myHP / myMaxHP), 6, C_GREEN);
     drawTextC(SH - 14, "OK TIR  BACK QUITTER", C_GRE);
     blit();
     Ion::Timing::msleep(20);
@@ -5034,11 +5289,7 @@ void ion_main(int argc, char *argv[]) {
     if (choice < 0) return;
     waitRelease();
     if (choice == 0) {
-      const char *modes[MODE_COUNT];
-      for (int i = 0; i < MODE_COUNT; i++) modes[i] = MODE_NAMES[i];
-      gMenuDesc = MODE_DESC; // affiche la description du mode selectionne
-      int selMode = menuPick("MODE DE JEU", modes, MODE_COUNT, 0);
-      gMenuDesc = nullptr;
+      int selMode = modeTileScreen(); // V5.16 : selection des modes en TUILES facon BS
       if (selMode < 0) { waitRelease(); continue; }
       waitRelease();
       if (selMode == MODE_DUEL) { // DUEL : on choisit SES 3 brawlers, l'IA a aussi les siens
@@ -5085,14 +5336,16 @@ void ion_main(int argc, char *argv[]) {
       trophyRoadScreen();
     } else if (choice == 8) {
       // V5.13 : le pseudo se change des PARAMETRES ; V5.14 : option 60 FPS
-      static char fpsLbl[16];
+      static char fpsLbl[16], fps2Lbl[16];
       fpsLbl[0] = 0; strcat(fpsLbl, gFps60 ? "60 FPS: OUI" : "60 FPS: NON");
-      const char *setItems[3] = {"TOUCHES DU JEU", "CHANGER PSEUDO", fpsLbl};
+      fps2Lbl[0] = 0; strcat(fps2Lbl, gFpsShow ? "FPS ECRAN: OUI" : "FPS ECRAN: NON");
+      const char *setItems[4] = {"TOUCHES DU JEU", "CHANGER PSEUDO", fpsLbl, fps2Lbl};
       waitRelease();
-      int sp = menuPick("PARAMETRES", setItems, 3, 0);
+      int sp = menuPick("PARAMETRES", setItems, 4, 0);
       if (sp == 0) settingsScreen();
       else if (sp == 1) { namePicker(); waitRelease(); } // BACK vide = pseudo inchangé
       else if (sp == 2) { gFps60 = !gFps60; saveAcc(); waitRelease(); } // V5.14 : bascule 30/60 FPS persistee
+      else if (sp == 3) { gFpsShow = !gFpsShow; saveAcc(); waitRelease(); } // V5.16 : compteur FPS persiste
     } else {
       bgPanel();
       drawTextC(8, "AIDE", C_YEL);

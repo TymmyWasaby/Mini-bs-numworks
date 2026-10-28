@@ -2080,6 +2080,7 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.boomer = (!isSuper && e.brawlerIdx == 16); p.ret = false; // Carl : pic-boomerang
     p.pierce = gPierceProj || p.boomer || (!isSuper && !e.isPet && (e.brawlerIdx == 7 || e.brawlerIdx == 19 || e.brawlerIdx == 22)); // V5.16 : eventail PERCEUR de Poco/Emz/Frank
     if (p.pierce) p.radius = p.boomer ? 7 : 3; // pic de Carl grand, balles perceuses petites
+    if (!isSuper && !e.isPet && (e.brawlerIdx == 7 || e.brawlerIdx == 19 || e.brawlerIdx == 22)) p.radius = 7; // V5.16 : attaque de ZONE — l'eventail est LARGE
     p.nHits = 0;
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     p.bIdx = e.brawlerIdx; // V5.13 : graphisme du projectile selon le brawler
@@ -2629,7 +2630,11 @@ static void updateAI(Ent &e, float dt) {
     float tvx = fcosf(tgt->faceAng * 0.017453f) * 88.0f, tvy = fsinf(tgt->faceAng * 0.017453f) * 88.0f;
     angT = atan2f(tgt->y + tvy * lead - e.y, tgt->x + tvx * lead - e.x);
     float err = (1.0f - sk) * 12.0f;
-    if (ed < RNG(d.range) * 0.95f && e.ammo >= 1 && e.attackT <= 0 && !(mode == MODE_BALL && e.hasBall)) {
+    bool zoneAtk = (e.brawlerIdx == 7 || e.brawlerIdx == 17 || e.brawlerIdx == 19 ||
+                    e.brawlerIdx == 22 || e.brawlerIdx == 23); // V5.16 : attaque de ZONE (Poco, Jacky, Emz, Frank, Bibi)
+    if (ed < RNG(d.range) * 0.95f && (!zoneAtk || ed > RNG(d.range) * 0.55f) &&
+        e.ammo >= 1 && e.attackT <= 0 && !(mode == MODE_BALL && e.hasBall)) {
+      // zoneAtk : on ne tire QUE quand l'ennemi est au bout de la zone (l'eventail couvre tout le passage)
       if (e.brawlerIdx == 37 || e.brawlerIdx == 32) e.atkCharge = 0.4f + rnd(70) / 100.0f; // l'IA (Hank/Ash) charge un peu au hasard
       if (d.atk == ATK_LOB) gLobRangeMul = fminf(1.0f, ed / RNG(d.range));
       doAttack(e, angT + (rnd(100) / 100.0f - 0.5f) * err * 0.01745f);
@@ -2692,11 +2697,29 @@ static void updateAI(Ent &e, float dt) {
     (void)done;
   }
 
+  // V5.16 : les attaquants PAR BALLES SEPAREES (Shelly, Bull, Primo, Rosa, Darryl, Pam,
+  // Edgar, Fang, Mortis...) foncent au corps a corps : de pres, TOUTES leurs balles touchent
+  if (tgt && ed < 150 && !e.isBoss &&
+      (e.brawlerIdx == 0 || e.brawlerIdx == 3 || e.brawlerIdx == 5 || e.brawlerIdx == 8 ||
+       e.brawlerIdx == 14 || e.brawlerIdx == 21 || e.brawlerIdx == 26 || e.brawlerIdx == 34 ||
+       e.brawlerIdx == 45)) {
+    wx = tgt->x; wy = tgt->y; // on colle l'adversaire
+  }
+  // V5.16 : les attaquants de ZONE (Poco, Jacky, Emz, Frank, Bibi) tapent au bout de leur
+  // zone : si l'ennemi colle, ils RE reculent pour le reprendre en pleine onde
+  if (tgt && ed < 70 && !e.isBoss &&
+      (e.brawlerIdx == 7 || e.brawlerIdx == 17 || e.brawlerIdx == 19 || e.brawlerIdx == 22 ||
+       e.brawlerIdx == 23)) {
+    float bkx = e.x - tgt->x, bky = e.y - tgt->y, bl = sqrtf(bkx * bkx + bky * bky);
+    if (bl > 0.01f) { wx = e.x + bkx / bl * 70; wy = e.y + bky / bl * 70; } // on reprend ses distances
+  }
+
   // ---------- 5) DEPLACEMENT ----------
   float dx = wx - e.x, dy = wy - e.y;
   float len = sqrtf(dx * dx + dy * dy);
   if (len > 10) {
     float sp = 72 + 24 * sk;
+    if (e.isBoss) sp *= 0.6f; // V5.16 : le mega robot est lent et massif
     if (e.speedBuffT > 0) sp *= 1.3f; // boost de vitesse (super de Carl, Max, Stu...)
     if (e.boostT > 0) sp *= 1.7f; // super de Carl
     if (e.slowT > 0) sp *= 0.6f;
@@ -2839,7 +2862,8 @@ static void updateMatch(float dt) {
   animT += (int)(dt * 1000);
   if (shakeT > 0) shakeT -= (int)(dt * 1000);
   bool ffa = (mode == MODE_SOLO || mode == MODE_DUO);
-  bool noRespawn = ffa || mode == MODE_KO || mode == MODE_SIEGE || mode == MODE_BOSSRUSH || mode == MODE_DUEL || mode == MODE_SURVIE;
+  bool noRespawn = ffa || mode == MODE_KO || mode == MODE_SIEGE || mode == MODE_DUEL || mode == MODE_SURVIE; // V5.16 : BOSS RUSH = respawn 20 s
+  if (mode == MODE_BOSSRUSH) respawnMs = 20000; else respawnMs = 3000; // V5.16 : long delai en boss rush
 
   for (int i = 0; i < MAX_POP; i++)
     if (pops[i].active) { pops[i].life -= (int)(dt * 1000); pops[i].y -= dt * 22; if (pops[i].life <= 0) pops[i].active = false; }
@@ -3459,10 +3483,10 @@ static void updateMatch(float dt) {
   if (mode == MODE_SIEGE || mode == MODE_BOSSRUSH || mode == MODE_DUEL) { // Siege/BossRush : boss a terre / Duel : equipe epuisee
     bool bossAlive = false, t0 = false, t1 = false;
     for (int i = 0; i < entCount; i++) {
-      if (!ents[i].alive || ents[i].isPet) continue;
-      if (ents[i].isBoss) bossAlive = true;
-      else if (ents[i].team == 0) t0 = true;
-      else t1 = true;
+      if (ents[i].isPet) continue;
+      if (ents[i].isBoss) { if (ents[i].alive) bossAlive = true; }
+      else if (ents[i].team == 0) { if (ents[i].alive || ents[i].respawnT < 9000000) t0 = true; } // V5.16 : les morts en attente de respawn comptent
+      else if (ents[i].alive) t1 = true;
     }
     if (mode == MODE_SIEGE) { if (!bossAlive) matchResult = 1; else if (!t0) matchResult = -1; }
     else if (mode == MODE_BOSSRUSH) {
@@ -3856,8 +3880,12 @@ static void drawProj(Proj &p, int sx, int sy, int myTeam) {
     case 6: // Barley : BOUTEILLE verte avec goulot
       fRect(sx, sy - 1, 2, 3, C_GREEN); px(sx, sy - 2, C_WHT); px(sx + 1, sy - 2, C_WHT);
       break;
-    case 7: // Poco : onde de son magenta
-      px(sx, sy, C_MAG); px(sx - dx, sy - dy, C_PUR); px(sx - dx * 2, sy - dy * 2, C_GRE);
+    case 7: // Poco : ONDE DE SON magenta — attaque de ZONE, le projectile est une onde large (V5.16)
+      { int wx2 = -dy, wy2 = dx;
+        fCirc(sx, sy, 3, C_MAG);
+        px(sx + wx2 * 4, sy + wy2 * 4, C_PUR); px(sx - wx2 * 4, sy - wy2 * 4, C_PUR);
+        px(sx + wx2 * 6, sy + wy2 * 6, C_MAG); px(sx - wx2 * 6, sy - wy2 * 6, C_MAG);
+        px(sx + wx2 * 8, sy + wy2 * 8, KDColor::RGB24(0x602070)); px(sx - wx2 * 8, sy - wy2 * 8, KDColor::RGB24(0x602070)); }
       break;
     case 9: // Jessie : boule d'energie cyan avec etincelle
       fCirc(sx, sy, 2, C_CYN); px(sx - 1, sy - 1, C_WHT);
@@ -3881,14 +3909,23 @@ static void drawProj(Proj &p, int sx, int sy, int myTeam) {
     case 18: // Bo : FLECHE blanche a pointe
       px(sx + dx, sy + dy, C_WHT); px(sx, sy, C_WHT); px(sx - dx, sy - dy, C_ORG);
       break;
-    case 19: // Emz : nuage de spray rose
-      fCirc(sx, sy, 2, KDColor::RGB24(0xFF7AB8)); px(sx + 1, sy - 1, C_MAG); px(sx - 1, sy + 1, C_MAG);
+    case 19: // Emz : NUAGE DE SPRAY rose — zone large (V5.16)
+      { int wx2 = -dy, wy2 = dx;
+        fCirc(sx, sy, 3, KDColor::RGB24(0xFF7AB8));
+        px(sx + wx2 * 5, sy + wy2 * 5, C_MAG); px(sx - wx2 * 5, sy - wy2 * 5, C_MAG);
+        px(sx + wx2 * 7, sy + wy2 * 7, KDColor::RGB24(0xD05090)); px(sx - wx2 * 7, sy - wy2 * 7, KDColor::RGB24(0xD05090)); }
       break;
     case 20: // Stu : flamme de booster cyan
       fCirc(sx, sy, 2, C_CYN); px(sx - dx, sy - dy, blink ? C_WHT : C_CYN);
       break;
     case 21: // Pam : boule de soin orange avec croix
       fCirc(sx, sy, 2, C_ORG); px(sx, sy - 1, C_WHT); px(sx, sy + 1, C_WHT);
+      break;
+    case 22: // Frank : ONDE DE MARTEAU bleu-gris — attaque de ZONE large (V5.16)
+      { int wx2 = -dy, wy2 = dx;
+        fCirc(sx, sy, 3, KDColor::RGB24(0x8A9Bb0));
+        px(sx + wx2 * 4, sy + wy2 * 4, KDColor::RGB24(0x6A829A)); px(sx - wx2 * 4, sy - wy2 * 4, KDColor::RGB24(0x6A829A));
+        px(sx + wx2 * 7, sy + wy2 * 7, KDColor::RGB24(0x506880)); px(sx - wx2 * 7, sy - wy2 * 7, KDColor::RGB24(0x506880)); }
       break;
     case 24: // Bea : ABEILLE rayee noir/jaune
       fRect(sx - 1, sy, 2, 2, C_YEL); px(sx, sy, C_BLK); px(sx + 1, sy - 2, C_WHT);

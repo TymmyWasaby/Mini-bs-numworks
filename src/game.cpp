@@ -1552,6 +1552,8 @@ struct Ent {
   bool dashRet; // Colette : le dash fait un aller-retour
   int gems, goals, stars, kills;
   bool beaCharge; // V5.16 : Bea — la balle suivante est chargee si la precedente a touche
+  int aiRvIdx; float aiRvT; // V5.17 : VENGEANCE — cible a traquer + timer
+  uint8_t aiTilt; // V5.17 : TILT — morts en chaine sans kill → bot patient
   bool hasBall;
   int aiThinkT, aiWx, aiWy;
   float aiSkill, stuckT;
@@ -1861,6 +1863,13 @@ static float aiSkillFromTrophies() {
   return fmaxf(0.0f, fminf(1.0f, s));
 }
 
+// V5.16 : munitions MAX selon le brawler — Carl (pic-boomerang) et Bea (charge) : 1 seule
+static int ammoMax(int bIdx) { return (bIdx == 16 || bIdx == 24) ? 1 : 3; }
+// V5.17 : niveau "metagame" du match = trophees du brawler joue (dose tous les reflexes d'IA)
+static float matchTr() {
+  if (humanIdx < 0 || ents[humanIdx].accIdx < 0) return 0.0f;
+  return (float)acc.b[ents[humanIdx].accIdx].trophies;
+}
 static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human, float aiSkill) {
   Ent &e = ents[entCount++];
   const BrawlerDef &d = BRAWLERS[bIdx];
@@ -1885,6 +1894,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0; e.beaCharge = false;
+  e.aiRvIdx = -1; e.aiRvT = 0; e.aiTilt = 0; // V5.17
   e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
 }
 
@@ -2138,8 +2148,8 @@ static void hitDestructibles(Proj &p) {
   }
 }
 
-// V5.16 : munitions MAX selon le brawler — Carl (pic-boomerang) et Bea (charge) : 1 seule
-static int ammoMax(int bIdx) { return (bIdx == 16 || bIdx == 24) ? 1 : 3; }
+// V5.17 : reflexes d'IA — vengeance, tilt, chat (bulle) — tous doses par matchTr()
+static int gChatEnt = -1, gChatT = 0, gChatIdx = 0; // V5.17 : bulle de chat des bots (rare)
 static void doAttack(Ent &e, float ang) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   if (e.ammo < 1) return;
@@ -2514,6 +2524,23 @@ static void updateAI(Ent &e, float dt) {
   bool melee = RNG(d.range) < 130;
   Ent *tgt = nullptr;
   float ed = nearestEnemyDist(e, &tgt);
+  float mtr = matchTr(); // V5.17 : trophees du brawler joue : dose TOUS les reflexes ci-dessous
+  // V5.17 : FOCUS DU PLUS FAIBLE (des 500 tr, non mecanique : 65% seulement, jamais hors de portee)
+  if (mtr >= 500 && tgt) {
+    float bd = RNG(d.range) * 1.05f;
+    for (int j = 0; j < entCount; j++) {
+      Ent &o = ents[j];
+      if (!o.alive || o.isPet || o.team == e.team || &o == &e) continue;
+      if (o.hp < o.maxHP * 0.7f) {
+        float ddx = o.x - e.x, ddy = o.y - e.y;
+        if (ddx * ddx + ddy * ddy < bd * bd && rnd(100) < 65) {
+          tgt = &o;
+          ed = sqrtf(ddx * ddx + ddy * ddy);
+          break;
+        }
+      }
+    }
+  }
 
   // ---------- 1) OBJECTIF : on avance TOUJOURS, pas besoin d'ennemi a portee ----------
   e.aiThinkT -= (int)(dt * 1000);
@@ -2628,6 +2655,7 @@ static void updateAI(Ent &e, float dt) {
   if (e.brawlerIdx == 47 && e.mechT > 0) keepDist = RNG(d.range) * 0.35f; // Meg en mecha : colle pour ecraser
   if (e.aiPers == 0) keepDist *= 0.75f;      // personnalite agressive
   else if (e.aiPers == 1) keepDist *= 1.25f; // personnalite defensive
+  if (e.aiTilt >= 2) keepDist *= 1.25f;      // V5.17 : TILT — morts en chaine → patient, garde distance
   if (melee) keepDist = RNG(d.range) * 0.35f;                      // les melees doivent coller pour exister
   if (d.baseHP >= 6000 && !lobber) keepDist *= 0.85f;         // les tanks osent s'approcher
   if (d.baseHP <= 4200) keepDist = fmaxf(keepDist, 175.0f);   // les fragiles gardent AU MOINS 175 px (Tick, Shelly...)
@@ -2681,8 +2709,9 @@ static void updateAI(Ent &e, float dt) {
         if (e.aiOnObj && (rnd(100) < 40 * sk)) { doSuper(e, angT); done = true; }
         break;
       // supers de fuite/survie : quand ca chauffe (Piper : le bond sert surtout a s'echapper)
+      // V5.17 : FEINTE (des 1000 tr) — le bot garde son super de fuite au chaud et te le lache AU NEZ
       case SUP_STEALTH: case SUP_MECH: case SUP_LEAP:
-        if (low) { doSuper(e, angT); done = true; } break;
+        if (low && (mtr < 1000 || ed < 130)) { doSuper(e, angT); done = true; } break;
       case SUP_SHIELD:
         if (tgt && ed < RNG(d.range) * 1.2f) { doSuper(e, angT); done = true; } break;
       case SUP_UPGRADE: case SUP_HEAL:
@@ -2716,6 +2745,50 @@ static void updateAI(Ent &e, float dt) {
     if (&o == &e || !o.alive || o.isPet || o.team != e.team) continue;
     float adx = e.x - o.x, ady = e.y - o.y;
     if (adx * adx + ady * ady < 40 * 40) { wx += (adx > 0 ? 30 : -30); wy += (ady > 0 ? 20 : -20); break; }
+  }
+
+  // ---------- V5.17 : reflexes de "vrai joueur", TOUS DOSES par les trophees du match ----------
+  {
+    float gate = fminf(1.0f, mtr / 1600.0f); // 0 a 0 tr, 1 a 1600 tr
+    // VENGEANCE (des 700 tr, dosee) : gros coup recu → on traque le coupable 8 s, jamais au suicide
+    if (e.aiRvIdx >= 0 && e.aiRvIdx < entCount && e.aiRvT > 0 && ents[e.aiRvIdx].alive &&
+        e.hp > e.maxHP * 0.45f && mtr >= 700) {
+      wx = ents[e.aiRvIdx].x; wy = ents[e.aiRvIdx].y;
+    }
+    // KITE general (dose) : les tireurs decrochent pendant leur temps de rechargement
+    if (!melee && tgt && ed < keepDist * 0.7f && e.attackT > 0 && rnd(100) < 35 + 45 * gate) {
+      float bkx = e.x - tgt->x, bky = e.y - tgt->y, bl = sqrtf(bkx * bkx + bky * bky);
+      if (bl > 0.01f) { wx = e.x + bkx / bl * 70; wy = e.y + bky / bl * 70; }
+    }
+    // COUVERTURE (des 1200 tr, progressive) : un tireur ne traverse pas a decouvert sous le feu
+    if (!melee && tgt && ed < 260 && rnd(100) < (mtr - 1200) / 8.0f) { wx = e.x; wy = e.y; }
+    // HEIST (des 600 tr) : le pillard recule quand un defenseur approche
+    if (mode == MODE_HEIST && e.aiOnObj && tgt && ed < 150 && e.ammo < 2 && mtr >= 600 && rnd(100) < 50) {
+      float bkx = e.x - tgt->x, bky = e.y - tgt->y, bl = sqrtf(bkx * bkx + bky * bky);
+      if (bl > 0.01f) { wx = e.x + bkx / bl * 80; wy = e.y + bky / bl * 80; }
+    }
+    // GEMMES (des 700 tr) : ESCORTE du porte-cles — on se colle au plus charge
+    if (mode == MODE_GEM && mtr >= 700 && e.gems < 2 && rnd(100) < 30) {
+      Ent *carrier = nullptr; int bestG = 2;
+      for (int j = 0; j < entCount; j++) {
+        Ent &o = ents[j];
+        if (!o.alive || o.isPet || o.team != e.team) continue;
+        if (o.gems > bestG) { bestG = o.gems; carrier = &o; }
+      }
+      if (carrier && carrier != &e) { wx = carrier->x + 40; wy = carrier->y + 40; }
+    }
+    // EMBUSCADE en buisson (des 800 tr, progressive) : sans cible, on file par le buisson le plus proche
+    if (!tgt && mtr >= 800 && rnd(100) < (mtr - 800) / 12.0f) {
+      int mx = (int)(e.x / TILE), my = (int)(e.y / TILE);
+      bool found = false;
+      for (int r2 = 1; r2 <= 5 && !found; r2++)
+        for (int dx2 = -r2; dx2 <= r2 && !found; dx2++)
+          for (int dy2 = -r2; dy2 <= r2 && !found; dy2++) {
+            int tx2 = mx + dx2, ty2 = my + dy2;
+            if (tx2 < 1 || ty2 < 1 || tx2 >= mapW - 1 || ty2 >= mapH - 1) continue;
+            if (tileMap[tx2][ty2] == 2) { wx = tx2 * TILE + TILE / 2; wy = ty2 * TILE + TILE / 2; found = true; }
+          }
+    }
   }
 
   // V5.16 : les attaquants PAR BALLES SEPAREES (Shelly, Bull, Primo, Rosa, Darryl, Pam,
@@ -2800,6 +2873,14 @@ static void damageEnt(Ent &e, float dmg, Ent &src) {
   src.superCharge = fminf(100, src.superCharge + chg); // ~7 tirs reussis = ulti prete
   addPop(e.x + rnd(8) - 4, e.y - 12, (int)dmg, popKind);
   spawnParts(e.x, e.y, 0, 5); // etincelles d'impact plus visibles
+  // V5.17 : VENGEANCE (des 700 tr) — un bot gros-blesse retient qui l'a frappe
+  if (&e != &src && !e.isHuman && !e.isPet && e.team != src.team && dmg > e.maxHP * 0.35f && matchTr() >= 700) {
+    e.aiRvIdx = (&src - ents); e.aiRvT = 8000;
+  }
+  // V5.17 : CHAT des bots (sans spam : 1 bulle max toute les 4,5 s, et que 15% des gros coups)
+  if (!e.isHuman && !e.isPet && gChatT <= 0 && dmg > e.maxHP * 0.28f && rnd(100) < 15) {
+    gChatEnt = (&e - ents); gChatT = 4500; gChatIdx = rnd(2);
+  }
   // V5.16 : screen shake DIRECTIONNEL — la camera recule dans le sens du coup recu
   if (&e == &ents[humanIdx] && &src != &e) {
     float ddx = e.x - src.x, ddy = e.y - src.y, l = sqrtf(ddx * ddx + ddy * ddy);
@@ -3020,6 +3101,8 @@ static void updateMatch(float dt) {
     const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
     e.ammo = fminf(ammoMax(e.brawlerIdx), e.ammo + dt * 1000.0f / d.reloadMs); // V5.16 : Carl/Bea = 1 munition
     e.regenT += dt;
+    if (e.aiRvT > 0) e.aiRvT -= dt * 1000; // V5.17 : timer de vengeance
+    if (gChatT > 0) gChatT -= (int)(dt * 1000); // V5.17 : bulle de chat des bots
     float regenDelay = 4.0f;
     if (e.accIdx >= 0 && acc.b[e.accIdx].starPower && d.star == STAR_REGEN) regenDelay = 2.0f;
     if (e.regenT > regenDelay) e.hp = fminf(e.maxHP, e.hp + e.maxHP * 0.12f * dt);
@@ -3058,6 +3141,7 @@ static void updateMatch(float dt) {
         continue;
       }
       e.respawnT = respawnMs;
+      if (!e.isHuman) e.aiTilt++; // V5.17 : TILT — mort en chaine → le bot devient patient
       if (e.gems > 0)
         for (int g = 0; g < 10 && e.gems > 0; g++)
           if (!gems[g].active) { gems[g].active = true; gems[g].x = e.x + rnd(20) - 10; gems[g].y = e.y + rnd(20) - 10; e.gems--; }
@@ -3085,7 +3169,7 @@ static void updateMatch(float dt) {
       shakeT = 200; shakeMag = 3;
       spawnParts(e.x, e.y, 1, 14); spawnParts(e.x, e.y, 0, 6); // V5.16 : mini explosion de STYLE (0 degat)
       for (int j = 0; j < entCount; j++)
-        if (ents[j].alive && ents[j].team != e.team && fabsf(ents[j].x - e.x) < 140 && fabsf(ents[j].y - e.y) < 140) { addKill((&e - ents), j); ents[j].kills++; break; }
+        if (ents[j].alive && ents[j].team != e.team && fabsf(ents[j].x - e.x) < 140 && fabsf(ents[j].y - e.y) < 140) { addKill((&e - ents), j); ents[j].kills++; ents[j].aiTilt = 0; break; } // un kill remet les idees en place (V5.17)
       if (ffa && e.isHuman && mode == MODE_SOLO) matchResult = -1; // en solo : mort = fini. En duo : tant que le coequipier vit, on continue
       if (mode == MODE_BOUNTY) {
         int killer = 1;
@@ -3153,6 +3237,23 @@ static void updateMatch(float dt) {
         spawnParts(p.x, p.y, 0, 5);
         p.active = false; continue;
       } else { p.active = false; continue; }
+    }
+    // V5.17 : ESQUIVE (tres haut niveau : brawler a 1600 tr MINIMUM) — les bons bots
+    // s'ecartent d'un pas du projectile qui arrive sur eux, pas de fuite panique
+    if (matchTr() >= 1600 && !p.lob && p.mineT <= 0) {
+      for (int j = 0; j < entCount; j++) {
+        Ent &e2 = ents[j];
+        if (!e2.alive || e2.isHuman || e2.isPet || e2.dashT > 0 || e2.team == p.team) continue;
+        float rx = e2.x - p.x, ry = e2.y - p.y;
+        float dd = rx * rx + ry * ry;
+        if (dd > 70 * 70 || dd < 1) continue;
+        if (rx * p.vx + ry * p.vy <= 0) continue; // le tir s'eloigne : pas la peine
+        if (rnd(100) < 55) {
+          float nx2 = -p.vy, ny2 = p.vx, nl = sqrtf(nx2 * nx2 + ny2 * ny2);
+          int side = (rnd(2)) ? 1 : -1;
+          if (nl > 0.01f) moveEnt(e2, nx2 / nl * side * 42.0f * dt, ny2 / nl * side * 42.0f * dt);
+        }
+      }
     }
     if (p.ret) { // retour vers Carl : peut toucher d'autres cibles au passage
       float bdx = ents[p.owner].x - p.x, bdy = ents[p.owner].y - p.y;
@@ -4291,6 +4392,16 @@ static void renderMatch() {
     }
   }
 
+  // ---- V5.17 : bulle de CHAT des bots (rare, anti-spam integre au declencheur) ----
+  if (gChatT > 0 && gChatEnt >= 0 && gChatEnt < entCount && ents[gChatEnt].alive) {
+    static const char *chatMsgs[2] = {"AIE !", "NON !"};
+    int ex = (int)ents[gChatEnt].x - camX, ey = (int)ents[gChatEnt].y - camY - 30;
+    const char *cm = chatMsgs[gChatIdx];
+    rRect(ex - textW(cm) / 2 - 5, ey - 12, textW(cm) + 10, 15, 4, C_WHT);
+    fRect(ex - 2, ey + 3, 4, 4, C_WHT);
+    drawTextC(ey - 9, cm, C_BLK);
+  }
+
   // V5.16 : ARC DE VISEE en pointilles pour les lanceurs (ATK_LOB) pendant l'attaque
   if (me.alive && BRAWLERS[me.brawlerIdx].atk == ATK_LOB && keyOK) {
     float rng = RNG(BRAWLERS[me.brawlerIdx].range);
@@ -4789,7 +4900,7 @@ static void careerScreen() {
     drawTextC(196, "OK RETOUR", C_BLK);
     blit();
     prevOK = true;
-    while (prevOK) { pollKeys(); prevOK = keyOK; Ion::Timing::msleep(60); }
+    while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); } // V5.17 FIX : attend un VRAI appui OK (avant : l'ecran clignotait et sortait aussitot)
     prevOK = false;
   }
 }
@@ -4818,7 +4929,7 @@ static void shopScreen(int myBrawler) {
       drawTextC(124, "EN ACHETER PLUS", C_WHT);
       blit();
       prevOK = true;
-      while (prevOK) { pollKeys(); prevOK = keyOK; Ion::Timing::msleep(60); }
+      while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); } // V5.17 FIX : attend un VRAI appui OK (avant : l'ecran clignotait et sortait aussitot)
       return;
     }
     acc.coins -= SKIN_COST[c];
@@ -4840,7 +4951,7 @@ static void shopScreen(int myBrawler) {
   drawTextC(205, "OK RETOUR", C_BLK);
   blit();
   prevOK = true;
-  while (prevOK) { pollKeys(); prevOK = keyOK; Ion::Timing::msleep(60); }
+  while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); } // V5.17 FIX : attend un VRAI appui OK (avant : l'ecran clignotait et sortait aussitot)
   prevOK = false;
 }
 
@@ -5467,7 +5578,7 @@ void ion_main(int argc, char *argv[]) {
       drawTextC(190, "OK RETOUR", C_BLK);
       blit();
       prevOK = true;
-      while (prevOK) { pollKeys(); prevOK = keyOK; Ion::Timing::msleep(60); }
+      while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); } // V5.17 FIX : attend un VRAI appui OK (avant : l'ecran clignotait et sortait aussitot)
       prevOK = false;
     }
   }

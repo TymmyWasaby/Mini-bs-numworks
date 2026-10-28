@@ -1619,6 +1619,14 @@ static HotZone zones[MAX_ZONE];
 
 static float ballX, ballY, ballVX, ballVY;
 static int ballCd = 0; // V5.15 : delai de remise en jeu apres un but (anti double-but)
+static int mode, gemCountdown, teamGems[5], teamStars[5];
+static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
+static int shakeT = 0, shakeMag = 0, animT = 0;
+static float shakeDX = 0, shakeDY = 0; // V5.16 : direction du screen shake (recul opposé aux degats)
+static bool gSuddenDone = false; // V5.16 : KO elimination deja declenchee
+static int gKOBannerT = 0;      // V5.16 : banniere "ELIMINATOIRE !"
+static int gBossN = 0, gBossPattern = 0, gBossT = 0; // V5.16 : BOSS RUSH : boss n°, pattern, timer
+static float gFrameMs = 33.0f;  // V5.16 : EMA du temps de frame pour le compteur FPS
 // V5.15 : BUT = ballon au centre + TOUT LE MONDE respawne a son camp, PV au max (comme BS)
 static void ballResetAfterGoal() {
   ballX = mapW * TILE / 2; ballY = mapH * TILE / 2; ballVX = ballVY = 0;
@@ -1633,16 +1641,8 @@ static void ballResetAfterGoal() {
     e.y = mapH * TILE / 2 + ((row % 3) - 1) * 30;
     row++;
   }
-  shakeT = 400; shakeMag = 5;
+  // V5.16 : plus de shake ici — evite la dependance a l'ordre de declaration des globals
 }
-static int mode, gemCountdown, teamGems[5], teamStars[5];
-static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
-static int shakeT = 0, shakeMag = 0, animT = 0;
-static float shakeDX = 0, shakeDY = 0; // V5.16 : direction du screen shake (recul opposé aux degats)
-static bool gSuddenDone = false; // V5.16 : KO elimination deja declenchee
-static int gKOBannerT = 0;      // V5.16 : banniere "ELIMINATOIRE !"
-static int gBossN = 0, gBossPattern = 0, gBossT = 0; // V5.16 : BOSS RUSH : boss n°, pattern, timer
-static float gFrameMs = 33.0f;  // V5.16 : EMA du temps de frame pour le compteur FPS
 static int matchResult = -2;
 static int startCountdown = 0; // 3-2-1-GO au debut du match
 

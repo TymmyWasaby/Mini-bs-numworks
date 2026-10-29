@@ -300,7 +300,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Frank",    7400, 1800, 140, 2400, 260, 3, 30, ATK_SPREAD, SUP_WAVE,     GAD_AMMO,  STAR_HP,    3,  2900, 0x5C7A9B, 0x3B5068, 3},
   {"Bibi",     5900, 1350, 120, 1300, 360, 3, 15, ATK_SPREAD, SUP_WAVE,     GAD_SPEED, STAR_HP,    3,  3200, 0xE05C3B, 0xA03E22, 0},
   {"Bea",      3600,  960, 270, 1500, 380, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   3,  3500, 0xE0C93B, 0xA08A22, 2},
-  {"Nani",     3400, 1420, 260, 1900, 340, 1,  0, ATK_SHOT,   SUP_SUMMON,   GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
+  {"Nani",     3400, 1420, 260, 1900, 340, 3, 16, ATK_SHOT,   SUP_SUMMON,   GAD_SPEED, STAR_DMG,   4,  3900, 0x9B7BE0, 0x6850A0, 2},
   {"Edgar",    4200, 1050,  80, 1100, 380, 2, 10, ATK_SPREAD, SUP_DASH,     GAD_HEAL,  STAR_REGEN, 4,  4300, 0x3B3B50, 0x22223A, 0},
   {"Griff",    4900, 1080, 230, 1500, 360, 3,  8, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_DMG,   4,  4700, 0xC9C93B, 0x8A8A22, 1},
   {"Gale",     5300, 1240, 200, 1600, 320, 3, 14, ATK_SPREAD, SUP_PUSH,     GAD_SPEED, STAR_HP,    4,  5100, 0x7BC9E0, 0x508A9B, 2},
@@ -1585,6 +1585,7 @@ struct Proj {
   uint8_t hitIds[8]; int nHits; // pour les projectiles perforants : touche chaque cible une fois
   float mineT; // >0 : mine posee au sol (attaque de Tick), explose au contact ou a la fin du delai
   bool boomer, ret; // pic de Carl : boomerang qui revient vers son proprietaire
+  float steer; // V5.17 : Nani — les balles s'ecartent puis REJOIGNENT la ligne de visee (rad/s)
   int bounce; // rebonds restants sur les murs (Rico)
   int bIdx; // V5.13 : brawler qui a tire (graphisme specifique du projectile)
 };
@@ -2098,6 +2099,17 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
     p.shape = d.projShape; p.spin = 0; p.mineT = 0;
     p.bIdx = e.brawlerIdx; // V5.13 : graphisme du projectile selon le brawler
     p.bounce = ((e.brawlerIdx == 13 || e.brawlerIdx == 23) && !e.isPet) ? (e.brawlerIdx == 13 ? 3 : 1) : 0; // Rico rebondit 3x, Bibi 1x
+    p.steer = 0; // V5.17 : pas de convergence par defaut
+    // V5.17 : NANI — ses 3 balles s'ecartent en eventail puis SE REJOIGNENT sur la ligne
+    // de visee a mi-portee (comme le vrai Nani : ca resserre le garrot au bout)
+    if (!isSuper && !e.isPet && e.brawlerIdx == 25) {
+      float base = atan2f(p.vy, p.vx);
+      float diff = base - e.aimAng;
+      while (diff > 3.1416f) diff -= 6.2832f;
+      while (diff < -3.1416f) diff += 6.2832f;
+      float tHalf = (p.range * 0.5f) / fmaxf(1.0f, d.projSpeed * spdMul);
+      if (fabsf(diff) > 0.01f && tHalf > 0.05f) p.steer = -diff / tHalf;
+    }
     if (!isSuper) spawnParts(e.x + fcosf(ang) * 10, e.y + fsinf(ang) * 10 - 4, 0, 2); // FLASH DE BOUCHE
     return;
   }
@@ -2403,7 +2415,7 @@ static void doSuper(Ent &e, float ang) {
           for (int k = 0; k < MAX_PROJ; k++) {
             if (projs[k].active) continue;
             Proj &mp = projs[k];
-            mp.active = true; mp.lob = false; mp.fromSuper = true; mp.pierce = false;
+            mp.active = true; mp.lob = false; mp.steer = 0; mp.fromSuper = true; mp.pierce = false;
             mp.x = cx + mOff[m][0]; mp.y = cy + mOff[m][1];
             mp.vx = mp.vy = 0; mp.dmg = 1300.0f * mul; mp.travelled = 0; mp.range = 0;
             mp.team = e.team; mp.owner = (&e - ents); mp.radius = 3;
@@ -3210,6 +3222,14 @@ static void updateMatch(float dt) {
       }
       continue;
     }
+    // V5.17 : Nani — les balles courbes REJOIGNENT la ligne de visee a mi-portee
+    if (p.steer != 0) {
+      if (p.travelled < p.range * 0.5f) {
+        float a = atan2f(p.vy, p.vx) + p.steer * dt;
+        float sp = sqrtf(p.vx * p.vx + p.vy * p.vy);
+        p.vx = fcosf(a) * sp; p.vy = fsinf(a) * sp;
+      } else p.steer = 0;
+    }
     float nx = p.x + p.vx * dt, ny = p.y + p.vy * dt;
     p.travelled += sqrtf((nx - p.x) * (nx - p.x) + (ny - p.y) * (ny - p.y));
     p.x = nx; p.y = ny;
@@ -3223,7 +3243,7 @@ static void updateMatch(float dt) {
           for (int k = 0; k < MAX_PROJ; k++) {
             if (projs[k].active) continue;
             Proj &sp = projs[k];
-            sp.active = true; sp.lob = false; sp.fromSuper = false; sp.pierce = false;
+            sp.active = true; sp.lob = false; sp.steer = 0; sp.fromSuper = false; sp.pierce = false;
             sp.x = p.x; sp.y = p.y;
             float a2 = fa + (s - 2) * 0.16f;
             sp.vx = fcosf(a2) * 260; sp.vy = fsinf(a2) * 260;
@@ -3319,7 +3339,7 @@ static void updateMatch(float dt) {
             for (int k = 0; k < MAX_PROJ; k++) {
               if (projs[k].active) continue;
               Proj &mp = projs[k];
-              mp.active = true; mp.lob = false; mp.fromSuper = false; mp.pierce = false;
+              mp.active = true; mp.lob = false; mp.steer = 0; mp.fromSuper = false; mp.pierce = false;
               mp.x = p.x + mOff[m][0]; mp.y = p.y + mOff[m][1];
               mp.vx = mp.vy = 0; mp.dmg = p.dmg; mp.travelled = 0; mp.range = 0;
               mp.team = p.team; mp.owner = p.owner; mp.radius = 3;

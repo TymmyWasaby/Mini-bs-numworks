@@ -2107,8 +2107,8 @@ static void fireProj(Ent &e, float ang, bool isSuper, float dmgMul, float spdMul
       float diff = base - e.aimAng;
       while (diff > 3.1416f) diff -= 6.2832f;
       while (diff < -3.1416f) diff += 6.2832f;
-      float tHalf = (p.range * 0.5f) / fmaxf(1.0f, d.projSpeed * spdMul);
-      if (fabsf(diff) > 0.01f && tHalf > 0.05f) p.steer = -diff / tHalf;
+      float tEnd = p.range / fmaxf(1.0f, d.projSpeed * spdMul); // elles se rejoignent a LA FIN du trajet
+      if (fabsf(diff) > 0.01f && tEnd > 0.05f) p.steer = -diff / tEnd;
     }
     if (!isSuper) spawnParts(e.x + fcosf(ang) * 10, e.y + fsinf(ang) * 10 - 4, 0, 2); // FLASH DE BOUCHE
     return;
@@ -3222,9 +3222,10 @@ static void updateMatch(float dt) {
       }
       continue;
     }
-    // V5.17 : Nani — les balles courbes REJOIGNENT la ligne de visee a mi-portee
+    // V5.17 : Nani — les balles partent en eventail (comme Shelly) et SE REJOIGNENT
+    // a la FIN de leur trajet : le garrot se referme au dernier moment
     if (p.steer != 0) {
-      if (p.travelled < p.range * 0.5f) {
+      if (p.travelled < p.range) {
         float a = atan2f(p.vy, p.vx) + p.steer * dt;
         float sp = sqrtf(p.vx * p.vx + p.vy * p.vy);
         p.vx = fcosf(a) * sp; p.vy = fsinf(a) * sp;
@@ -4441,6 +4442,17 @@ static void renderMatch() {
     rRect(ex - textW(cm) / 2 - 5, ey - 12, textW(cm) + 10, 15, 4, C_WHT);
     fRect(ex - 2, ey + 3, 4, 4, C_WHT);
     drawTextC(ey - 9, cm, C_BLK);
+  }
+
+  // V5.17 : Hank — la bulle GONFLE devant lui pendant qu'il maintient l'attaque (comme le vrai Hank :
+  // plus on maintient, plus l'explosion est mortelle), puis elle part et eclate en zone
+  if (me.alive && me.brawlerIdx == 37 && me.atkCharge > 0.1f) {
+    int br = 3 + (int)(fminf(1.2f, me.atkCharge) * 9);
+    int hx = (int)me.x - camX + (int)(fcosf(me.aimAng) * 12);
+    int hy = (int)me.y - camY + (int)(fsinf(me.aimAng) * 12);
+    fCirc(hx, hy, br, C_BLUED);
+    fCirc(hx - br / 3, hy - br / 3, br > 4 ? br / 3 : 1, C_WHT); // reflet
+    oCirc(hx, hy, br + 1, C_WHT); // contour de ballon
   }
 
   // V5.16 : ARC DE VISEE en pointilles pour les lanceurs (ATK_LOB) pendant l'attaque

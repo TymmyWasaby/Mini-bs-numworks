@@ -4452,7 +4452,7 @@ static void renderMatch() {
     int hy = (int)me.y - camY + (int)(fsinf(me.aimAng) * 12);
     fCirc(hx, hy, br, C_BLUED);
     fCirc(hx - br / 3, hy - br / 3, br > 4 ? br / 3 : 1, C_WHT); // reflet
-    oCirc(hx, hy, br + 1, C_WHT); // contour de ballon
+    fRing(hx, hy, br + 1, C_WHT); // contour de ballon
   }
 
   // V5.16 : ARC DE VISEE en pointilles pour les lanceurs (ATK_LOB) pendant l'attaque

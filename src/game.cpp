@@ -1623,6 +1623,7 @@ static HotZone zones[MAX_ZONE];
 
 static float ballX, ballY, ballVX, ballVY;
 static int ballCd = 0; // V5.15 : delai de remise en jeu apres un but (anti double-but)
+static int ballShooter = -1, ballShotT = 0; // V5.17 : le tireur ne peut pas rattraper sa passe aussitot
 static int mode, gemCountdown, teamGems[5], teamStars[5];
 static int soloShrink, poisonWaveT, matchTimeMs, respawnMs = 3000;
 static int shakeT = 0, shakeMag = 0, animT = 0;
@@ -2180,7 +2181,23 @@ static void doAttack(Ent &e, float ang) {
   }
   // Mortis : chaque coup de pelle le propulse en avant
   if (e.brawlerIdx == 45 && !e.isPet) { e.dashT = 0.15f; e.dashDx = (int)(fcosf(ang) * 240); e.dashDy = (int)(fsinf(ang) * 240); }
-  if (n > 1 && d.atk == ATK_SHOT) {
+  // V5.17 : Hank — il ne TIRE PAS de projectile : la bulle gonfle devant lui puis
+  // ECLATE sur place — les ennemis dans le rayon prennent les degats (comme le vrai Hank)
+  if (e.brawlerIdx == 37 && !e.isPet) {
+    float ch = hm - 1.0f;                        // 0 a ~1.1 selon la charge
+    float R = 48 + ch * 42;                      // rayon de l'explosion selon la charge
+    float bx = e.x + fcosf(ang) * 14, by = e.y + fsinf(ang) * 14;
+    for (int j = 0; j < entCount; j++) {
+      Ent &t = ents[j];
+      if (!t.alive || t.team == e.team) continue;
+      float ddx = t.x - bx, ddy = t.y - by;
+      if (ddx * ddx + ddy * ddy < R * R) damageEnt(t, d.baseDmg * mul * hm * 0.85f, e);
+    }
+    spawnParts(bx, by, 0, 18); shakeT = 150; shakeMag = 3;
+    e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
+    return; // PAS de projectile : la bulle a deja eclate
+  }
+  if (n > 1 && d.atk == ATK_SHOT && e.brawlerIdx != 25) { // Nani EXCLUE : ses 3 balles partent en eventail d'un coup
     // tir en rafale (Colt, Rico, Bo...) : les balles partent l'une apres l'autre,
     // pas toutes d'un coup en eventail. La premiere part maintenant.
     fireProj(e, ang, false, mul * hm, 1.0f, hrm);
@@ -2855,6 +2872,7 @@ static void shootBall(Ent &e, float ang) {
   e.hasBall = false;
   ballX = e.x + fcosf(ang) * 12; ballY = e.y + fsinf(ang) * 12;
   ballVX = fcosf(ang) * 300; ballVY = fsinf(ang) * 300;
+  ballShooter = (&e - ents); ballShotT = 800; // V5.17 FIX : sans ca, le tireur rattrapait le ballon dans la seconde
   e.attackT = 200; shakeT = 120; shakeMag = 2;
 }
 // But marque par le ballon libre : credite l'equipe attaquante et recentre
@@ -3475,12 +3493,14 @@ static void updateMatch(float dt) {
 
   if (mode == MODE_BALL) {
     if (ballCd > 0) ballCd -= (int)(dt * 1000); // V5.15 : delai anti double-but
+    if (ballShotT > 0) ballShotT -= (int)(dt * 1000); // V5.17 : cooldown de reprise pour le tireur
     bool carried = false;
     for (int i = 0; i < entCount; i++) if (ents[i].alive && ents[i].hasBall) carried = true;
     if (!carried && ballCd <= 0) { // V5.15 : ramassage impossible pendant la remise en jeu
       for (int i = 0; i < entCount; i++) {
         Ent &e = ents[i];
         if (e.isPet || !e.alive || e.hasBall) continue;
+        if (i == ballShooter && ballShotT > 0) continue; // V5.17 : pas de reprise immediate par le tireur
         if (fabsf(e.x - ballX) < 12 && fabsf(e.y - ballY) < 12) { e.hasBall = true; break; }
       }
       if (!carried) {
@@ -4445,13 +4465,13 @@ static void renderMatch() {
   }
 
   // V5.17 : Hank — la bulle GONFLE devant lui pendant qu'il maintient l'attaque (comme le vrai Hank :
-  // plus on maintient, plus l'explosion est mortelle), puis elle part et eclate en zone
+  // plus on maintient, plus l'explosion est mortelle), puis elle ECLATE en zone sur place
   if (me.alive && me.brawlerIdx == 37 && me.atkCharge > 0.1f) {
-    int br = 3 + (int)(fminf(1.2f, me.atkCharge) * 9);
-    int hx = (int)me.x - camX + (int)(fcosf(me.aimAng) * 12);
-    int hy = (int)me.y - camY + (int)(fsinf(me.aimAng) * 12);
+    int br = 4 + (int)(fminf(1.2f, me.atkCharge) * 16); // bien plus grosse qu'avant
+    int hx = (int)me.x - camX + (int)(fcosf(me.aimAng) * 14);
+    int hy = (int)me.y - camY + (int)(fsinf(me.aimAng) * 14);
     fCirc(hx, hy, br, C_BLUED);
-    fCirc(hx - br / 3, hy - br / 3, br > 4 ? br / 3 : 1, C_WHT); // reflet
+    fCirc(hx - br / 3, hy - br / 3, br > 5 ? br / 3 : 1, C_WHT); // reflet
     fRing(hx, hy, br + 1, C_WHT); // contour de ballon
   }
 

@@ -312,7 +312,7 @@ static const BrawlerDef BRAWLERS[55] = {
   {"Fang",     5700, 1420, 140, 1400, 350, 2, 12, ATK_SPREAD, SUP_DASH,     GAD_SPEED, STAR_HP,    4,  8000, 0xC95C3B, 0x8A3E22, 0},
   {"Maisie",   4700, 1260, 240, 1700, 330, 1,  0, ATK_SHOT,   SUP_BURST,    GAD_BLAST, STAR_DMG,   5,  8600, 0x3BE0A0, 0x229B68, 2},
   {"Squeak",   3500, 1200, 250, 1800, 280, 1,  0, ATK_LOB,    SUP_BARRAGE,  GAD_BLAST, STAR_REGEN, 5,  9200, 0xC93BE0, 0x8A22A0, 3},
-  {"Hank",     6900, 1500, 220, 2000, 290, 3, 10, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_HP,    5,  9800, 0x3B6BE0, 0x2247A0, 2},
+  {"Hank",     6900, 1500, 220, 2000, 290, 1,  0, ATK_SHOT,   SUP_BARRAGE,  GAD_AMMO,  STAR_HP,    5,  9800, 0x3B6BE0, 0x2247A0, 2},
   {"Pearl",    5200, 1230, 210, 1500, 320, 2,  8, ATK_SPREAD, SUP_HEAL,     GAD_HEAL,  STAR_REGEN, 5, 10500, 0xE09B3B, 0xA06822, 1},
   {"Spike",    3200, 1120, 250, 1900, 300, 3, 20, ATK_LOB,    SUP_BURST,    GAD_SPEED, STAR_DMG,   5, 11200, 0x7BE05C, 0x4FA03E, 3},
   {"Crow",     3200, 1080, 260, 1500, 400, 3,  6, ATK_SHOT,   SUP_BARRAGE,  GAD_SPEED, STAR_DMG,   5, 12000, 0x5C3BE0, 0x3E22A0, 2},
@@ -1456,7 +1456,7 @@ static bool loadAcc() {
     acc.emoteP = acc.emoteM = 0;
   }
   // ---- V5.11 : pseudo + record survie (444 = format actuel) ----
-  if (len == 444 || len == 445) {
+  if (len == 444 || len == 445 || len == 776) { // V5.17 FIX : 776 sinon le pseudo etait PERDU au chargement !
     for (int i = 0; i < 9; i++) acc.name[i] = (char)buf[p++];
     acc.name[8] = 0;
     acc.bestWave = (buf[p] << 8) | buf[p + 1];
@@ -1915,6 +1915,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.brawlerIdx = owner.brawlerIdx; e.accIdx = -1; e.team = owner.team;
   e.x = owner.x + fcosf(owner.aimAng) * 22; e.y = owner.y + fsinf(owner.aimAng) * 22;
   e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 900 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
+  e.hp = e.maxHP; // V5.17 FIX : SANS cette ligne le pet spawnait a 0 PV et mourait aussitot (tourelle/tete invisibles !)
   e.isHuman = false; e.alive = true; e.respawnT = 0;
   e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = owner.aimAng;
@@ -3236,10 +3237,21 @@ static void updateMatch(float dt) {
         }
         spawnParts(p.x, p.y, 0, 5);
         p.active = false; continue;
+      } else if (!p.fromSuper && p.bIdx == 37) { // V5.17 : Hank — la bulle ECLATE en zone
+        for (int j = 0; j < entCount; j++) {
+          Ent &t = ents[j];
+          if (!t.alive || t.team == p.team) continue;
+          float ddx = t.x - p.x, ddy = t.y - p.y;
+          if (ddx * ddx + ddy * ddy < 45 * 45) damageEnt(t, p.dmg * 0.75f, ents[p.owner]);
+        }
+        spawnParts(p.x, p.y, 0, 12); shakeT = 120; shakeMag = 3;
+        p.active = false; continue;
       } else { p.active = false; continue; }
     }
-    // V5.17 : ESQUIVE (tres haut niveau : brawler a 1600 tr MINIMUM) — les bons bots
-    // s'ecartent d'un pas du projectile qui arrive sur eux, pas de fuite panique
+    // V5.17 : Hank — sa bulle GROSSIT en avancant puis eclate en zone a la portee max
+    if (p.bIdx == 37 && !p.fromSuper && p.mineT <= 0)
+      p.radius = 4 + (int)(p.travelled / fmaxf(1.0f, (float)p.range) * 9.0f);
+    // V5.17 : ESQUIVE (tres haut niveau : brawler a 1600 tr MINIMUM) — les bons bots    // s'ecartent d'un pas du projectile qui arrive sur eux, pas de fuite panique
     if (matchTr() >= 1600 && !p.lob && p.mineT <= 0) {
       for (int j = 0; j < entCount; j++) {
         Ent &e2 = ents[j];
@@ -4075,8 +4087,10 @@ static void drawProj(Proj &p, int sx, int sy, int myTeam) {
     case 36: // Squeak : boule verte avec yeux
       fCirc(sx, sy, 2, C_GREEN); px(sx - 1, sy, C_BLK); px(sx + 1, sy, C_BLK);
       break;
-    case 37: // Hank : bulles bleues
-      fCirc(sx, sy, 2, C_BLUE); px(sx + 2, sy - 2, C_CYN); px(sx - 2, sy + 1, C_CYN);
+    case 37: // Hank : BULLE qui grossit en avancant puis eclate (V5.17)
+      { int br = (p.radius > 3) ? p.radius : 3;
+        fCirc(sx, sy, br, p.team == myTeam ? C_BLUED : KDColor::RGB24(0xA03040));
+        fCirc(sx - br / 3, sy - br / 3, br > 4 ? br / 3 : 1, C_WHT); } // reflet
       break;
     case 38: // Pearl : perle blanche brillante
       fCirc(sx, sy, 2, C_WHT); px(sx - 1, sy - 1, KDColor::RGB24(0xFFE8C0));
@@ -4224,12 +4238,19 @@ static void renderMatch() {
   if (mode == MODE_ZONE)
     for (int z = 0; z < MAX_ZONE; z++) {
       int sx = (int)zones[z].x - camX, sy = (int)zones[z].y - camY;
-      KDColor zc = zones[z].prog >= 0 ? (zones[z].prog > 66 ? C_GREEN : C_BLUE) : C_RED;
-      fRing(sx, sy, 24, zc); fRing(sx, sy, 25, C_BLK);
-      if (fabsf(zones[z].prog) > 3) {
-        fRect(sx - 15, sy - 3, 30, 7, C_BLK);
-        int fw = (int)(28 * fabsf(zones[z].prog) / 100.0f);
-        fRect(sx - 14, sy - 2, fw, 5, zones[z].prog >= 0 ? C_GREEN : C_RED);
+      // V5.17 : comme dans le vrai Brawl Stars — l'anneau est scinde en 2 MOITIES :
+      // moitie GAUCHE = progression de TON equipe, moitie DROITE = celle de l'ennemi
+      fRing(sx, sy, 24, KDColor::RGB24(0x3A3A4A)); fRing(sx, sy, 25, C_BLK); // anneau de base
+      float pr = fabsf(zones[z].prog);
+      if (zones[z].prog >= 0) // ton equipe capture : l'aiguille balaie la moitie gauche
+        arc(sx, sy, 25, 1.5708f, 1.5708f + 3.1416f * pr / 100.0f, 3, (pr > 66) ? C_GREEN : C_BLUE);
+      else // l'ennemi capture : la sienne balaie la moitie droite
+        arc(sx, sy, 25, -1.5708f, -1.5708f + 3.1416f * pr / 100.0f, 3, C_RED);
+      fRing(sx, sy, 20, C_BTND); // interieur sombre
+      if (pr > 3) { // pourcentage au centre, colore selon qui mene
+        KDColor pc = (zones[z].prog >= 0) ? ((pr > 66) ? C_GREEN : C_BLUE) : C_RED;
+        drawNum(sx - 10, sy - 4, (int)pr, pc);
+        drawText(sx + 6, sy - 4, "%", pc);
       }
     }
 

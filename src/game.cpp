@@ -1918,6 +1918,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.x = owner.x + fcosf(owner.aimAng) * 22; e.y = owner.y + fsinf(owner.aimAng) * 22;
   e.maxHP = (kind == 0) ? 4200 : (kind == 1 ? 3200 : (kind == 2 ? 2800 : (kind == 3 ? 900 : (kind == 4 ? 3000 : (kind == 6 ? 1600 : 2600)))));
   e.hp = e.maxHP; // V5.17 FIX : SANS cette ligne le pet spawnait a 0 PV et mourait aussitot (tourelle/tete invisibles !)
+  e.ammo = 3; // V5.17 FIX : idem pour les munitions — la tourelle de Penny ne tirait JAMAIS (ammo non init)
   e.isHuman = false; e.alive = true; e.respawnT = 0;
   e.regenT = 0; e.speedBuffT = e.hyperT = e.dashT = 0; e.boostT = e.boostCd = 0; e.dashRet = false;
   e.aimAng = e.faceAng = owner.aimAng;
@@ -2164,6 +2165,7 @@ static void hitDestructibles(Proj &p) {
 
 // V5.17 : reflexes d'IA — vengeance, tilt, chat (bulle) — tous doses par matchTr()
 static int gChatEnt = -1, gChatT = 0, gChatIdx = 0; // V5.17 : bulle de chat des bots (rare)
+static float gHankHoldT = 0; // V5.17 : temps de maintien de la bulle Hank a charge max (3 s)
 static void doAttack(Ent &e, float ang) {
   const BrawlerDef &d = BRAWLERS[e.brawlerIdx];
   if (e.ammo < 1) return;
@@ -2196,6 +2198,22 @@ static void doAttack(Ent &e, float ang) {
     spawnParts(bx, by, 0, 18); shakeT = 150; shakeMag = 3;
     e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
     return; // PAS de projectile : la bulle a deja eclate
+  }
+  // V5.17 : FANG — le coup de chaussure fait TRES mal au corps a corps + une chaussure
+  // lente qui file tout droit et ne pique qu'un peu (comme le vrai Fang)
+  if (e.brawlerIdx == 34 && !e.isPet) {
+    float bx = e.x + fcosf(ang) * 16, by = e.y + fsinf(ang) * 16;
+    bool touched = false;
+    for (int j = 0; j < entCount; j++) {
+      Ent &t = ents[j];
+      if (!t.alive || t.team == e.team) continue;
+      float ddx = t.x - bx, ddy = t.y - by;
+      if (ddx * ddx + ddy * ddy < 32 * 32) { damageEnt(t, d.baseDmg * mul * 1.15f, e); touched = true; }
+    }
+    if (touched) spawnParts(bx, by, 0, 8);
+    fireProj(e, ang, false, mul * 0.45f, 0.7f, 1.3f); // la chaussure volante, lente
+    e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
+    return;
   }
   if (n > 1 && d.atk == ATK_SHOT && e.brawlerIdx != 25) { // Nani EXCLUE : ses 3 balles partent en eventail d'un coup
     // tir en rafale (Colt, Rico, Bo...) : les balles partent l'une apres l'autre,
@@ -2254,10 +2272,13 @@ static void doSuper(Ent &e, float ang) {
       } else if (e.brawlerIdx == 29) { // Colette : aller-retour, casse PAS les murs
         e.dashT = 0.4f; e.dashRet = true;
         e.dashDx = (int)(fcosf(ang) * 330); e.dashDy = (int)(fsinf(ang) * 330);
-      } else if (e.brawlerIdx == 34) { // Fang : le coup volant enchaine les ennemis proches
+      } else if (e.brawlerIdx == 14) { // V5.17 : Darryl — long tonneau qui REBONDIT sur les murs (sans les casser)
+        e.dashT = 0.8f; e.dashDx = (int)(fcosf(ang) * 340); e.dashDy = (int)(fsinf(ang) * 340);
+      } else if (e.brawlerIdx == 34) { // Fang : le coup volant — il FONCE sur l'ennemi le plus
+        // proche puis REBONDIT d'ennemi en ennemi proche, SANS casser ni traverser les murs
         bool hit[MAX_ENT] = {};
         for (int step = 0; step < 4; step++) {
-          int best = -1; float bd = 200.0f;
+          int best = -1; float bd = 190.0f;
           for (int j = 0; j < entCount; j++) {
             Ent &o = ents[j];
             if (!o.alive || o.isPet || o.team == e.team || hit[j]) continue;
@@ -2266,8 +2287,20 @@ static void doSuper(Ent &e, float ang) {
             if (dd < bd) { bd = dd; best = j; }
           }
           if (best < 0) break;
+          // il avance par petits pas : un mur l'arrete NET (plus de teleportation a travers)
+          float tx = ents[best].x, ty = ents[best].y;
+          float ddx = tx - e.x, ddy = ty - e.y, dl = sqrtf(ddx * ddx + ddy * ddy);
+          if (dl < 0.01f) { hit[best] = true; continue; }
+          bool reached = false;
+          for (int st = 0; st < 40 && !reached; st++) {
+            float ox = e.x, oy = e.y;
+            moveEnt(e, ddx / dl * 8.0f, ddy / dl * 8.0f);
+            if (fabsf(e.x - ox) + fabsf(e.y - oy) < 0.5f) break; // bloque par un mur : fin du rebond
+            float rdx = tx - e.x, rdy = ty - e.y;
+            if (rdx * rdx + rdy * rdy < 22 * 22) reached = true;
+          }
+          if (!reached) break; // le mur a arrete la charge : le super s'arrete la
           hit[best] = true;
-          e.x = ents[best].x; e.y = ents[best].y;
           damageEnt(ents[best], 1000.0f, e);
           spawnParts(e.x, e.y, 0, 6);
         }
@@ -2683,6 +2716,8 @@ static void updateAI(Ent &e, float dt) {
   if (sniper) keepDist = RNG(d.range) * 0.92f;                      // les snipers tirent de TRES loin
   if (e.brawlerIdx == 50) keepDist = RNG(d.range) * 0.97f;         // Piper : la reine du combat a distance
   if (e.brawlerIdx == 47 && e.mechT > 0) keepDist = RNG(d.range) * 0.35f; // Meg en mecha : colle pour ecraser
+  if (e.brawlerIdx == 34) keepDist = RNG(d.range) * 0.25f;         // V5.17 : Fang — son shoe fait bien plus mal de pres
+  if (e.brawlerIdx == 37) keepDist = 55.0f;                        // V5.17 : Hank — sa bulle eclate pres de lui
   if (e.aiPers == 0) keepDist *= 0.75f;      // personnalite agressive
   else if (e.aiPers == 1) keepDist *= 1.25f; // personnalite defensive
   if (e.aiTilt >= 2) keepDist *= 1.25f;      // V5.17 : TILT — morts en chaine → patient, garde distance
@@ -2826,7 +2861,7 @@ static void updateAI(Ent &e, float dt) {
   if (tgt && ed < 150 && !e.isBoss &&
       (e.brawlerIdx == 0 || e.brawlerIdx == 3 || e.brawlerIdx == 5 || e.brawlerIdx == 8 ||
        e.brawlerIdx == 14 || e.brawlerIdx == 21 || e.brawlerIdx == 26 || e.brawlerIdx == 34 ||
-       e.brawlerIdx == 45)) {
+       e.brawlerIdx == 37 || e.brawlerIdx == 45)) {
     wx = tgt->x; wy = tgt->y; // on colle l'adversaire
   }
   // V5.16 : les attaquants de ZONE (Poco, Jacky, Emz, Frank, Bibi) tapent au bout de leur
@@ -3044,9 +3079,16 @@ static void updateMatch(float dt) {
     if (me.brawlerIdx == 37 || me.brawlerIdx == 32) { // Hank / Ash : maintenir pour charger
       if ((keyOK || kVar || kExp) && me.ammo >= 1) {
         shotAtk = false;
+        if (me.atkCharge < dt) gHankHoldT = 0; // nouvelle charge : on repart de zero
         me.atkCharge += dt;
-        if (me.atkCharge >= 1.2f && me.attackT <= 0) { me.atkCharge = 1.2f; shotAtk = true; } // pleine charge : boum
+        if (me.atkCharge >= 1.2f) {
+          me.atkCharge = 1.2f;
+          // V5.17 : a fond, la bulle RESTE gonflee 3 s si on maintient — ensuite elle eclate
+          gHankHoldT += dt;
+          if (gHankHoldT >= 3.0f && me.attackT <= 0) shotAtk = true;
+        }
       } else if (me.atkCharge > 0) {
+        gHankHoldT = 0;
         if (me.attackT <= 0 && me.ammo >= 1) shotAtk = true; // relachement : on lance
         else me.atkCharge = 0;
       }
@@ -3108,10 +3150,16 @@ static void updateMatch(float dt) {
       if (e.dashT <= 0 && e.dashRet) { // Colette : demi-tour, elle revient d'ou elle vient
         e.dashRet = false; e.dashT = 0.4f; e.dashDx = -e.dashDx; e.dashDy = -e.dashDy;
       }
-      // seuls les dashs "classiques" (Bull, Darryl, El Primo...) defoncent les murs
-      if (e.brawlerIdx != 20 && e.brawlerIdx != 29 && e.brawlerIdx != 50)
+      // seuls les dashs "classiques" (Bull, El Primo...) defoncent les murs —
+      // V5.17 : Darryl (comme Stu/Colette/Piper) REBONDIT dessus sans les casser
+      if (e.brawlerIdx != 14 && e.brawlerIdx != 20 && e.brawlerIdx != 29 && e.brawlerIdx != 50)
         breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
+      float dashOX = e.x, dashOY = e.y;
       moveEnt(e, e.dashDx * dt, e.dashDy * dt);
+      // V5.17 : Darryl — bloque par un mur ? il REBONDIT dans l'autre sens
+      if (e.brawlerIdx == 14 && fabsf(e.x - dashOX) + fabsf(e.y - dashOY) < 0.5f) {
+        e.dashDx = -e.dashDx; e.dashDy = -e.dashDy;
+      }
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team) {
           float ddx = ents[j].x - e.x, ddy = ents[j].y - e.y;
@@ -4467,7 +4515,7 @@ static void renderMatch() {
   // V5.17 : Hank — la bulle GONFLE devant lui pendant qu'il maintient l'attaque (comme le vrai Hank :
   // plus on maintient, plus l'explosion est mortelle), puis elle ECLATE en zone sur place
   if (me.alive && me.brawlerIdx == 37 && me.atkCharge > 0.1f) {
-    int br = 4 + (int)(fminf(1.2f, me.atkCharge) * 16); // bien plus grosse qu'avant
+    int br = 5 + (int)(fminf(1.2f, me.atkCharge) * 22); // V5.17 : bulle bien plus grosse
     int hx = (int)me.x - camX + (int)(fcosf(me.aimAng) * 14);
     int hy = (int)me.y - camY + (int)(fsinf(me.aimAng) * 14);
     fCirc(hx, hy, br, C_BLUED);

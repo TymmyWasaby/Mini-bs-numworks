@@ -1339,6 +1339,7 @@ static const char* curStarName(int i) {
 struct Quest { int type; int goal; int prog; int reward; };
 static Quest quests[3];
 static int killCounter = 0, gemCounter = 0, superCounter = 0, winStreak = 0;
+static int auWins = 0, auKills = 0, auBestS = 0; // V5.18 : stats Among Us Micro (victoires, kills, meilleur temps)
 #define SAVE_NAME "minibs.sav"
 #define SAVE_BACKUP "minibs.bak" // V5.14 : double record anti-corruption
 static int gFps60 = 0; // V5.14 : option "60 FPS" (0 = 30 fps par defaut, plus fluide a 1 mais plus gourmand)
@@ -1385,20 +1386,60 @@ static void saveAcc() {
     buf[p++] = (uint8_t)(acc.pKills[i] >> 8); buf[p++] = (uint8_t)(acc.pKills[i] & 0xFF);
     buf[p++] = (uint8_t)(acc.pDmg[i] >> 8);   buf[p++] = (uint8_t)(acc.pDmg[i] & 0xFF);
   }
-  buf[p++] = gFpsShow ? 1 : 0; // V5.16 : compteur FPS (776 octets au total)
+  buf[p++] = gFpsShow ? 1 : 0; // V5.16 : compteur FPS
+  // V5.18 : stats Among Us Micro (782 octets au total)
+  buf[p++] = (uint8_t)(auWins >> 8);  buf[p++] = (uint8_t)(auWins & 0xFF);
+  buf[p++] = (uint8_t)(auKills >> 8); buf[p++] = (uint8_t)(auKills & 0xFF);
+  buf[p++] = (uint8_t)(auBestS >> 8); buf[p++] = (uint8_t)(auBestS & 0xFF);
   ef_write(SAVE_NAME, buf, (uint32_t)p);
   ef_write(SAVE_BACKUP, buf, (uint32_t)p); // V5.14 : sauvegarde de secours anti-corruption
+  // V5.18 : methode NumPlay — on copie TOUTE la sauvegarde dans un SCRIPT PYTHON
+  // (minibs_saves.py). Installer un .nwa efface les fichiers de l'app mais PAS les
+  // scripts Python : la progression revient toute seule apres une reinstal/update.
+  static char py[1760];
+  int q = 0;
+  const char *pre = "# Sauvegarde Brawl MicroStars + Among Us Micro (ne pas supprimer)\ns = \"";
+  while (pre[q]) { py[q] = pre[q]; q++; }
+  for (int i = 0; i < p; i++) {
+    py[q++] = "0123456789ABCDEF"[(buf[i] >> 4) & 15];
+    py[q++] = "0123456789ABCDEF"[buf[i] & 15];
+  }
+  py[q++] = '"'; py[q++] = '\n'; py[q] = 0;
+  ef_write("minibs_saves.py", (const uint8_t *)py, (uint32_t)q);
 }
 static bool loadAcc() {
   uint32_t len = 0;
   const uint8_t *buf = ef_read(SAVE_NAME, &len);
   // V5.14 : double record anti-corruption — si le record principal est perdu/corrompu, on tente la copie de secours
-  bool bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776);
+  bool bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776 && len != 782);
   if (bad) {
     buf = ef_read(SAVE_BACKUP, &len);
-    bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776);
-    if (bad) return false; // format inattendu : partie vierge
+    bad = !buf || (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776 && len != 782);
   }
+  // V5.18 : DERNIER recours (methode NumPlay) — la copie PYTHON de la sauvegarde.
+  // minibs_saves.py survit a la reinstal de l'app : on decode son hex et on relit tout.
+  if (bad) {
+    static uint8_t pyBuf[782];
+    uint32_t plen = 0;
+    const uint8_t *py = ef_read("minibs_saves.py", &plen);
+    if (py && plen > 10) {
+      int st = 0, d = 0;
+      for (uint32_t i = 0; i < plen && d < 782 * 2; i++) {
+        uint8_t c = py[i];
+        if (st == 0) { if (c == '"') st = 1; continue; } // cherche le debut de la chaine
+        if (c == '"') break;                            // fin de la chaine hex
+        int hv = (c >= '0' && c <= '9') ? c - '0' : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1;
+        if (hv < 0) break;                              // caractere inattendu : stop
+        if (d % 2 == 0) pyBuf[d / 2] = (uint8_t)(hv << 4); else pyBuf[d / 2] |= (uint8_t)hv;
+        d++;
+      }
+      if (d >= 2) {
+        buf = pyBuf; len = (uint32_t)(d / 2);
+        bad = (len != 231 && len != 331 && len != 361 && len != 433 && len != 444 && len != 445 && len != 776 && len != 782);
+      }
+    }
+  }
+  if (bad) return false; // format inattendu : partie vierge
   // V5.13 FIX : tailles REELLES ecrites par saveAcc au fil des versions.
   // 445 = format actuel | 444 = V5.13 | 433 = V5.10/V5.11 (emotes, sans pseudo/record) | 361/331/231 = anciens.
   int nb = (len == 331 || len == 231) ? 50 : 55; // nombre de brawlers presents dans la sauvegarde
@@ -1440,7 +1481,7 @@ static bool loadAcc() {
   winStreak   = (buf[p] << 8) | buf[p + 1];
   if (winStreak < 0) winStreak = 0;
   // ---- V5.10 : carriere, skins, emotes (absents des vieilles sauvegardes) ----
-  if (len == 433 || len == 444 || len == 445) {
+  if (len == 433 || len == 444 || len == 445 || len == 776 || len == 782) { // V5.18 FIX : 776/782 sinon la carriere etait sautee et le reste DECALE !
     p += 2;
     acc.matches = (buf[p] << 8) | buf[p + 1]; p += 2;
     acc.wins = (buf[p] << 8) | buf[p + 1]; p += 2;
@@ -1456,22 +1497,29 @@ static bool loadAcc() {
     acc.emoteP = acc.emoteM = 0;
   }
   // ---- V5.11 : pseudo + record survie (444 = format actuel) ----
-  if (len == 444 || len == 445 || len == 776) { // V5.17 FIX : 776 sinon le pseudo etait PERDU au chargement !
+  if (len == 444 || len == 445 || len == 776 || len == 782) { // V5.17 FIX : 776/782 sinon le pseudo etait PERDU au chargement !
     for (int i = 0; i < 9; i++) acc.name[i] = (char)buf[p++];
     acc.name[8] = 0;
     acc.bestWave = (buf[p] << 8) | buf[p + 1];
     if (acc.bestWave < 0 || acc.bestWave > 999) acc.bestWave = 0;
     p += 2;
   } else { acc.name[0] = 0; acc.bestWave = 0; }
-  if (len == 445 || len == 776) gFps60 = (buf[p++] != 0); // V5.14 : option 60 FPS persistee
-  // ---- V5.16 : stats par brawler (seulement format 776) ----
-  if (len == 776) {
+  if (len == 445 || len == 776 || len == 782) gFps60 = (buf[p++] != 0); // V5.14 : option 60 FPS persistee
+  // ---- V5.16 : stats par brawler (formats 776 et 782) ----
+  if (len == 776 || len == 782) {
     for (int i = 0; i < 55; i++) {
       acc.pMatches[i] = buf[p++]; acc.pWins[i] = buf[p++];
       acc.pKills[i] = (buf[p] << 8) | buf[p + 1]; p += 2;
       acc.pDmg[i] = (buf[p] << 8) | buf[p + 1]; p += 2;
     }
     gFpsShow = (buf[p++] != 0);
+    if (len == 782) { // V5.18 : stats Among Us Micro en fin de sauvegarde
+      auWins = (buf[p] << 8) | buf[p + 1]; p += 2;
+      auKills = (buf[p] << 8) | buf[p + 1]; p += 2;
+      auBestS = (buf[p] << 8) | buf[p + 1]; p += 2;
+      if (auWins < 0) auWins = 0; if (auKills < 0) auKills = 0;
+      if (auBestS < 0 || auBestS > 9999) auBestS = 0;
+    }
   }
   for (int i = 0; i < 9; i++) if (acc.name[i] != 0 && (acc.name[i] < ' ' || acc.name[i] > 'z')) acc.name[i] = 0; // sanity
   return true;
@@ -5613,6 +5661,358 @@ static void trainingMode(int myBrawler) {
   }
 }
 
+// ====================  V5.18 : AMONG US MICRO  ========================
+// 2e jeu du projet ! Tu es l'IMPOSTEUR : elimine les 6 membres d'equipage
+// avant que les TACHES ne soient terminees, sans te faire signaler.
+// FLECHES: bouger | OK: TUER (cooldown) | EXE/TOOLBOX: VENTILO | RETOUR: pause
+#define AUW 40
+#define AUH 30
+static const char *AU_MAP[AUH] = {
+"########################################",
+"########################################",
+"########################################",
+"###............##########............###",
+"###............##########............###",
+"###...B.......................T......###",
+"###..................................###",
+"###..................................###",
+"###.......T....##########............###",
+"###..........V.##########............###",
+"###.............##############...#######",
+"#####...#####...##############...#######",
+"#####...#####...##############...#######",
+"##.......####...############..........##",
+"##.......####...############..........##",
+"##..T...........############..........##",
+"##..............############.....T....##",
+"##..............############..........##",
+"##.......####..........#####..........##",
+"##.V.....#####.........#####.......V..##",
+"##.......#####.........#####..........##",
+"#####...######.........#####..........##",
+"#####...######...T.....#######...#######",
+"###........###.........#######...#######",
+"###...................................##",
+"###...T...............................##",
+"###..................V...........V....##",
+"###........###.........#######........##",
+"########################################",
+"########################################"};
+static char auCell(int cx, int cy) {
+  if (cx < 0 || cy < 0 || cx >= AUW || cy >= AUH) return '#';
+  return AU_MAP[cy][cx];
+}
+static bool auSolidPx(float x, float y) { return auCell((int)(x / 8.0f), (int)(y / 8.0f)) == '#'; }
+static bool auFree(float x, float y) { // les 4 coins du bean
+  if (auSolidPx(x - 3.5f, y - 3.5f) || auSolidPx(x + 3.5f, y - 3.5f)) return false;
+  if (auSolidPx(x - 3.5f, y + 4.0f) || auSolidPx(x + 3.5f, y + 4.0f)) return false;
+  return true;
+}
+// ---- waypoints (cases) + graphe : les bots patrouillent de salle en salle ----
+static const int AU_NX[13] = { 8, 31, 33, 33, 18, 6, 5, 11, 18, 14, 20, 31, 14};
+static const int AU_NY[13] = { 6,  6, 17, 25, 25, 25,16, 16, 22, 14,  6, 11, 10};
+static const int AU_ADJ[13][4] = {
+  {10,12,-1,-1}, {10,11,-1,-1}, {11,3,-1,-1}, {2,4,-1,-1}, {3,5,8,-1},
+  {4,6,-1,-1}, {5,7,-1,-1}, {6,9,-1,-1}, {4,9,-1,-1}, {7,8,12,-1},
+  {0,1,-1,-1}, {1,2,-1,-1}, {0,9,-1,-1}};
+static int auNH[13]; // auNH[i] = prochaine etape pour rejoindre la CAFETERIA (noeud 0)
+static void auInitNav() {
+  for (int i = 0; i < 13; i++) auNH[i] = -1;
+  auNH[0] = 0;
+  bool prog = true;
+  while (prog) {
+    prog = false;
+    for (int i = 0; i < 13; i++) {
+      if (auNH[i] >= 0) continue;
+      for (int k = 0; k < 4; k++) {
+        int j = AU_ADJ[i][k];
+        if (j < 0) break;
+        if (auNH[j] >= 0) { auNH[i] = j; prog = true; break; }
+      }
+    }
+  }
+}
+static const int AU_TX[6] = {10, 30, 33,  6,  4, 17}; // taches (cases)
+static const int AU_TY[6] = { 8,  5, 16, 25, 15, 22};
+static const int AU_TN[6] = { 0,  1,  2,  5,  6,  8}; // noeud rattache
+static const int AU_VX[5] = {13,  3, 21, 35, 33};     // ventilos (cases)
+static const int AU_VY[5] = { 9, 19, 26, 19, 26};
+static const uint32_t AU_COL[7] = {0xC51111, 0x132ED1, 0x117F2D, 0xED54BA, 0xF07D0D, 0xD6E0F0, 0x38FEDC};
+
+// un petit crewmate/imposteur : corps arrondi + visiere + sac a dos
+static void drawBean(int x, int y, KDColor col, bool left) {
+  KDColor dark = KDColor::RGB24(0x1B1B25);
+  fRect(x - 5, y + 4, 4, 3, col); fRect(x + 2, y + 4, 4, 3, col); // jambes
+  fRect(left ? x + 4 : x - 8, y - 4, 4, 8, col);                 // sac a dos
+  fCirc(x, y - 1, 6, col);
+  oCirc(x, y - 1, 6, col, dark);
+  fRect(left ? x - 5 : x - 1, y - 4, 6, 4, KDColor::RGB24(0x9ACAD5)); // visiere
+  fRect(left ? x - 5 : x - 1, y - 4, 6, 1, KDColor::RGB24(0xC6F0F7));
+}
+static void drawCorpse(int x, int y, KDColor col) {
+  oCirc(x - 2, y + 2, 5, col, KDColor::RGB24(0x1B1B25));
+  fRect(x - 5, y + 1, 3, 2, KDColor::RGB24(0xF2F2F2)); // os qui depasse
+  fCirc(x - 6, y, 2, KDColor::RGB24(0xF2F2F2));
+  fCirc(x - 6, y + 3, 2, KDColor::RGB24(0xF2F2F2));
+}
+
+struct AuBot { float x, y; int node, tgt, prev, state; float t; bool panic; };
+static AuBot auBots[6];
+static bool auBotAlive[6];
+static float auBodyX[6], auBodyY[6]; static uint32_t auBodyCol[6]; static int auBodyN = 0;
+
+static void amongUsGame() {
+  auInitNav();
+  auBodyN = 0;
+  float px = 8 * 8 + 4, py = 6 * 8 + 4; // spawn cafeteria
+  int auAlive = 6;
+  float taskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f;
+  int playerDir = 1;
+  const int startNodes[6] = {1, 3, 5, 6, 8, 10};
+  for (int i = 0; i < 6; i++) {
+    auBots[i].x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
+    auBots[i].y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
+    auBots[i].node = startNodes[i]; auBots[i].prev = startNodes[i];
+    int first = AU_ADJ[startNodes[i]][rnd(4)]; if (first < 0) first = 0;
+    auBots[i].tgt = first; auBots[i].state = 0; auBots[i].t = 0; auBots[i].panic = false;
+    auBotAlive[i] = true;
+  }
+  bool pOK = false, pExp = false, pBack = false;
+  int endScreen = 0; // 0=rien, 1=victoire, 2=taches, 3=signale
+  float dt = 0.033f;
+  while (!endScreen) {
+    pollKeys();
+    if (kHome) break;
+    gTime += dt;
+    killCd -= dt; if (killCd < 0) killCd = 0;
+    ventCd -= dt; if (ventCd < 0) ventCd = 0;
+    // ---- deplacement joueur ----
+    float spd = 68.0f * dt;
+    float dx = 0, dy = 0;
+    if (kLeft) dx -= spd; if (kRight) dx += spd;
+    if (kUp) dy -= spd; if (kDown) dy += spd;
+    if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
+    if (dx && auFree(px + dx, py)) px += dx;
+    if (dy && auFree(px, py + dy)) py += dy;
+    // ---- TUER (OK) : bot vivant a portee, sinon rien ----
+    if (keyOK && !pOK && killCd <= 0) {
+      float bd = 1e9; int bi = -1;
+      for (int i = 0; i < 6; i++) {
+        if (!auBotAlive[i]) continue;
+        float ddx = auBots[i].x - px, ddy = auBots[i].y - py;
+        float d2 = ddx * ddx + ddy * ddy;
+        if (d2 < bd) { bd = d2; bi = i; }
+      }
+      if (bi >= 0 && bd < 17 * 17) {
+        auBotAlive[bi] = false; auAlive--;
+        auBodyX[auBodyN] = auBots[bi].x; auBodyY[auBodyN] = auBots[bi].y;
+        auBodyCol[auBodyN] = AU_COL[bi + 1]; auBodyN++;
+        auKills++; killCd = 10.0f;
+        for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il panique et va signaler
+          if (!auBotAlive[w]) continue;
+          float wx = auBots[w].x - px, wy = auBots[w].y - py;
+          if (wx * wx + wy * wy < 48 * 48) auBots[w].panic = true;
+        }
+        if (auAlive == 0) endScreen = 1;
+      }
+    }
+    // ---- VENTILO (EXE) : sur une bouche d'aeration, on teleporte a la suivante ----
+    if (kExp && !pExp && ventCd <= 0) {
+      for (int i = 0; i < 5; i++) {
+        float vx = AU_VX[i] * 8.0f + 4.0f, vy = AU_VY[i] * 8.0f + 4.0f;
+        float ddx = vx - px, ddy = vy - py;
+        if (ddx * ddx + ddy * ddy < 11 * 11) {
+          int j = (i + 1 + rnd(4)) % 5;
+          px = AU_VX[j] * 8.0f + 4.0f; py = AU_VY[j] * 8.0f + 4.0f;
+          ventCd = 1.2f; break;
+        }
+      }
+    }
+    // ---- pause ----
+    if (keyBack && !pBack) {
+      waitRelease();
+      bool resumed = false;
+      while (!resumed) {
+        pollKeys();
+        if (keyOK) { waitRelease(); resumed = true; }
+        else if (keyBack) { endScreen = 4; break; } // abandon
+        Ion::Timing::msleep(40);
+      }
+    }
+    // ---- bots ----
+    for (int i = 0; i < 6; i++) {
+      if (!auBotAlive[i]) continue;
+      AuBot &b = auBots[i];
+      if (b.panic) { // il fonce vers le bouton d'alerte de la cafeteria
+        float tx, ty;
+        if (b.state == 9) { tx = 6 * 8.0f + 4.0f; ty = 5 * 8.0f + 4.0f; }
+        else if (b.state == 8) { tx = AU_NX[b.tgt] * 8.0f + 4.0f; ty = AU_NY[b.tgt] * 8.0f + 4.0f; }
+        else { tx = AU_NX[b.tgt] * 8.0f + 4.0f; ty = AU_NY[b.tgt] * 8.0f + 4.0f; }
+        float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
+        if (dl < 2.0f) {
+          if (b.state == 9) { endScreen = 3; break; } // IL A SIGNALER LE CORPS !
+          b.node = b.tgt;
+          if (b.node == 0) { b.state = 9; } else { b.state = 8; b.tgt = auNH[b.node]; }
+        } else { b.x += ddx / dl * 52.0f * dt; b.y += ddy / dl * 52.0f * dt; }
+        continue;
+      }
+      // un bot vivant passe pres d'un cadavre ? il panique aussi
+      for (int c = 0; c < auBodyN; c++) {
+        float ddx = auBodyX[c] - b.x, ddy = auBodyY[c] - b.y;
+        if (ddx * ddx + ddy * ddy < 34 * 34) {
+          b.panic = true; b.state = 7;
+          float bd = 1e9; b.tgt = b.node;
+          for (int n = 0; n < 13; n++) {
+            float nx = AU_NX[n] * 8.0f + 4.0f, ny = AU_NY[n] * 8.0f + 4.0f;
+            float dd2 = (nx - b.x) * (nx - b.x) + (ny - b.y) * (ny - b.y);
+            if (dd2 < bd) { bd = dd2; b.tgt = n; }
+          }
+          break;
+        }
+      }
+      if (b.panic) continue;
+      if (b.state == 1) { // il fait une tache
+        b.t -= dt;
+        if (b.t <= 0) {
+          b.state = 0;
+          int nn = AU_ADJ[b.node][rnd(4)];
+          int tries = 0;
+          while (nn < 0 || (nn == b.prev && rnd(100) < 75 && tries < 4)) { nn = AU_ADJ[b.node][rnd(4)]; tries++; }
+          if (nn < 0) nn = b.prev;
+          b.prev = b.node; b.tgt = nn;
+        }
+        continue;
+      }
+      // marche vers son waypoint
+      float tx = AU_NX[b.tgt] * 8.0f + 4.0f, ty = AU_NY[b.tgt] * 8.0f + 4.0f;
+      float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
+      if (dl < 2.0f) {
+        b.node = b.tgt;
+        int task = -1;
+        for (int k = 0; k < 6; k++) if (AU_TN[k] == b.node) task = k;
+        if (task >= 0 && rnd(100) < 40) { b.state = 1; b.t = 5.0f; }
+        else {
+          int nn = AU_ADJ[b.node][rnd(4)];
+          int tries = 0;
+          while (nn < 0 || (nn == b.prev && rnd(100) < 75 && tries < 4)) { nn = AU_ADJ[b.node][rnd(4)]; tries++; }
+          if (nn < 0) nn = b.prev;
+          b.prev = b.node; b.tgt = nn;
+        }
+      } else { b.x += ddx / dl * 30.0f * dt; b.y += ddy / dl * 30.0f * dt; }
+    }
+    // avancement des taches : plus il reste de monde, plus ca va vite
+    taskProg += auAlive * 0.18f * dt;
+    if (taskProg >= 100.0f) endScreen = 2;
+    pOK = keyOK; pExp = kExp; pBack = keyBack;
+
+    // ===================== RENDU =====================
+    for (int cy = 0; cy < AUH; cy++) { // carte en spans horizontaux (perf)
+      int x0 = 0;
+      while (x0 < AUW) {
+        char c = auCell(x0, cy); int x1 = x0;
+        while (x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
+        int rx = x0 * 8, rw = (x1 - x0 + 1) * 8;
+        if (c == '#') fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x2E3A4A));
+        else if (c == 'T') fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x9FA8B5));
+        else fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x8B94A3));
+        x0 = x1 + 1;
+      }
+    }
+    for (int k = 0; k < 6; k++) { // taches (jaune = pas faites)
+      fRect(AU_TX[k] * 8 + 1, AU_TY[k] * 8 + 1, 6, 6, KDColor::RGB24(0xF5C518));
+      fRect(AU_TX[k] * 8 + 2, AU_TY[k] * 8 + 2, 4, 4, KDColor::RGB24(0xB08A10));
+    }
+    for (int i = 0; i < 5; i++) { // ventilos
+      int vx = AU_VX[i] * 8, vy = AU_VY[i] * 8;
+      fRect(vx, vy, 8, 8, KDColor::RGB24(0x55606E));
+      fRect(vx + 1, vy + 2, 6, 1, KDColor::RGB24(0x2E3A4A));
+      fRect(vx + 1, vy + 5, 6, 1, KDColor::RGB24(0x2E3A4A));
+    }
+    fCirc(6 * 8 + 4, 5 * 8 + 4, 4, KDColor::RGB24(0xC51111)); // bouton d'alerte
+    for (int c = 0; c < auBodyN; c++) drawCorpse((int)auBodyX[c], (int)auBodyY[c], KDColor::RGB24(auBodyCol[c]));
+    for (int i = 0; i < 6; i++) {
+      if (!auBotAlive[i]) continue;
+      drawBean((int)auBots[i].x, (int)auBots[i].y, KDColor::RGB24(AU_COL[i + 1]), auBots[i].x > px);
+      if (auBots[i].panic) drawText((int)auBots[i].x + 6, (int)auBots[i].y - 16, "!", KDColor::RGB24(0xC51111));
+      else if (auBots[i].state == 1) drawText((int)auBots[i].x + 6, (int)auBots[i].y - 16, "...", KDColor::RGB24(0xF5C518));
+    }
+    drawBean((int)px, (int)py, KDColor::RGB24(0xC51111), playerDir == 0);
+    // HUD haut : barre de taches + equipage
+    fRect(0, 0, SW, 13, KDColor::RGB24(0x1B1B25));
+    fRect(4, 3, 190, 7, KDColor::RGB24(0x3A3A4A));
+    fRect(5, 4, (int)(188 * taskProg / 100.0f), 5, KDColor::RGB24(0xC51111));
+    drawText(198, 3, "EQ:", KDColor::RGB24(0xD6E0F0)); drawNum(224, 3, auAlive, KDColor::RGB24(0xD6E0F0));
+    // HUD bas : cooldown du kill
+    fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
+    drawText(4, SH - 10, "OK:TUER EXE:VENT", KDColor::RGB24(0xD6E0F0));
+    fRect(160, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
+    fRect(161, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
+    blit();
+    Ion::Timing::msleep(30);
+  }
+  // ------------------ ecran de fin ------------------
+  if (endScreen >= 1 && endScreen <= 3) {
+    if (endScreen == 1) {
+      auWins++;
+      int secs = (int)gTime;
+      if (auBestS == 0 || secs < auBestS) auBestS = secs;
+    }
+    saveAcc();
+  }
+  bgPanel();
+  const char *t1 = (endScreen == 1) ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" :
+                   (endScreen == 2) ? "TACHES FINIES..." : "CORPS SIGNALE !";
+  const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE" : (endScreen == 2) ? "L'EQUIPAGE S'EST ECHAPPE" : "TU AS ETE EJECTE";
+  drawTextC(60, t1, endScreen == 1 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
+  drawTextC(80, t2, C_WHT);
+  if (endScreen == 1) { drawTextC(100, "TEMPS:", C_GRE); drawNum(SW / 2 + 24, 100, (int)gTime, C_ORG); }
+  drawTextC(130, "VICTOIRES:", C_GRE); drawNum(SW / 2 + 34, 130, auWins, C_ORG);
+  drawTextC(148, "KILLS AU TOTAL:", C_GRE); drawNum(SW / 2 + 62, 148, auKills, C_ORG);
+  rRect(SW / 2 - 70, 184, 140, 24, 8, C_YEL);
+  drawTextC(190, "OK RETOUR", C_BLK);
+  blit();
+  prevOK = true;
+  while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); }
+  prevOK = false;
+}
+
+// ------------------------- LANCEUR : 2 jeux dans l'app ----------------
+static int launcherScreen() {
+  int sel = 0, drawn = -1;
+  bool pL = false, pR = false, pOK = false, pB = false;
+  waitRelease();
+  while (true) {
+    pollKeys();
+    if (kLeft && !pL) sel = 0;
+    if (kRight && !pR) sel = 1;
+    if (keyOK && !pOK) { waitRelease(); return sel; }
+    if (keyBack && !pB) { waitRelease(); return -1; }
+    if (kHome) return -1;
+    if (drawn != sel) {
+      drawn = sel;
+      for (int y = 0; y < SH; y++) { int x = 0; while (x < SW) { int band = (x + y * 2) / 40; int xe = (band + 1) * 40 - y * 2 - 1; if (xe >= SW) xe = SW - 1; fillSpan(y, x, xe, (band % 2) ? KDColor::RGB24(0x151A22) : KDColor::RGB24(0x1B222D)); x = xe + 1; } }
+      drawTextC(20, "MICRO GAMES", C_YEL);
+      fRect(SW / 2 - 60, 30, 120, 3, C_BTND);
+      // carte 1 : BRAWL MICROSTARS
+      rRect(12, 52, 140, 140, 10, sel == 0 ? KDColor::RGB24(0xF5C518) : KDColor::RGB24(0x2E3A4A));
+      fRect(16, 56, 132, 132, sel == 0 ? KDColor::RGB24(0x22282F) : KDColor::RGB24(0x1B222D));
+      oCirc(82, 118, 22, KDColor::RGB24(0xF5C518), KDColor::RGB24(0x8A6D00));
+      fRect(58, 138, 48, 6, KDColor::RGB24(0x8A6D00));
+      drawText(82 - textW("BRAWL") / 2, 158, "BRAWL", C_WHT);
+      drawText(82 - textW("MICROSTARS") / 2, 170, "MICROSTARS", C_WHT);
+      // carte 2 : AMONG US MICRO
+      rRect(168, 52, 140, 140, 10, sel == 1 ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x2E3A4A));
+      fRect(172, 56, 132, 132, sel == 1 ? KDColor::RGB24(0x22282F) : KDColor::RGB24(0x1B222D));
+      drawBean(238, 116, KDColor::RGB24(0xC51111), false);
+      drawText(238 - textW("AMONG US") / 2, 158, "AMONG US", C_WHT);
+      drawText(238 - textW("MICRO") / 2, 170, "MICRO", C_WHT);
+      drawTextC(212, sel == 0 ? "FLECHES PUIS OK POUR JOUER" : "IMPOSTEUR : ELIMINE L'EQUIPAGE", C_GRE);
+    }
+    pL = kLeft; pR = kRight; pOK = keyOK; pB = keyBack;
+    Ion::Timing::msleep(40);
+  }
+}
+
 // ------------------------- Point d'entree ------------------------------
 void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;
@@ -5620,12 +6020,17 @@ void ion_main(int argc, char *argv[]) {
   if (!acc.name[0]) { namePicker(); waitRelease(); } // pseudo au premier lancement (V5.11)
   int myBrawler = 0;
   const char *mainItems[10] = {"JOUER", "ENTRAINEMENT", "BRAWLERS", "BOUTIQUE", "CARRIERE", "EMOTES", "QUETES DU JOUR", "ROUTE DES TROPHEES", "PARAMETRES", "AIDE"};
-  while (true) {
+  while (true) { // V5.18 : LANCEUR — le projet contient DEUX jeux maintenant !
+    int game = launcherScreen();
+    waitRelease();
+    if (game < 0) return; // BACK au lanceur = quitter l'app
+    if (game == 1) { amongUsGame(); waitRelease(); continue; } // AMONG US MICRO
+  while (true) { // menu BRAWL MICROSTARS
     gTitleAnim = true; // brawlers qui defilent derriere le menu principal (V5.11)
     gPortrait = myBrawler; // V5.14 : portrait du brawler courant au menu principal
     int choice = menuPick("BRAWL MICROSTARS", mainItems, 10, 0);
     gTitleAnim = false;
-    if (choice < 0) return;
+    if (choice < 0) break; // V5.18 : BACK = retour au LANCEUR (plus de sortie directe)
     waitRelease();
     if (choice == 0) {
       int selMode = modeTileScreen(); // V5.16 : selection des modes en TUILES facon BS
@@ -5702,7 +6107,8 @@ void ion_main(int argc, char *argv[]) {
       while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); } // V5.17 FIX : attend un VRAI appui OK (avant : l'ecran clignotait et sortait aussitot)
       prevOK = false;
     }
-  }
+  } // fin du menu BRAWL MICROSTARS
+  } // fin du lanceur (V5.18)
 }
 
 // --- Entry point reel : sans main, --gc-sections supprime tout le jeu ---

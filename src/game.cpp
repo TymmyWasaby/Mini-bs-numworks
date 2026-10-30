@@ -5833,6 +5833,7 @@ struct AuBot {
   int state;            // 0 marche, 1 tache, 2 erre, 3 panique
   float t;              // timer de tache
   bool alive, panic, witness, imp;
+  float flee;           // V5.20 : l'imposteur PNJ s'ecarte des cadavres qu'il decouvre
   int tasks[4], taskI;  // SES 4 taches personnelles
 };
 static AuBot auB[6];
@@ -5879,6 +5880,7 @@ static void amongUsGame() {
   float px = 30 * 8.0f + 4.0f, py = 8 * 8.0f + 4.0f; // spawn cafeteria
   int playerDir = 1, pTasks[4], pTaskI = 0;
   float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 2.6f, impKillCd = 7.0f;
+  bool gSus = false; // V5.20 : fausse accusation en attente — le prochain vote te condamne
   for (int i = 0; i < 4; i++) { // MES taches (si equipage)
     int t = rnd(12);
     for (int j = 0; j < i; j++) if (pTasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
@@ -5889,7 +5891,7 @@ static void amongUsGame() {
     AuBot &b = auB[i];
     b.x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
     b.y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
-    b.alive = true; b.panic = false; b.witness = false;
+    b.alive = true; b.panic = false; b.witness = false; b.flee = 0;
     b.imp = (!meImp && i == impBot);
     b.taskI = 0; b.t = 0;
     for (int k = 0; k < 4; k++) { // 4 taches personnelles par membre d'equipage
@@ -5900,7 +5902,7 @@ static void amongUsGame() {
     auNextTask(b);
   }
   float totalTasks = 24.0f; // 6 equipages x 4 taches (5 bots + toi si tu es equipage)
-  bool pOK = false, pExp = false, pBack = false;
+  bool pOK = false, pExp = false, pBack = false, pPlus = false;
   int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 temoin/signale, 4 abandon, 5 equip gagne, 6 tue
   float dt = 0.033f;
   while (!endScreen) {
@@ -5925,10 +5927,13 @@ static void amongUsGame() {
     if (meetT > 0) { // REUNION : tout le monde s'arrete, puis les corps sont nettoyes
       meetT -= dt;
       if (meetT <= 0) {
-        auBodyN = 0;
-        for (int i = 0; i < 6; i++)
-          if (auB[i].alive) { auB[i].panic = false; auB[i].witness = false; auNextTask(auB[i]); }
-        killCd = 10.0f; impKillCd = 8.0f;
+        if (gSus) endScreen = 7; // V5.20 : ta fausse accusation a ete decelée — c'est TOI qui es ejete
+        else {
+          auBodyN = 0;
+          for (int i = 0; i < 6; i++)
+            if (auB[i].alive) { auB[i].panic = false; auB[i].witness = false; auNextTask(auB[i]); }
+          killCd = 10.0f; impKillCd = 8.0f;
+        }
       }
     } else {
       // ---- deplacement joueur ----
@@ -5987,6 +5992,25 @@ static void amongUsGame() {
           }
         }
       }
+      // ---- V5.20 : SIGNALER (+) : accuser le bot le plus proche d'etre l'imposteur ----
+      // Bonne pioche : il est ejete (victoire en equipage). Mauvaise pioche : il est ejete
+      // quand meme, mais tu restes SUSPICION — et au prochain vote/signal, c'est TOI.
+      if (kPlus && !pPlus) {
+        if (gSus) endScreen = 7; // tu avais deja accuse un innocent : ejete
+        else {
+          float bd = 1e9; int bi = -1;
+          for (int i = 0; i < 6; i++) {
+            if (!auB[i].alive) continue;
+            float ddx = auB[i].x - px, ddy = auB[i].y - py;
+            float d2 = ddx * ddx + ddy * ddy;
+            if (d2 < bd) { bd = d2; bi = i; }
+          }
+          if (bi >= 0 && bd < 24 * 24) {
+            if (auB[bi].imp) endScreen = 3; // bien joue : l'imposteur est demasque !
+            else { auB[bi].alive = false; gSus = true; } // accuse a tort...
+          }
+        }
+      }
     }
     // ---- pause ----
     if (keyBack && !pBack) {
@@ -6013,9 +6037,19 @@ static void amongUsGame() {
         continue;
       }
       // un bot vivant passe pres d'un cadavre ? il va le signaler (le corps ne designe personne)
+      b.flee -= dt; if (b.flee < 0) b.flee = 0;
       for (int c = 0; c < auBodyN; c++) {
         float ddx = auBodyX[c] - b.x, ddy = auBodyY[c] - b.y;
-        if (ddx * ddx + ddy * ddy < 30 * 30) { b.witness = false; auPanicTo(b); break; }
+        if (ddx * ddx + ddy * ddy < 30 * 30) {
+          if (b.imp) { // V5.20 : l'imposteur PNJ ne DECLARE JAMAIS un corps : il s'en ecarte
+            if (b.flee <= 0) {
+              int n = rnd(AUN);
+              auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
+              b.state = 0; b.flee = 4.0f;
+            }
+          } else { b.witness = false; auPanicTo(b); }
+          break;
+        }
       }
       if (b.panic) continue;
       // l'imposteur PNJ chasse quand il est seul avec quelqu'un
@@ -6076,12 +6110,25 @@ static void amongUsGame() {
       }
       auBotWalk(b, dt, 30.0f);
       if (auBotArrived(b)) {
-        if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
+        if (b.imp && impKillCd <= 0) { // V5.20 : l'imposteur PNJ FAIT SEMBLANT de faire ses
+          // taches... et des que son kill est pret, il se met a TRAQUER le plus proche
+          float bd = 1e9; int vi = -1;
+          for (int v = 0; v < 6; v++) {
+            if (!auB[v].alive || auB[v].imp) continue;
+            float ddx = auB[v].x - b.x, ddy = auB[v].y - b.y;
+            float d2 = ddx * ddx + ddy * ddy;
+            if (d2 < bd) { bd = d2; vi = v; }
+          }
+          if (vi >= 0) auSetDest(b, auB[vi].x, auB[vi].y); // il se dirige vers sa victime
+          else if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
+          else auNextTask(b);
+        }
+        else if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
         else auNextTask(b); // taches finies : il erre
       }
     }
     if (auTaskBar >= 1.0f) endScreen = meImp ? 2 : 5; // taches finies : l'equipage gagne
-    pOK = keyOK; pExp = kExp; pBack = keyBack;
+    pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus;
 
     // ===================== RENDU =====================
     int camX = (int)px - SW / 2; if (camX < 0) camX = 0; if (camX > AUW * 8 - SW) camX = AUW * 8 - SW;
@@ -6145,17 +6192,18 @@ static void amongUsGame() {
     // HUD bas : selon le role
     fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
     if (meImp) {
-      drawText(4, SH - 10, "OK:TUER EXE:VENT", KDColor::RGB24(0xD6E0F0));
+      drawText(4, SH - 10, "OK:TUER EXE:VENT +:SIGN", KDColor::RGB24(0xD6E0F0));
       fRect(160, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
       fRect(161, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
     } else {
-      drawText(4, SH - 10, pTaskI < 4 ? "OK (MAINTENIR): TACHE" : "TACHES FINIES", KDColor::RGB24(0xD6E0F0));
+      drawText(4, SH - 10, "OK:TACHE +:SIGNALER", KDColor::RGB24(0xD6E0F0));
       if (pTaskI < 4) {
-        drawText(176, SH - 10, "TACHE:", C_GRE); drawNum(232, SH - 10, pTaskI + 1, C_ORG);
-        fRect(252, SH - 9, 60, 7, KDColor::RGB24(0x3A4A4A));
-        fRect(253, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));
+        fRect(236, SH - 9, 60, 7, KDColor::RGB24(0x3A3A4A));
+        fRect(237, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));
+        drawNum(300, SH - 10, pTaskI + 1, C_ORG);
       }
     }
+    if (gSus) drawText(256, 3, "SUS!", KDColor::RGB24(0xC51111)); // V5.20 : tu es suspect
     if (meetT > 0) { // bandeau reunion
       fRect(0, 100, SW, 40, KDColor::RGB24(0x1B1B25));
       drawTextC(112, "REUNION : CORPS SIGNALE", KDColor::RGB24(0xC51111));
@@ -6177,15 +6225,16 @@ static void amongUsGame() {
     saveAcc();
   }
   if (endScreen == 5) { auWins++; saveAcc(); }
-  if (endScreen == 6) saveAcc();
+  if (endScreen == 6 || endScreen == 7) saveAcc();
   bgPanel();
-  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen == 6) ? "ELIMINE..." : "PERDU !";
+  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen == 6 || endScreen == 7) ? "ELIMINE..." : "PERDU !";
   const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE"
                  : (endScreen == 2 && meImp) ? "L'EQUIPAGE A FINI SES TACHES"
                  : (endScreen == 2 && !meImp) ? "TOUTES LES TACHES SONT FINIES"
                  : (endScreen == 3) ? (meImp ? "UN TEMOIN T'A SIGNALE !" : "L'IMPOSTEUR A ETE EJECTE")
                  : (endScreen == 5) ? "TES 4 TACHES SONT FINIES"
-                 : (endScreen == 6) ? "L'IMPOSTEUR T'A EU..." : "";
+                 : (endScreen == 6) ? "L'IMPOSTEUR T'A EU..."
+                 : (endScreen == 7) ? "FAUSSE ACCUSATION : EJECTE" : "";
   drawTextC(60, t1, won ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
   drawTextC(80, t2, C_WHT);
   drawTextC(130, "VICTOIRES AU TOTAL:", C_GRE); drawNum(SW / 2 + 100, 130, auWins, C_ORG);

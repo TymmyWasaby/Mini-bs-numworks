@@ -1345,7 +1345,7 @@ static int auWins = 0, auKills = 0, auBestS = 0; // V5.18 : stats Among Us Micro
 static int gFps60 = 0; // V5.14 : option "60 FPS" (0 = 30 fps par defaut, plus fluide a 1 mais plus gourmand)
 static int gFpsShow = 0; // V5.16 : afficher le compteur FPS en match
 static void saveAcc() {
-  uint8_t buf[776]; // 776 octets reels (V5.16 : +330 stats par brawler + 1 fpsShow)
+  uint8_t buf[782]; // V5.18 FIX CRASH : 782 octets reels (+6 stats Among Us) — le buffer restait a 776, debordement de pile au 1er lancement !
   int p = 0;
   for (int i = 0; i < 55; i++) {
     buf[p++] = (uint8_t)acc.b[i].level;

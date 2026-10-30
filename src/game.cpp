@@ -1614,6 +1614,7 @@ struct Ent {
   bool isPet; int petOwner; uint8_t petKind; float petLife; // creature invoquee (0=ours 1=tourelle 2=station de soin)
   float stealthT, shieldT; // invisibilite (Leon/Sandy) et bouclier (Rosa)
   float slowT; // ralenti (drones de Bea, spray d Emz, balles de Piper)
+  float stunT; // V5.19 : etourdi par le taser de Buzz — ni bouger, ni tirer
   float blindT; // V5.13b : aveugle (super de Jacky) : ne voit plus rien, erre sans tirer
   float atkCharge; // charge de Hank : maintenir l'attaque pour gonfler le ballon
   float mechT; // Meg : temps restant en mega robot (super)
@@ -1945,7 +1946,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0; e.beaCharge = false;
   e.aiRvIdx = -1; e.aiRvT = 0; e.aiTilt = 0; // V5.17
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
 }
 
 // invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
@@ -1975,7 +1976,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0; e.aiOnObj = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
   e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
@@ -2322,6 +2323,9 @@ static void doSuper(Ent &e, float ang) {
         e.dashDx = (int)(fcosf(ang) * 330); e.dashDy = (int)(fsinf(ang) * 330);
       } else if (e.brawlerIdx == 14) { // V5.17 : Darryl — long tonneau qui REBONDIT sur les murs (sans les casser)
         e.dashT = 0.8f; e.dashDx = (int)(fcosf(ang) * 340); e.dashDy = (int)(fsinf(ang) * 340);
+      } else if (e.brawlerIdx == 31) { // V5.19 : Buzz — coup de taser : il fonce mais fait 0 degat, il ETOURDIT
+        e.dashT = 0.4f;
+        e.dashDx = (int)(fcosf(ang) * 360); e.dashDy = (int)(fsinf(ang) * 360);
       } else if (e.brawlerIdx == 34) { // Fang : le coup volant — il FONCE sur l'ennemi le plus
         // proche puis REBONDIT d'ennemi en ennemi proche, SANS casser ni traverser les murs
         bool hit[MAX_ENT] = {};
@@ -2435,6 +2439,17 @@ static void doSuper(Ent &e, float ang) {
       break;
     }
     case SUP_SUMMON: { // creature invoquee (Nita ours, Jessie/8-Bit/Penny tourelle, Pam station, Ash rats, Lola ego, Mr. P pingouins)
+      if (e.brawlerIdx == 15) { // V5.19 : Penny — FINI la tourelle qui ne touche que les cibles immobiles :
+        // son ulti devient une PLUIE DE PIECES facon Dynamike : 3 impacts de mortier en eventail,
+        // zone d'attaque visee, degats seulement si l'ennemi reste dedans a l'impact
+        gForceLob = true;
+        fireProj(e, ang - 14 * 0.01745f, true, mul * 0.5f, 0.8f, 0.85f);
+        fireProj(e, ang, true, mul * 0.7f, 0.8f, 1.0f);
+        fireProj(e, ang + 14 * 0.01745f, true, mul * 0.5f, 0.8f, 0.85f);
+        gForceLob = false;
+        spawnParts(e.x, e.y, 1, 8);
+        break;
+      }
       int kind = 1;
       if (e.brawlerIdx == 1) kind = 0; // Nita : ours
       else if (e.brawlerIdx == 11) kind = 6; // Tick : sa tete-mine
@@ -2622,6 +2637,7 @@ static float nearestEnemyDist(Ent &e, Ent **out) {
 static void shootBall(Ent &e, float ang); // declaree ici : updateAI l'utilise avant sa definition
 
 static void updateAI(Ent &e, float dt) {
+  if (e.stunT > 0) return; // V5.19 : tase par Buzz — completement fige, il ne bouge plus
   // V5.13b : AVEUGLE (super de Jacky) : le bot ne voit plus rien, erre au hasard et ne tire plus
   if (e.blindT > 0) {
     if (e.aiThinkT <= 0) {
@@ -3115,7 +3131,7 @@ static void updateMatch(float dt) {
     if (me.accIdx >= 0 && acc.b[me.accIdx].starPower && d.star == STAR_SPEED) spd *= 1.1f;
     float dx = (kRight ? 1 : 0) - (kLeft ? 1 : 0);
     float dy = (kDown ? 1 : 0) - (kUp ? 1 : 0);
-    if (dx || dy) { float l = sqrtf(dx * dx + dy * dy); moveEnt(me, dx / l * spd * dt, dy / l * spd * dt); }
+    if (me.stunT <= 0 && (dx || dy)) { float l = sqrtf(dx * dx + dy * dy); moveEnt(me, dx / l * spd * dt, dy / l * spd * dt); } // V5.19 : tase = immobile
     // --- Commandes V5.3 : OK/var = attaque vers la direction du perso,
     //     RETOUR = ulti, HOME = quitter (sans ecran de resultat) ---
     bool shotUlti = keyBack && !prevBack;
@@ -3140,6 +3156,9 @@ static void updateMatch(float dt) {
         if (me.attackT <= 0 && me.ammo >= 1) shotAtk = true; // relachement : on lance
         else me.atkCharge = 0;
       }
+    }
+    if (me.stunT > 0) { // V5.19 : tase par Buzz — ni bouger, ni tirer, ni ulti
+      dx = 0; dy = 0; shotAtk = false; shotUlti = false;
     }
     // V5.15 : le tir automatique VISE L'ENNEMI LE PLUS PROCHE meme quand on se deplace —
     // les fleches servent a bouger, pas a viser (comme l'auto-visse de BS)
@@ -3181,6 +3200,7 @@ static void updateMatch(float dt) {
     if (e.isBoss) e.mechT = 1.0f; // le boss du Siege reste en mega robot
     e.tpCd -= dt; // recharge du teleporteur
     if (e.slowT > 0) e.slowT -= dt;
+    if (e.stunT > 0) e.stunT -= dt; // V5.19 : taser de Buzz
     if (e.blindT > 0) e.blindT -= dt; // V5.13b : aveuglement (super de Jacky)
     if (e.hyperT > 0) e.hyperT -= dt;
     if (e.lastHitT > 0) e.lastHitT -= (int)(dt * 1000);
@@ -3200,7 +3220,7 @@ static void updateMatch(float dt) {
       }
       // seuls les dashs "classiques" (Bull, El Primo...) defoncent les murs —
       // V5.17 : Darryl (comme Stu/Colette/Piper) REBONDIT dessus sans les casser
-      if (e.brawlerIdx != 14 && e.brawlerIdx != 20 && e.brawlerIdx != 29 && e.brawlerIdx != 50)
+      if (e.brawlerIdx != 14 && e.brawlerIdx != 20 && e.brawlerIdx != 29 && e.brawlerIdx != 31 && e.brawlerIdx != 50)
         breakWalls(e.x, e.y, 14); // la charge defonce les murs sur son passage
       float dashOX = e.x, dashOY = e.y;
       moveEnt(e, e.dashDx * dt, e.dashDy * dt);
@@ -3211,7 +3231,10 @@ static void updateMatch(float dt) {
       for (int j = 0; j < entCount; j++)
         if (ents[j].alive && ents[j].team != e.team) {
           float ddx = ents[j].x - e.x, ddy = ents[j].y - e.y;
-          if (ddx * ddx + ddy * ddy < 20 * 20) damageEnt(ents[j], 2200, e);
+          if (ddx * ddx + ddy * ddy < 20 * 20) {
+            if (e.brawlerIdx == 31) ents[j].stunT = fmaxf(ents[j].stunT, 1.6f); // V5.19 : Buzz = TASER : 0 degat mais ETOURDI
+            else damageEnt(ents[j], 2200, e);
+          }
         }
     }
     // Carl booste : il blesse les ennemis qu'il traverse pendant 5 s
@@ -3485,6 +3508,25 @@ static void updateMatch(float dt) {
           float ddx = t.x - p.x, ddy = t.y - p.y;
           if (ddx * ddx + ddy * ddy < R * R) damageEnt(t, p.dmg, ents[p.owner]);
         }
+        // V5.19 : les explosions REPOUSSENT les brawlers ennemis (et l'ecran glisse dans
+        // le sens du recul pour TOI). Les explosions de MORT de brawler restent purement
+        // visuelles : elles ne repoussent personne (elles ne passent pas par ici).
+        {
+          float kR = R + 42.0f;
+          for (int j = 0; j < entCount; j++) {
+            Ent &t = ents[j];
+            if (!t.alive || t.team == p.team || t.isPet) continue;
+            float ddx = t.x - p.x, ddy = t.y - p.y;
+            float dd = sqrtf(ddx * ddx + ddy * ddy);
+            if (dd > 1 && dd < kR) {
+              float push = (p.fromSuper ? 54.0f : 36.0f) * (1.0f - dd / kR);
+              moveEnt(t, ddx / dd * push, ddy / dd * push);
+              if (t.isHuman) { // le recul s'affiche : l'ecran part du cote ou on vole
+                shakeDX = ddx / dd * 4; shakeDY = ddy / dd * 4; shakeT = 170; shakeMag = 3;
+              }
+            }
+          }
+        }
         if (mode == MODE_HEIST)
           for (int s = 0; s < MAX_SAFE; s++) {
             if (safes[s].hp <= 0 || safes[s].team == p.team) continue;
@@ -3660,16 +3702,11 @@ static void updateMatch(float dt) {
           if (ents[i].team == 0) myTeamHere++; else enTeamHere++;
         }
       }
-      // V5.13 : capture VERROUILLEE — la premiere equipe seule dans la zone s'en approprie la
-      // progression, l'adversaire ne peut plus la faire redescendre (il peut juste la bloquer)
-      if (myTeamHere > 0 && enTeamHere == 0) {
-        if (zones[z].owner == -1) zones[z].owner = 0;
-        if (zones[z].owner == 0) zones[z].prog = fminf(100, zones[z].prog + 9 * dt);
-      }
-      if (enTeamHere > 0 && myTeamHere == 0) {
-        if (zones[z].owner == -1) zones[z].owner = 1;
-        if (zones[z].owner == 1) zones[z].prog = fmaxf(-100, zones[z].prog - 9 * dt);
-      }
+      // V5.13 : capture VERROUILLEE — REMPLACEE en V5.19 : le verrou bloquait la
+      // 2e zone des qu l'ennemi l'avait entamee. Une zone tenue par une seule equipe
+      // REPART dans SON sens, meme si l'adversaire l'avait commencee. Zone contestee = gelee.
+      if (myTeamHere > 0 && enTeamHere == 0) zones[z].prog = fminf(100, zones[z].prog + 9 * dt);
+      if (enTeamHere > 0 && myTeamHere == 0) zones[z].prog = fmaxf(-100, zones[z].prog - 9 * dt);
       if (zones[z].prog < 100) all0 = 0;
       if (zones[z].prog > -100) all1 = 0;
     }
@@ -5661,43 +5698,110 @@ static void trainingMode(int myBrawler) {
   }
 }
 
-// ====================  V5.18 : AMONG US MICRO  ========================
-// 2e jeu du projet ! Tu es l'IMPOSTEUR : elimine les 6 membres d'equipage
-// avant que les TACHES ne soient terminees, sans te faire signaler.
-// FLECHES: bouger | OK: TUER (cooldown) | EXE/TOOLBOX: VENTILO | RETOUR: pause
-#define AUW 40
-#define AUH 30
+// ====================  V5.19 : AMONG US MICRO  ========================
+// 2e jeu du projet, facon vrai Among Us : GRANDE carte (60x45 cases, la
+// camera suit le joueur), vision limitee, chaque membre d'equipage a 4
+// TACHES a faire aux 4 coins du vaisseau, et on n'est PAS toujours
+// imposteur : parfois un PNJ l'est et toi tu fais tes taches.
+// Un cadavre ne designe PERSONNE : tant qu'aucun temoin ne t'a VU tuer,
+// la reunion te laisse en vie. Mais un temoin qui signale = ejection.
+// FLECHES: bouger | OK: TUER (imposteur) / FAIRE UNE TACHE (equipage)
+// EXE/TOOLBOX: ventilo (imposteur) | RETOUR: pause
+#define AUW 60
+#define AUH 45
+#define AUN 23
 static const char *AU_MAP[AUH] = {
-"########################################",
-"########################################",
-"########################################",
-"###............##########............###",
-"###............##########............###",
-"###...B.......................T......###",
-"###..................................###",
-"###..................................###",
-"###.......T....##########............###",
-"###..........V.##########............###",
-"###.............##############...#######",
-"#####...#####...##############...#######",
-"#####...#####...##############...#######",
-"##.......####...############..........##",
-"##.......####...############..........##",
-"##..T...........############..........##",
-"##..............############.....T....##",
-"##..............############..........##",
-"##.......####..........#####..........##",
-"##.V.....#####.........#####.......V..##",
-"##.......#####.........#####..........##",
-"#####...######.........#####..........##",
-"#####...######...T.....#######...#######",
-"###........###.........#######...#######",
-"###...................................##",
-"###...T...............................##",
-"###..................V...........V....##",
-"###........###.........#######........##",
-"########################################",
-"########################################"};
+"############################################################",
+"############################################################",
+"############################################################",
+"######################................#########..........###",
+"####.........#########..T.....B.......#########..T.......###",
+"####.........#########...................................###",
+"####.T.......#########...................................###",
+"####.....................................................###",
+"####..................................#########..........###",
+"####..................................#########..........###",
+"####.........#########................###############...####",
+"####.........#########................###############...####",
+"####.........#########............T...###############...####",
+"####.V.......#########................###############...####",
+"####.........###########........#####################...####",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"######...###############.....T..####################......##",
+"######...###############........####################....V.##",
+"###........#############........#...........########......##",
+"###........#############...######.........T.########......##",
+"###.T......#############...######.........................##",
+"###........#############...######.........................##",
+"###........#############...######.........................##",
+"###........#...............######...........########....T.##",
+"###..........V.............######.V.........########......##",
+"###........................######...........########...#####",
+"###........................##########...############...#####",
+"###........#...............##########...############...#####",
+"###........#...............##########...############...#####",
+"############...............##########...############...#####",
+"############....................#####...######...........###",
+"############..T.................###.........##.........V.###",
+"############....................###.T.......##...........###",
+"############................................##...........###",
+"#####################....................................###",
+"#####################....................................###",
+"#####################...........###......................###",
+"#####################...........###.........##...........###",
+"#####################..T........##############..T........###",
+"#####################...........##############...........###",
+"############################################################",
+"############################################################",
+"############################################################",
+};
+"############################################################",
+"############################################################",
+"############################################################",
+"######################................#########..........###",
+"####.........#########..T.....B.......#########..T.......###",
+"####.........#########...................................###",
+"####.T.......#########...................................###",
+"####.....................................................###",
+"####..................................#########..........###",
+"####..................................#########..........###",
+"####.........#########................###############...####",
+"####.........#########................###############...####",
+"####.........#########............T...###############...####",
+"####.V.......#########................###############...####",
+"####.........###########........#####################...####",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"######...###############.....T..####################......##",
+"######...###############........####################....V.##",
+"######...###############........####################......##",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"######...###############........#####################...####",
+"###........#############...######.........................##",
+"###........#...............######...........########....T.##",
+"###..........V.............######.V.........########......##",
+"###........................######...........########...#####",
+"###........................##########...############...#####",
+"###........#...............##########...############...#####",
+"###........#...............##########...############...#####",
+"############...............##########...############...#####",
+"############....................#####...######...........###",
+"############..T.................###.........##.........V.###",
+"############....................###.T.......##...........###",
+"############................................##...........###",
+"#####################....................................###",
+"#####################....................................###",
+"#####################...........###......................###",
+"#####################...........###.........##...........###",
+"#####################..T........##############..T........###",
+"#####################...........##############...........###",
+"############################################################",
+"############################################################",
+"############################################################"};
 static char auCell(int cx, int cy) {
   if (cx < 0 || cy < 0 || cx >= AUW || cy >= AUH) return '#';
   return AU_MAP[cy][cx];
@@ -5708,23 +5812,25 @@ static bool auFree(float x, float y) { // les 4 coins du bean
   if (auSolidPx(x - 3.5f, y + 4.0f) || auSolidPx(x + 3.5f, y + 4.0f)) return false;
   return true;
 }
-// ---- waypoints (cases) + graphe : les bots patrouillent de salle en salle ----
-static const int AU_NX[13] = { 8, 31, 33, 33, 18, 6, 5, 11, 18, 14, 20, 31, 14};
-static const int AU_NY[13] = { 6,  6, 17, 25, 25, 25,16, 16, 22, 14,  6, 11, 10};
-static const int AU_ADJ[13][4] = {
-  {10,12,-1,-1}, {10,11,-1,-1}, {11,3,-1,-1}, {2,4,-1,-1}, {3,5,8,-1},
-  {4,6,-1,-1}, {5,7,-1,-1}, {6,9,-1,-1}, {4,9,-1,-1}, {7,8,12,-1},
-  {0,1,-1,-1}, {1,2,-1,-1}, {0,9,-1,-1}};
-static int auNH[13]; // auNH[i] = prochaine etape pour rejoindre la CAFETERIA (noeud 0)
-static void auInitNav() {
-  for (int i = 0; i < 13; i++) auNH[i] = -1;
-  auNH[0] = 0;
+// ---- waypoints (23 noeuds) : salles + jonctions, aretes toutes droites ----
+static const int AU_NX[AUN] = { 7, 30, 30, 54, 25, 25, 11,  7, 16, 16, 21, 21, 26, 39, 44, 51, 53, 53, 53, 53, 53, 38, 39};
+static const int AU_NY[AUN] = { 8,  8,  6,  6, 16, 27, 27, 27, 27, 31, 31, 37, 37, 37, 37, 37, 32, 26, 23, 13,  9, 23, 33};
+static const int AU_ADJ[AUN][3] = {
+  { 1, -1, -1}, { 0,  2, -1}, { 1,  3,  4}, { 2, -1, -1}, { 2,  5, -1},
+  { 4,  6,  8}, { 5,  7, -1}, { 6,  8, -1}, { 5,  7,  9}, { 8, 10, -1},
+  { 9, 11, -1}, {10, 12, -1}, {11, 13, -1}, {12, 14, 22}, {13, 15, -1},
+  {14, -1, -1}, {17, -1, -1}, {16, 18, -1}, {17, 19, 21}, {18, 20, -1},
+  {19, -1, -1}, {18, 22, -1}, {21, 13, -1}};
+static int auNH[AUN];
+static void auRouteTo(int dest) { // BFS : prochain saut de chaque noeud pour rejoindre dest
+  for (int i = 0; i < AUN; i++) auNH[i] = -1;
+  auNH[dest] = dest;
   bool prog = true;
   while (prog) {
     prog = false;
-    for (int i = 0; i < 13; i++) {
+    for (int i = 0; i < AUN; i++) {
       if (auNH[i] >= 0) continue;
-      for (int k = 0; k < 4; k++) {
+      for (int k = 0; k < 3; k++) {
         int j = AU_ADJ[i][k];
         if (j < 0) break;
         if (auNH[j] >= 0) { auNH[i] = j; prog = true; break; }
@@ -5732,11 +5838,21 @@ static void auInitNav() {
     }
   }
 }
-static const int AU_TX[6] = {10, 30, 33,  6,  4, 17}; // taches (cases)
-static const int AU_TY[6] = { 8,  5, 16, 25, 15, 22};
-static const int AU_TN[6] = { 0,  1,  2,  5,  6,  8}; // noeud rattache
-static const int AU_VX[5] = {13,  3, 21, 35, 33};     // ventilos (cases)
-static const int AU_VY[5] = { 9, 19, 26, 19, 26};
+static int auNearestNode(float x, float y) {
+  int best = 0; float bd = 1e9;
+  for (int i = 0; i < AUN; i++) {
+    float dx = AU_NX[i] * 8.0f + 4.0f - x, dy = AU_NY[i] * 8.0f + 4.0f - y;
+    float d2 = dx * dx + dy * dy;
+    if (d2 < bd) { bd = d2; best = i; }
+  }
+  return best;
+}
+static const int AU_TX[12] = { 5, 24, 34, 49, 56, 48, 36, 23, 14,  4, 42, 29}; // taches
+static const int AU_TY[12] = { 6,  4, 12,  4, 25, 40, 34, 40, 33, 22, 21, 18};
+static const int AU_VX[5]  = { 5, 13, 55, 56, 34};                              // ventilos
+static const int AU_VY[5]  = {13, 26, 33, 19, 26};
+#define AU_BTNX (30 * 8 + 4) // bouton d'alerte de la cafeteria
+#define AU_BTNY (4 * 8 + 4)
 static const uint32_t AU_COL[7] = {0xC51111, 0x132ED1, 0x117F2D, 0xED54BA, 0xF07D0D, 0xD6E0F0, 0x38FEDC};
 
 // un petit crewmate/imposteur : corps arrondi + visiere + sac a dos
@@ -5756,75 +5872,163 @@ static void drawCorpse(int x, int y, KDColor col) {
   fCirc(x - 6, y + 3, 2, KDColor::RGB24(0xF2F2F2));
 }
 
-struct AuBot { float x, y; int node, tgt, prev, state; float t; bool panic; };
-static AuBot auBots[6];
-static bool auBotAlive[6];
-static float auBodyX[6], auBodyY[6]; static uint32_t auBodyCol[6]; static int auBodyN = 0;
+struct AuBot {
+  float x, y, dx, dy;   // position + destination finale
+  int path[6], pi, pn;  // noeuds a traverser
+  int state;            // 0 marche, 1 tache, 2 erre, 3 panique
+  float t;              // timer de tache
+  bool alive, panic, witness, imp;
+  int tasks[4], taskI;  // SES 4 taches personnelles
+static AuBot auB[6];
+static float auBodyX[6], auBodyY[6]; static uint32_t auBodyC[6]; static int auBodyN = 0;
+static float auTaskBar = 0.0f; // 0..1 : progression de TOUTES les taches d'equipage
+
+static void auSetDest(AuBot &b, float tx, float ty) {
+  b.dx = tx; b.dy = ty;
+  int cur = auNearestNode(b.x, b.y);
+  int dst = auNearestNode(tx, ty);
+  auRouteTo(dst);
+  b.pn = 0; b.pi = 0;
+  int n = cur;
+  while (n != dst && b.pn < 5) { n = auNH[n]; if (n < 0) break; b.path[b.pn++] = n; }
+}
+static void auBotWalk(AuBot &b, float dt, float spd) {
+  float tx = (b.pi < b.pn) ? AU_NX[b.path[b.pi]] * 8.0f + 4.0f : b.dx;
+  float ty = (b.pi < b.pn) ? AU_NY[b.path[b.pi]] * 8.0f + 4.0f : b.dy;
+  float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
+  if (dl < 2.0f) { if (b.pi < b.pn) b.pi++; return; }
+  b.x += ddx / dl * spd * dt; b.y += ddy / dl * spd * dt;
+}
+static bool auBotArrived(AuBot &b) {
+  float ddx = b.dx - b.x, ddy = b.dy - b.y;
+  return (b.pi >= b.pn) && (ddx * ddx + ddy * ddy < 4.0f);
+}
+static void auPanicTo(AuBot &b) { // il fonce vers le bouton d'alerte
+  b.panic = true; b.state = 3;
+  auSetDest(b, AU_BTNX, AU_BTNY);
+}
+static void auNextTask(AuBot &b) { // lui fixe sa tache suivante comme destination
+  b.state = 0;
+  if (b.taskI < 4) auSetDest(b, AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f);
+  else { // taches finies : il erre de salle en salle
+    int n = rnd(AUN);
+    auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
+  }
+}
 
 static void amongUsGame() {
-  auInitNav();
-  auBodyN = 0;
-  float px = 8 * 8 + 4, py = 6 * 8 + 4; // spawn cafeteria
-  int auAlive = 6;
-  float taskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f;
-  int playerDir = 1;
-  const int startNodes[6] = {1, 3, 5, 6, 8, 10};
-  for (int i = 0; i < 6; i++) {
-    auBots[i].x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
-    auBots[i].y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
-    auBots[i].node = startNodes[i]; auBots[i].prev = startNodes[i];
-    int first = AU_ADJ[startNodes[i]][rnd(4)]; if (first < 0) first = 0;
-    auBots[i].tgt = first; auBots[i].state = 0; auBots[i].t = 0; auBots[i].panic = false;
-    auBotAlive[i] = true;
+  auBodyN = 0; auTaskBar = 0.0f;
+  bool meImp = (rnd(100) < 45); // 45% imposteur, sinon membre d'equipage
+  int impBot = rnd(6);          // l'imposteur PNJ (si on est equipage)
+  float px = 30 * 8.0f + 4.0f, py = 8 * 8.0f + 4.0f; // spawn cafeteria
+  int playerDir = 1, pTasks[4], pTaskI = 0;
+  float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 2.6f, impKillCd = 7.0f;
+  for (int i = 0; i < 4; i++) { // MES taches (si equipage)
+    int t = rnd(12);
+    for (int j = 0; j < i; j++) if (pTasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
+    pTasks[i] = t;
   }
+  const int startNodes[6] = {3, 7, 9, 12, 15, 21};
+  for (int i = 0; i < 6; i++) {
+    AuBot &b = auB[i];
+    b.x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
+    b.y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
+    b.alive = true; b.panic = false; b.witness = false;
+    b.imp = (!meImp && i == impBot);
+    b.taskI = 0; b.t = 0;
+    for (int k = 0; k < 4; k++) { // 4 taches personnelles par membre d'equipage
+      int t = rnd(12);
+      for (int j = 0; j < k; j++) if (b.tasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
+      b.tasks[k] = t;
+    }
+    auNextTask(b);
+  }
+  float totalTasks = 24.0f; // 6 equipages x 4 taches (5 bots + toi si tu es equipage)
   bool pOK = false, pExp = false, pBack = false;
-  int endScreen = 0; // 0=rien, 1=victoire, 2=taches, 3=signale
+  int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 temoin/signale, 4 abandon, 5 equip gagne, 6 tue
   float dt = 0.033f;
   while (!endScreen) {
     pollKeys();
-    if (kHome) break;
+    if (kHome) { endScreen = 4; break; }
+    if (introT > 0) { // revelation du role
+      introT -= dt;
+      if (keyOK && !pOK) introT = 0;
+      pOK = keyOK;
+      fRect(0, 90, SW, 60, KDColor::RGB24(0x1B1B25));
+      drawTextC(104, meImp ? "TU ES L'IMPOSTEUR" : "TU ES MEMBRE D'EQUIPAGE", meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
+      drawTextC(126, meImp ? "ELIMINE TOUT LE MONDE" : "FAIS TES 4 TACHES", C_GRE);
+      drawTextC(140, "PERSONNE NE DOIT TE VOIR", C_GRE);
+      blit();
+      Ion::Timing::msleep(30);
+      continue;
+    }
     gTime += dt;
     killCd -= dt; if (killCd < 0) killCd = 0;
     ventCd -= dt; if (ventCd < 0) ventCd = 0;
-    // ---- deplacement joueur ----
-    float spd = 68.0f * dt;
-    float dx = 0, dy = 0;
-    if (kLeft) dx -= spd; if (kRight) dx += spd;
-    if (kUp) dy -= spd; if (kDown) dy += spd;
-    if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
-    if (dx && auFree(px + dx, py)) px += dx;
-    if (dy && auFree(px, py + dy)) py += dy;
-    // ---- TUER (OK) : bot vivant a portee, sinon rien ----
-    if (keyOK && !pOK && killCd <= 0) {
-      float bd = 1e9; int bi = -1;
-      for (int i = 0; i < 6; i++) {
-        if (!auBotAlive[i]) continue;
-        float ddx = auBots[i].x - px, ddy = auBots[i].y - py;
-        float d2 = ddx * ddx + ddy * ddy;
-        if (d2 < bd) { bd = d2; bi = i; }
+    impKillCd -= dt; if (impKillCd < 0) impKillCd = 0;
+    if (meetT > 0) { // REUNION : tout le monde s'arrete, puis les corps sont nettoyes
+      meetT -= dt;
+      if (meetT <= 0) {
+        auBodyN = 0;
+        for (int i = 0; i < 6; i++)
+          if (auB[i].alive) { auB[i].panic = false; auB[i].witness = false; auNextTask(auB[i]); }
+        killCd = 10.0f; impKillCd = 8.0f;
       }
-      if (bi >= 0 && bd < 17 * 17) {
-        auBotAlive[bi] = false; auAlive--;
-        auBodyX[auBodyN] = auBots[bi].x; auBodyY[auBodyN] = auBots[bi].y;
-        auBodyCol[auBodyN] = AU_COL[bi + 1]; auBodyN++;
-        auKills++; killCd = 10.0f;
-        for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il panique et va signaler
-          if (!auBotAlive[w]) continue;
-          float wx = auBots[w].x - px, wy = auBots[w].y - py;
-          if (wx * wx + wy * wy < 48 * 48) auBots[w].panic = true;
+    } else {
+      // ---- deplacement joueur ----
+      float spd = 68.0f * dt;
+      float dx = 0, dy = 0;
+      if (kLeft) dx -= spd; if (kRight) dx += spd;
+      if (kUp) dy -= spd; if (kDown) dy += spd;
+      if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
+      if (dx && auFree(px + dx, py)) px += dx;
+      if (dy && auFree(px, py + dy)) py += dy;
+      // ---- OK : TUER (imposteur) ou FAIRE UNE TACHE (equipage) ----
+      if (keyOK) {
+        if (meImp) {
+          if (!pOK && killCd <= 0) {
+            float bd = 1e9; int bi = -1;
+            for (int i = 0; i < 6; i++) {
+              if (!auB[i].alive) continue;
+              float ddx = auB[i].x - px, ddy = auB[i].y - py;
+              float d2 = ddx * ddx + ddy * ddy;
+              if (d2 < bd) { bd = d2; bi = i; }
+            }
+            if (bi >= 0 && bd < 17 * 17) {
+              auB[bi].alive = false;
+              auBodyX[auBodyN] = auB[bi].x; auBodyY[auBodyN] = auB[bi].y;
+              auBodyC[auBodyN] = AU_COL[bi + 1]; auBodyN++;
+              auKills++; killCd = 10.0f;
+              for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il va temoigner
+                if (!auB[w].alive) continue;
+                float wx = auB[w].x - px, wy = auB[w].y - py;
+                if (wx * wx + wy * wy < 48 * 48) { auB[w].witness = true; auPanicTo(auB[w]); }
+              }
+              bool anyAlive = false;
+              for (int i = 0; i < 6; i++) if (auB[i].alive) anyAlive = true;
+              if (!anyAlive) endScreen = 1;
+            }
+          }
+        } else if (pTaskI < 4) { // maintenir OK sur SA tache pour la faire
+          float tx = AU_TX[pTasks[pTaskI]] * 8.0f + 4.0f, ty = AU_TY[pTasks[pTaskI]] * 8.0f + 4.0f;
+          float ddx = tx - px, ddy = ty - py;
+          if (ddx * ddx + ddy * ddy < 13 * 13) {
+            pTaskProg += dt / 4.0f;
+            if (pTaskProg >= 1.0f) { pTaskProg = 0; pTaskI++; auTaskBar += 1.0f / totalTasks; }
+            if (pTaskI >= 4) endScreen = 5;
+          }
         }
-        if (auAlive == 0) endScreen = 1;
       }
-    }
-    // ---- VENTILO (EXE) : sur une bouche d'aeration, on teleporte a la suivante ----
-    if (kExp && !pExp && ventCd <= 0) {
-      for (int i = 0; i < 5; i++) {
-        float vx = AU_VX[i] * 8.0f + 4.0f, vy = AU_VY[i] * 8.0f + 4.0f;
-        float ddx = vx - px, ddy = vy - py;
-        if (ddx * ddx + ddy * ddy < 11 * 11) {
-          int j = (i + 1 + rnd(4)) % 5;
-          px = AU_VX[j] * 8.0f + 4.0f; py = AU_VY[j] * 8.0f + 4.0f;
-          ventCd = 1.2f; break;
+      // ---- VENTILO (EXE) : imposteur seulement ----
+      if (meImp && kExp && !pExp && ventCd <= 0) {
+        for (int i = 0; i < 5; i++) {
+          float vx = AU_VX[i] * 8.0f + 4.0f, vy = AU_VY[i] * 8.0f + 4.0f;
+          float ddx = vx - px, ddy = vy - py;
+          if (ddx * ddx + ddy * ddy < 11 * 11) {
+            int j = (i + 1 + rnd(4)) % 5;
+            px = AU_VX[j] * 8.0f + 4.0f; py = AU_VY[j] * 8.0f + 4.0f;
+            ventCd = 1.2f; break;
+          }
         }
       }
     }
@@ -5835,139 +6039,201 @@ static void amongUsGame() {
       while (!resumed) {
         pollKeys();
         if (keyOK) { waitRelease(); resumed = true; }
-        else if (keyBack) { endScreen = 4; break; } // abandon
+        else if (keyBack) { endScreen = 4; break; }
         Ion::Timing::msleep(40);
       }
     }
-    // ---- bots ----
-    for (int i = 0; i < 6; i++) {
-      if (!auBotAlive[i]) continue;
-      AuBot &b = auBots[i];
-      if (b.panic) { // il fonce vers le bouton d'alerte de la cafeteria
-        float tx, ty;
-        if (b.state == 9) { tx = 6 * 8.0f + 4.0f; ty = 5 * 8.0f + 4.0f; }
-        else if (b.state == 8) { tx = AU_NX[b.tgt] * 8.0f + 4.0f; ty = AU_NY[b.tgt] * 8.0f + 4.0f; }
-        else { tx = AU_NX[b.tgt] * 8.0f + 4.0f; ty = AU_NY[b.tgt] * 8.0f + 4.0f; }
-        float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
-        if (dl < 2.0f) {
-          if (b.state == 9) { endScreen = 3; break; } // IL A SIGNALER LE CORPS !
-          b.node = b.tgt;
-          if (b.node == 0) { b.state = 9; } else { b.state = 8; b.tgt = auNH[b.node]; }
-        } else { b.x += ddx / dl * 52.0f * dt; b.y += ddy / dl * 52.0f * dt; }
+    // ================== BOTS ==================
+    for (int i = 0; i < 6 && !endScreen; i++) {
+      AuBot &b = auB[i];
+      if (!b.alive || meetT > 0) continue;
+      if (b.panic) { // il fonce au bouton pour signaler
+        auBotWalk(b, dt, 54.0f);
+        float ddx = AU_BTNX - b.x, ddy = AU_BTNY - b.y;
+        if (ddx * ddx + ddy * ddy < 10 * 10) {
+          if (b.witness) endScreen = 3; // un TEMOIN : ejection !
+          else { meetT = 3.0f; b.panic = false; b.state = 0; auNextTask(b); } // corps signale : reunion sans coupable
+        }
         continue;
       }
-      // un bot vivant passe pres d'un cadavre ? il panique aussi
+      // un bot vivant passe pres d'un cadavre ? il va le signaler (le corps ne designe personne)
       for (int c = 0; c < auBodyN; c++) {
         float ddx = auBodyX[c] - b.x, ddy = auBodyY[c] - b.y;
-        if (ddx * ddx + ddy * ddy < 34 * 34) {
-          b.panic = true; b.state = 7;
-          float bd = 1e9; b.tgt = b.node;
-          for (int n = 0; n < 13; n++) {
-            float nx = AU_NX[n] * 8.0f + 4.0f, ny = AU_NY[n] * 8.0f + 4.0f;
-            float dd2 = (nx - b.x) * (nx - b.x) + (ny - b.y) * (ny - b.y);
-            if (dd2 < bd) { bd = dd2; b.tgt = n; }
-          }
-          break;
-        }
+        if (ddx * ddx + ddy * ddy < 30 * 30) { b.witness = false; auPanicTo(b); break; }
       }
       if (b.panic) continue;
-      if (b.state == 1) { // il fait une tache
+      // l'imposteur PNJ chasse quand il est seul avec quelqu'un
+      if (b.imp && impKillCd <= 0) {
+        bool victim = false;
+        float vx = 0, vy = 0;
+        for (int v = 0; v < 6 && !victim; v++) { // victime : un bot d'equipage isole
+          if (v == i || !auB[v].alive || auB[v].imp) continue;
+          float ddx = auB[v].x - b.x, ddy = auB[v].y - b.y;
+          if (ddx * ddx + ddy * ddy < 14 * 14) {
+            victim = true; vx = auB[v].x; vy = auB[v].y;
+            for (int w = 0; w < 6; w++) { // personne d'autre autour ?
+              if (w == i || w == v || !auB[w].alive) continue;
+              float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
+              if (wx * wx + wy * wy < 70 * 70) { victim = false; break; }
+            }
+            float wx = px - b.x, wy = py - b.y; // le joueur compte comme temoin
+            if (wx * wx + wy * wy < 70 * 70) victim = false;
+          }
+        }
+        if (!victim) { // sinon... TOI, si personne ne regarde
+          float ddx = px - b.x, ddy = py - b.y;
+          if (ddx * ddx + ddy * ddy < 14 * 14) {
+            victim = true; vx = px; vy = py;
+            for (int w = 0; w < 6; w++) {
+              if (w == i || !auB[w].alive) continue;
+              float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
+              if (wx * wx + wy * wy < 70 * 70) { victim = false; break; }
+            }
+          }
+        }
+        if (victim) {
+          if (vx == px && vy == py) endScreen = 6; // il t'a eu !
+          else {
+            for (int v = 0; v < 6; v++)
+              if (auB[v].alive && !auB[v].imp && auB[v].x == vx && auB[v].y == vy) {
+                auB[v].alive = false;
+                auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1]; auBodyN++;
+                for (int w = 0; w < 6; w++) { // temoins : ils courent temoigner
+                  if (w == i || w == v || !auB[w].alive || auB[w].imp) continue;
+                  float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
+                  if (wx * wx + wy * wy < 60 * 60) { auB[w].witness = true; auPanicTo(auB[w]); }
+                }
+              }
+            impKillCd = 9.0f;
+          }
+        }
+      }
+      if (endScreen) break;
+      if (b.state == 1) { // il fait sa tache
         b.t -= dt;
         if (b.t <= 0) {
-          b.state = 0;
-          int nn = AU_ADJ[b.node][rnd(4)];
-          int tries = 0;
-          while (nn < 0 || (nn == b.prev && rnd(100) < 75 && tries < 4)) { nn = AU_ADJ[b.node][rnd(4)]; tries++; }
-          if (nn < 0) nn = b.prev;
-          b.prev = b.node; b.tgt = nn;
+          b.taskI++;
+          if (!b.imp) auTaskBar += 1.0f / totalTasks; // les taches de l'imposteur ne comptent pas
+          auNextTask(b);
         }
         continue;
       }
-      // marche vers son waypoint
-      float tx = AU_NX[b.tgt] * 8.0f + 4.0f, ty = AU_NY[b.tgt] * 8.0f + 4.0f;
-      float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
-      if (dl < 2.0f) {
-        b.node = b.tgt;
-        int task = -1;
-        for (int k = 0; k < 6; k++) if (AU_TN[k] == b.node) task = k;
-        if (task >= 0 && rnd(100) < 40) { b.state = 1; b.t = 5.0f; }
-        else {
-          int nn = AU_ADJ[b.node][rnd(4)];
-          int tries = 0;
-          while (nn < 0 || (nn == b.prev && rnd(100) < 75 && tries < 4)) { nn = AU_ADJ[b.node][rnd(4)]; tries++; }
-          if (nn < 0) nn = b.prev;
-          b.prev = b.node; b.tgt = nn;
-        }
-      } else { b.x += ddx / dl * 30.0f * dt; b.y += ddy / dl * 30.0f * dt; }
+      auBotWalk(b, dt, 30.0f);
+      if (auBotArrived(b)) {
+        if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
+        else auNextTask(b); // taches finies : il erre
+      }
     }
-    // avancement des taches : plus il reste de monde, plus ca va vite
-    taskProg += auAlive * 0.18f * dt;
-    if (taskProg >= 100.0f) endScreen = 2;
+    if (auTaskBar >= 1.0f) endScreen = meImp ? 2 : 5; // taches finies : l'equipage gagne
     pOK = keyOK; pExp = kExp; pBack = keyBack;
 
     // ===================== RENDU =====================
-    for (int cy = 0; cy < AUH; cy++) { // carte en spans horizontaux (perf)
-      int x0 = 0;
-      while (x0 < AUW) {
+    int camX = (int)px - SW / 2; if (camX < 0) camX = 0; if (camX > AUW * 8 - SW) camX = AUW * 8 - SW;
+    int camY = (int)py - SH / 2; if (camY < 0) camY = 0; if (camY > AUH * 8 - SH) camY = AUH * 8 - SH;
+    int cX0 = camX / 8, cY0 = camY / 8;
+    for (int cy = cY0; cy < cY0 + SH / 8 + 1 && cy < AUH; cy++) { // carte en spans (perf)
+      int x0 = cX0;
+      while (x0 < cX0 + SW / 8 + 1 && x0 < AUW) {
         char c = auCell(x0, cy); int x1 = x0;
-        while (x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
-        int rx = x0 * 8, rw = (x1 - x0 + 1) * 8;
-        if (c == '#') fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x2E3A4A));
-        else if (c == 'T') fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x9FA8B5));
-        else fRect(rx, cy * 8, rw, 8, KDColor::RGB24(0x8B94A3));
+        while (x1 + 1 < cX0 + SW / 8 + 1 && x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
+        int rx = x0 * 8 - camX, rw = (x1 - x0 + 1) * 8, ry = cy * 8 - camY;
+        if (rx + rw > SW) rw = SW - rx;
+        if (rx < 0) { rw += rx; rx = 0; }
+        if (c == '#') fRect(rx, ry, rw, 8, KDColor::RGB24(0x2E3A4A));
+        else fRect(rx, ry, rw, 8, KDColor::RGB24(0x8B94A3));
         x0 = x1 + 1;
       }
     }
-    for (int k = 0; k < 6; k++) { // taches (jaune = pas faites)
-      fRect(AU_TX[k] * 8 + 1, AU_TY[k] * 8 + 1, 6, 6, KDColor::RGB24(0xF5C518));
-      fRect(AU_TX[k] * 8 + 2, AU_TY[k] * 8 + 2, 4, 4, KDColor::RGB24(0xB08A10));
+    for (int k = 0; k < 12; k++) { // taches
+      int rx = AU_TX[k] * 8 - camX + 1, ry = AU_TY[k] * 8 - camY + 1;
+      if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
+      fRect(rx, ry, 6, 6, KDColor::RGB24(0xF5C518));
+      fRect(rx + 1, ry + 1, 4, 4, KDColor::RGB24(0xB08A10));
+    }
+    if (!meImp && pTaskI < 4 && ((int)(gTime * 4) % 2)) { // MA tache courante clignote
+      int rx = AU_TX[pTasks[pTaskI]] * 8 - camX - 3, ry = AU_TY[pTasks[pTaskI]] * 8 - camY - 3;
+      fRect(rx, ry, 12, 12, KDColor::RGB24(0xF5C518));
     }
     for (int i = 0; i < 5; i++) { // ventilos
-      int vx = AU_VX[i] * 8, vy = AU_VY[i] * 8;
-      fRect(vx, vy, 8, 8, KDColor::RGB24(0x55606E));
-      fRect(vx + 1, vy + 2, 6, 1, KDColor::RGB24(0x2E3A4A));
-      fRect(vx + 1, vy + 5, 6, 1, KDColor::RGB24(0x2E3A4A));
+      int rx = AU_VX[i] * 8 - camX, ry = AU_VY[i] * 8 - camY;
+      if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
+      fRect(rx, ry, 8, 8, KDColor::RGB24(0x55606E));
+      fRect(rx + 1, ry + 2, 6, 1, KDColor::RGB24(0x2E3A4A));
+      fRect(rx + 1, ry + 5, 6, 1, KDColor::RGB24(0x2E3A4A));
     }
-    fCirc(6 * 8 + 4, 5 * 8 + 4, 4, KDColor::RGB24(0xC51111)); // bouton d'alerte
-    for (int c = 0; c < auBodyN; c++) drawCorpse((int)auBodyX[c], (int)auBodyY[c], KDColor::RGB24(auBodyCol[c]));
+    int brx = AU_BTNX - camX, bry = AU_BTNY - camY;
+    fCirc(brx, bry, 5, KDColor::RGB24(0xC51111));
+    fRing(brx, bry, 6, KDColor::RGB24(0x7A0A0A));
+    // vision limitee : on ne voit les gens et les corps qu'a ~100 px
+    for (int c = 0; c < auBodyN; c++) {
+      float ddx = auBodyX[c] - px, ddy = auBodyY[c] - py;
+      if (ddx * ddx + ddy * ddy < 100 * 100) drawCorpse((int)auBodyX[c] - camX, (int)auBodyY[c] - camY, KDColor::RGB24(auBodyC[c]));
+    }
     for (int i = 0; i < 6; i++) {
-      if (!auBotAlive[i]) continue;
-      drawBean((int)auBots[i].x, (int)auBots[i].y, KDColor::RGB24(AU_COL[i + 1]), auBots[i].x > px);
-      if (auBots[i].panic) drawText((int)auBots[i].x + 6, (int)auBots[i].y - 16, "!", KDColor::RGB24(0xC51111));
-      else if (auBots[i].state == 1) drawText((int)auBots[i].x + 6, (int)auBots[i].y - 16, "...", KDColor::RGB24(0xF5C518));
+      if (!auB[i].alive) continue;
+      float ddx = auB[i].x - px, ddy = auB[i].y - py;
+      if (ddx * ddx + ddy * ddy >= 100 * 100) continue; // hors de vue
+      int rx = (int)auB[i].x - camX, ry = (int)auB[i].y - camY;
+      drawBean(rx, ry, KDColor::RGB24(AU_COL[i + 1]), auB[i].x > px);
+      if (auB[i].panic) drawText(rx + 6, ry - 16, "!", KDColor::RGB24(0xC51111));
+      else if (auB[i].state == 1) drawText(rx + 6, ry - 16, "...", KDColor::RGB24(0xF5C518));
     }
-    drawBean((int)px, (int)py, KDColor::RGB24(0xC51111), playerDir == 0);
-    // HUD haut : barre de taches + equipage
+    drawBean((int)px - camX, (int)py - camY, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), playerDir == 0);
+    // HUD haut : barre des taches d'equipage
     fRect(0, 0, SW, 13, KDColor::RGB24(0x1B1B25));
     fRect(4, 3, 190, 7, KDColor::RGB24(0x3A3A4A));
-    fRect(5, 4, (int)(188 * taskProg / 100.0f), 5, KDColor::RGB24(0xC51111));
-    drawText(198, 3, "EQ:", KDColor::RGB24(0xD6E0F0)); drawNum(224, 3, auAlive, KDColor::RGB24(0xD6E0F0));
-    // HUD bas : cooldown du kill
+    fRect(5, 4, (int)(188 * auTaskBar), 5, KDColor::RGB24(0x38E05C));
+    drawText(198, 3, "EQ:", KDColor::RGB24(0xD6E0F0));
+    int aliveN = 0; for (int i = 0; i < 6; i++) if (auB[i].alive) aliveN++;
+    drawNum(224, 3, aliveN, KDColor::RGB24(0xD6E0F0));
+    // HUD bas : selon le role
     fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
-    drawText(4, SH - 10, "OK:TUER EXE:VENT", KDColor::RGB24(0xD6E0F0));
-    fRect(160, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
-    fRect(161, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
+    if (meImp) {
+      drawText(4, SH - 10, "OK:TUER EXE:VENT", KDColor::RGB24(0xD6E0F0));
+      fRect(160, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
+      fRect(161, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
+    } else {
+      drawText(4, SH - 10, pTaskI < 4 ? "OK (MAINTENIR): TACHE" : "TACHES FINIES", KDColor::RGB24(0xD6E0F0));
+      if (pTaskI < 4) {
+        drawText(176, SH - 10, "TACHE:", C_GRE); drawNum(232, SH - 10, pTaskI + 1, C_ORG);
+        fRect(252, SH - 9, 60, 7, KDColor::RGB24(0x3A4A4A));
+        fRect(253, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));
+      }
+    }
+    if (meetT > 0) { // bandeau reunion
+      fRect(0, 100, SW, 40, KDColor::RGB24(0x1B1B25));
+      drawTextC(112, "REUNION : CORPS SIGNALE", KDColor::RGB24(0xC51111));
+      drawTextC(128, "PERSONNE N'AVOUEE...", C_GRE);
+    }
     blit();
     Ion::Timing::msleep(30);
   }
   // ------------------ ecran de fin ------------------
+  bool won = (endScreen == 1) || (!meImp && (endScreen == 2 || endScreen == 3 || endScreen == 5));
   if (endScreen >= 1 && endScreen <= 3) {
-    if (endScreen == 1) {
+    if (won) {
       auWins++;
-      int secs = (int)gTime;
-      if (auBestS == 0 || secs < auBestS) auBestS = secs;
+      if (meImp && endScreen == 1) {
+        int secs = (int)gTime;
+        if (auBestS == 0 || secs < auBestS) auBestS = secs;
+      }
     }
     saveAcc();
   }
+  if (endScreen == 5) { auWins++; saveAcc(); }
+  if (endScreen == 6) saveAcc();
   bgPanel();
-  const char *t1 = (endScreen == 1) ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" :
-                   (endScreen == 2) ? "TACHES FINIES..." : "CORPS SIGNALE !";
-  const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE" : (endScreen == 2) ? "L'EQUIPAGE S'EST ECHAPPE" : "TU AS ETE EJECTE";
-  drawTextC(60, t1, endScreen == 1 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
+  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen == 6) ? "ELIMINE..." : "PERDU !";
+  const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE"
+                 : (endScreen == 2 && meImp) ? "L'EQUIPAGE A FINI SES TACHES"
+                 : (endScreen == 2 && !meImp) ? "TOUTES LES TACHES SONT FINIES"
+                 : (endScreen == 3) ? (meImp ? "UN TEMOIN T'A SIGNALE !" : "L'IMPOSTEUR A ETE EJECTE")
+                 : (endScreen == 5) ? "TES 4 TACHES SONT FINIES"
+                 : (endScreen == 6) ? "L'IMPOSTEUR T'A EU..." : "";
+  drawTextC(60, t1, won ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
   drawTextC(80, t2, C_WHT);
-  if (endScreen == 1) { drawTextC(100, "TEMPS:", C_GRE); drawNum(SW / 2 + 24, 100, (int)gTime, C_ORG); }
-  drawTextC(130, "VICTOIRES:", C_GRE); drawNum(SW / 2 + 34, 130, auWins, C_ORG);
-  drawTextC(148, "KILLS AU TOTAL:", C_GRE); drawNum(SW / 2 + 62, 148, auKills, C_ORG);
+  drawTextC(130, "VICTOIRES AU TOTAL:", C_GRE); drawNum(SW / 2 + 100, 130, auWins, C_ORG);
+  drawTextC(148, "KILLS AU TOTAL:", C_GRE); drawNum(SW / 2 + 84, 148, auKills, C_ORG);
   rRect(SW / 2 - 70, 184, 140, 24, 8, C_YEL);
   drawTextC(190, "OK RETOUR", C_BLK);
   blit();
@@ -6006,13 +6272,12 @@ static int launcherScreen() {
       drawBean(238, 116, KDColor::RGB24(0xC51111), false);
       drawText(238 - textW("AMONG US") / 2, 158, "AMONG US", C_WHT);
       drawText(238 - textW("MICRO") / 2, 170, "MICRO", C_WHT);
-      drawTextC(212, sel == 0 ? "FLECHES PUIS OK POUR JOUER" : "IMPOSTEUR : ELIMINE L'EQUIPAGE", C_GRE);
+      drawTextC(212, sel == 0 ? "FLECHES PUIS OK POUR JOUER" : "IMPOSTEUR OU EQUIPAGE ?", C_GRE);
     }
     pL = kLeft; pR = kRight; pOK = keyOK; pB = keyBack;
     Ion::Timing::msleep(40);
   }
 }
-
 // ------------------------- Point d'entree ------------------------------
 void ion_main(int argc, char *argv[]) {
   (void)argc; (void)argv;

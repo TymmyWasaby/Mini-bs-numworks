@@ -1615,6 +1615,7 @@ struct Ent {
   float stealthT, shieldT; // invisibilite (Leon/Sandy) et bouclier (Rosa)
   float slowT; // ralenti (drones de Bea, spray d Emz, balles de Piper)
   float poisonT; // V5.23 : poison de Byron — degats continus
+  int poisonBy;  // V5.25 : qui a empoisonne (pour crediter le kill)
   float stunT; // V5.19 : etourdi par le taser de Buzz — ni bouger, ni tirer
   float blindT; // V5.13b : aveugle (super de Jacky) : ne voit plus rien, erre sans tirer
   float atkCharge; // charge de Hank : maintenir l'attaque pour gonfler le ballon
@@ -1947,7 +1948,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0; e.beaCharge = false;
   e.aiRvIdx = -1; e.aiRvT = 0; e.aiTilt = 0; // V5.17
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.poisonBy = -1; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
 }
 
 // invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
@@ -1977,7 +1978,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0; e.aiOnObj = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.poisonBy = -1; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
   e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
@@ -3221,10 +3222,11 @@ static void updateMatch(float dt) {
     if (e.isBoss) e.mechT = 1.0f; // le boss du Siege reste en mega robot
     e.tpCd -= dt; // recharge du teleporteur
     if (e.slowT > 0) e.slowT -= dt;
-    if (e.poisonT > 0) { // V5.23 : poison de Byron — il ronge sans tuer
+    if (e.poisonT > 0) { // V5.25 : poison de Byron — il ronge... et peut ACHEVER
       e.poisonT -= dt;
-      e.hp -= 320.0f * dt; e.regenT = 0;
-      if (e.hp < 1.0f) e.hp = 1.0f; // le poison laisse toujours 1 PV : il acheve pas
+      e.hp -= 320.0f * dt; e.regenT = 0; e.lastHitT = 150;
+      if (e.hp <= 0 && e.alive && e.poisonBy >= 0 && e.poisonBy < entCount)
+        damageEnt(e, 1.0f - e.hp, ents[e.poisonBy]); // mort geree proprement (credit au poisonneur)
     }
     if (e.stunT > 0) e.stunT -= dt; // V5.19 : taser de Buzz
     if (e.blindT > 0) e.blindT -= dt; // V5.13b : aveuglement (super de Jacky)
@@ -3536,6 +3538,7 @@ static void updateMatch(float dt) {
         }
         // V5.23 : POTION DE BYRON — les ALLIES touches par la zone sont SOIGNES
         if (p.fromSuper && p.bIdx == 46) {
+          spawnParts(p.x, p.y, 1, 12); // eclaboussure de potion
           for (int j = 0; j < entCount; j++) {
             Ent &t = ents[j];
             if (!t.alive || t.team != p.team) continue;
@@ -3575,7 +3578,7 @@ static void updateMatch(float dt) {
         // drones de Bea / spray d'Emz (super) : la cible est ralentie
         if (p.fromSuper && (ents[p.owner].brawlerIdx == 24 || ents[p.owner].brawlerIdx == 19)) t.slowT = 2.5f;
         // V5.23 : BYRON — son attaque EMPOISONNE la cible pendant 3 s
-        if (!p.fromSuper && p.bIdx == 46) t.poisonT = 3.0f;
+        if (!p.fromSuper && p.bIdx == 46) { t.poisonT = 3.0f; t.poisonBy = p.owner; }
         // V5.16 : Bea — si sa balle touche, la suivante est CHARGEE (degats x3)
         if (ents[p.owner].brawlerIdx == 24 && !p.fromSuper) ents[p.owner].beaCharge = true;
         if (p.pierce) { // onde perforante : chaque cible touchee une seule fois
@@ -5723,19 +5726,15 @@ static void trainingMode(int myBrawler) {
   }
 }
 
-// ====================  V5.19 : AMONG US MICRO  ========================
-// 2e jeu du projet, facon vrai Among Us : GRANDE carte (60x45 cases, la
-// camera suit le joueur), vision limitee, chaque membre d'equipage a 4
-// TACHES a faire aux 4 coins du vaisseau, et on n'est PAS toujours
-// imposteur : parfois un PNJ l'est et toi tu fais tes taches.
-// Un cadavre ne designe PERSONNE : tant qu'aucun temoin ne t'a VU tuer,
-// la reunion te laisse en vie. Mais un temoin qui signale = ejection.
+
+// ====================  V5.26 : AMONG US MICRO — 6 CARTES, BFS ANTI-BLOCAGE, VOTES, SABOTAGES  ========================
 // FLECHES: bouger | OK: TUER (imposteur) / FAIRE UNE TACHE (equipage)
-// EXE/TOOLBOX: ventilo (imposteur) | RETOUR: pause
+// EXE: ventilo/cameras/vitals | +: VOTE | -: ZOOM | DIV: sabotage (imposteur)
 #define AUW 60
 #define AUH 45
-#define AUN 23
-static const char *AU_MAP[AUH] = {
+#define AU_MAXBOT 14
+// ================== V5.26 : LES 6 CARTES ==================
+static const char *AU_M1[AUH] = {
 "############################################################",
 "############################################################",
 "############################################################",
@@ -5782,12 +5781,273 @@ static const char *AU_MAP[AUH] = {
 "############################################################",
 "############################################################",
 };
+static const char *AU_M2[AUH] = {
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"########............####################............########",
+"########............####################............########",
+"########............####################............########",
+"########............................................########",
+"########............................................########",
+"########............................................########",
+"########............###########...######............########",
+"########............###########...######............########",
+"########............###########...######............########",
+"##########...##################...##############...#########",
+"##########...##################...##############...#########",
+"##########...##################...##############...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...###########..............##########...#########",
+"##########...##################...##############...#########",
+"##########...##################...##############...#########",
+"########............###########...######............########",
+"########............###########...######............########",
+"########............###########...######............########",
+"########............###########...######............########",
+"########............................................########",
+"########............................................########",
+"########............................................########",
+"########............####################............########",
+"########............####################............########",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+};
+static const char *AU_M3[AUH] = {
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"####............########..........######..........##########",
+"####............########..........######..........##########",
+"####............########..........######..........##########",
+"####..............................................##########",
+"####..............................................##########",
+"####..............................................##########",
+"####............########..........######..........##########",
+"####............########..........######..........##########",
+"########...#################...#############...#############",
+"########...#################...#############...#############",
+"########...#################...#############...#############",
+"########...#################...#############...#############",
+"####............############...#########..........##########",
+"####............############...#########..........##########",
+"####............####............########..........##########",
+"####............####............########..........##########",
+"####............................########..........##########",
+"####..............................................##########",
+"####..............................................##########",
+"####............####..............................##########",
+"####............####............########..........##########",
+"####............####............###############...##########",
+"########...#########............###############...##########",
+"########...#################...################...##########",
+"########...#################...################...##########",
+"########...#################...################...##########",
+"####............########............###########...##########",
+"####............########............###########...##########",
+"####............########............########..........######",
+"####............########............########..........######",
+"####..................................................######",
+"####..................................................######",
+"####..................................................######",
+"####............########............########..........######",
+"####............########............########..........######",
+"############################################..........######",
+"############################################..........######",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+};
+static const char *AU_M4[AUH] = {
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"####............########............########............####",
+"####............########............########............####",
+"####............########............########............####",
+"####....................................................####",
+"####....................................................####",
+"####....................................................####",
+"####............########............########............####",
+"####............########............########............####",
+"########...#################...#################...#########",
+"########...#################...#################...#########",
+"########...#################...#################...#########",
+"########...#################...#################...#########",
+"########...#################...#################...#########",
+"########...#################...#################...#########",
+"########...#############............############...#########",
+"########...#############............############...#########",
+"####..............######............########............####",
+"####..............######............########............####",
+"####..............######............########............####",
+"####..............######............########............####",
+"####....................................................####",
+"####....................................................####",
+"####....................................................####",
+"####..............######............########............####",
+"####..............######............########............####",
+"####..............######............########............####",
+"############...#############...###############...###########",
+"############...#############...###############...###########",
+"############...#############...###############...###########",
+"############...#############...###############...###########",
+"##########.....................###....................######",
+"##########..................######....................######",
+"##########..................######....................######",
+"##########............................................######",
+"##########............................................######",
+"##########............................................######",
+"##########..................######....................######",
+"##########..................######....................######",
+"############################################################",
+"############################################################",
+"############################################################",
+};
+static const char *AU_M5[AUH] = {
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"##########################............######################",
+"##########################............######################",
+"##########################............######################",
+"##############.............................#################",
+"##############.............................#################",
+"##############.............................#################",
+"##########################............######################",
+"##########################............######################",
+"##############################...###########################",
+"##############################...###########################",
+"##############################...###########################",
+"##############################...###########################",
+"##########..........##########...#######..........##########",
+"##########..........##########...#######..........##########",
+"##########..........##########...#######..........##########",
+"##########........................................##########",
+"##########........................................##########",
+"##########........................................##########",
+"##########..........##########...#######..........##########",
+"##########..........##########...#######..........##########",
+"#############...##############...###########...#############",
+"#############...##############...###########...#############",
+"#############...##############...###########...#############",
+"#############...##############...###########...#############",
+"#############...##..........##...###...........#############",
+"##################..........########..........##############",
+"##################..........########..........##############",
+"##################............................##############",
+"##################............................##############",
+"##################............................##############",
+"##################..........########..........##############",
+"##################..........########..........##############",
+"######################...###############...#################",
+"######################...###############...#################",
+"######################...#..........####...#################",
+"##########################..........########################",
+"##########################..........########################",
+"##########################..........########################",
+"##########################..........########################",
+"############################################################",
+"############################################################",
+};
+static const char *AU_M6[AUH] = {
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"##########################............######################",
+"##########################............######################",
+"####............##########............######################",
+"####............##########............######################",
+"####....................................................####",
+"####....................................................####",
+"####....................................................####",
+"####............##########............########..........####",
+"####............##########............########..........####",
+"####............###############...############..........####",
+"####............###############...############..........####",
+"#########...###################...############..........####",
+"#########...###################...############..........####",
+"#########...###################...##########################",
+"#########...###################...##########################",
+"#########...###################...##########################",
+"#########...###################...##########################",
+"#########...###################...##########################",
+"#########...##################............##################",
+"#########...##################............##################",
+"#########...##################.................#############",
+"#########...##################.................#############",
+"########..............########.................#############",
+"########..............########............##################",
+"########..............########............####..........####",
+"########................................................####",
+"########................................................####",
+"########................................................####",
+"########..............########################..........####",
+"########..............########################..........####",
+"########................................................####",
+"########................................................####",
+"######################..................................####",
+"##############################################..........####",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+"############################################################",
+};
+// ---- V5.26 : metadata des 6 cartes (taches, ventilos, bouton, cameras, vitals, spawn, couleurs)
+static const char **AU_MAPS[6] = { AU_M1, AU_M2, AU_M3, AU_M4, AU_M5, AU_M6 };
+static const char *AU_MAPNAMES[6] = { "SKELD", "MIRA", "POLUS", "AIRSHIP", "SOUS-MARIN", "FUNGLE" };
+static const int AU_TXS[6][12] = { {5,24,34,49,56,48,36,23,14,4,42,29}, {27,14,49,12,47,32,13,48,11,46,27,12}, {7,30,43,8,27,46,9,32,47,10,27,46}, {7,30,53,6,31,46,17,42,7,30,53,10}, {29,16,43,24,39,32,31,16,43,24,39,32}, {7,32,49,10,37,52,9,34,49,18,39,52} };
+static const int AU_TYS[6][12] = { {6,4,12,4,25,40,34,40,33,22,21,18}, {20,8,8,33,33,21,10,10,35,35,23,12}, {6,6,7,19,21,20,34,34,38,9,7,7}, {6,6,6,23,21,24,37,37,9,9,9,25}, {6,18,19,31,32,40,8,21,18,30,31,40}, {8,6,11,29,25,32,10,8,14,30,27,35} };
+static const int AU_VXS[6][5] = { {5,13,55,56,34}, {12,49,14,43,28}, {28,43,10,23,46}, {28,53,8,27,52}, {14,43,20,43,32}, {30,49,12,33,52} };
+static const int AU_VYS[6][5] = { {13,26,33,19,26}, {8,8,33,34,22}, {6,7,19,22,21}, {6,6,23,22,24}, {18,19,32,32,40}, {6,11,29,26,33} };
+static const int AU_BTX[6] = {30,31,10,10,32,10};
+static const int AU_BTY[6] = {4,23,8,8,8,10};
+static const int AU_CAMX[6] = {39,42,42,46,42,48};
+static const int AU_CAMY[6] = {36,8,6,6,18,10};
+static const int AU_VITX[6] = {6,10,26,26,12,28};
+static const int AU_VITY[6] = {18,8,6,6,18,6};
+static const int AU_SPAWX[6] = {30,31,10,10,32,10};
+static const int AU_SPAWY[6] = {8,23,8,8,8,10};
+static const uint32_t AU_WALLC[6] = {0x2E3A4A, 0x3A4A5A, 0x8A5C3B, 0x4A4A55, 0x1E3A5A, 0x2E5A2E};
+static const uint32_t AU_FLOOC[6] = {0x8B94A3, 0xA8D8B0, 0xE8E4DA, 0x9BA3B0, 0x6E8FA8, 0xB0C98A};
+// la carte courante (pointeurs mis en place au lancement de la partie)
+static const char **AU_MAP;
+static const int *AU_TX, *AU_TY, *AU_VX, *AU_VY;
+static float auBtnX, auBtnY;
+static int auCamXc, auCamYc, auVitXc, auVitYc;
+static uint32_t auWallC, auFlooC;
+// couleurs des 14 PNJ possibles (le joueur reste cyan/rouge)
+static const uint32_t AU_BOTC[AU_MAXBOT] = {0x132ED1,0x117F2D,0xED54BA,0xF07D0D,0xF5C518,0x3F474E,0xD6E0F0,0x6B2FBB,0x8A5C22,0x50EF39,0x6B2B3C,0x8397A7,0xE8A15C,0xF0E7A8};
+static const char *AU_NAMES[AU_MAXBOT] = {"BLEU","VERT","ROSE","ORANGE","JAUNE","NOIR","BLANC","VIOLET","MARRON","LIME","BORDEAUX","GRIS","PECHE","BANANE"};
 static char auCell(int cx, int cy) {
   if (cx < 0 || cy < 0 || cx >= AUW || cy >= AUH) return '#';
   return AU_MAP[cy][cx];
 }
 static bool auSolidPx(float x, float y) { return auCell((int)(x / 8.0f), (int)(y / 8.0f)) == '#'; }
-static bool auClearLine(float x0, float y0, float x1, float y1) { // V5.21 : ligne de visee libre ?
+static bool auClearLine(float x0, float y0, float x1, float y1) { // ligne de visee libre ?
   float dx = x1 - x0, dy = y1 - y0, dl = sqrtf(dx * dx + dy * dy);
   if (dl < 1.0f) return true;
   int steps = (int)(dl / 4.0f) + 1;
@@ -5802,56 +6062,6 @@ static bool auFree(float x, float y) { // les 4 coins du bean
   if (auSolidPx(x - 3.5f, y + 4.0f) || auSolidPx(x + 3.5f, y + 4.0f)) return false;
   return true;
 }
-// ---- waypoints (23 noeuds) : salles + jonctions, aretes toutes droites ----
-static const int AU_NX[AUN] = { 7, 30, 30, 54, 25, 25, 11,  7, 16, 16, 21, 21, 26, 39, 44, 51, 53, 53, 53, 53, 53, 38, 39};
-static const int AU_NY[AUN] = { 8,  8,  6,  6, 16, 27, 27, 27, 27, 31, 31, 37, 37, 37, 37, 37, 32, 26, 23, 13,  9, 23, 33};
-static const int AU_ADJ[AUN][3] = {
-  { 1, -1, -1}, { 0,  2, -1}, { 1,  3,  4}, { 2, -1, -1}, { 2,  5, -1},
-  { 4,  6,  8}, { 5,  7, -1}, { 6,  8, -1}, { 5,  7,  9}, { 8, 10, -1},
-  { 9, 11, -1}, {10, 12, -1}, {11, 13, -1}, {12, 14, 22}, {13, 15, -1},
-  {14, -1, -1}, {17, -1, -1}, {16, 18, -1}, {17, 19, 21}, {18, 20, -1},
-  {19, -1, -1}, {18, 22, -1}, {21, 13, -1}};
-static int auNH[AUN];
-static void auRouteTo(int dest) { // BFS : prochain saut de chaque noeud pour rejoindre dest
-  for (int i = 0; i < AUN; i++) auNH[i] = -1;
-  auNH[dest] = dest;
-  bool prog = true;
-  while (prog) {
-    prog = false;
-    for (int i = 0; i < AUN; i++) {
-      if (auNH[i] >= 0) continue;
-      for (int k = 0; k < 3; k++) {
-        int j = AU_ADJ[i][k];
-        if (j < 0) break;
-        if (auNH[j] >= 0) { auNH[i] = j; prog = true; break; }
-      }
-    }
-  }
-}
-static int auNearestNode(float x, float y) {
-  // V5.21 : le plus proche noeud VISIBLE (pas a travers un mur) — sinon les bots clippingpent
-  int best = -1; float bd = 1e9;
-  for (int i = 0; i < AUN; i++) {
-    float nx = AU_NX[i] * 8.0f + 4.0f, ny = AU_NY[i] * 8.0f + 4.0f;
-    float d2 = (nx - x) * (nx - x) + (ny - y) * (ny - y);
-    if (d2 < bd && auClearLine(x, y, nx, ny)) { bd = d2; best = i; }
-  }
-  if (best >= 0) return best;
-  int fb = 0; float fd = 1e9; // secours : le plus proche tout court
-  for (int i = 0; i < AUN; i++) {
-    float dx = AU_NX[i] * 8.0f + 4.0f - x, dy = AU_NY[i] * 8.0f + 4.0f - y;
-    if (dx * dx + dy * dy < fd) { fd = dx * dx + dy * dy; fb = i; }
-  }
-  return fb;
-}
-static const int AU_TX[12] = { 5, 24, 34, 49, 56, 48, 36, 23, 14,  4, 42, 29}; // taches
-static const int AU_TY[12] = { 6,  4, 12,  4, 25, 40, 34, 40, 33, 22, 21, 18};
-static const int AU_VX[5]  = { 5, 13, 55, 56, 34};                              // ventilos
-static const int AU_VY[5]  = {13, 26, 33, 19, 26};
-#define AU_BTNX (30 * 8 + 4) // bouton d'alerte de la cafeteria
-#define AU_BTNY (4 * 8 + 4)
-static const uint32_t AU_COL[7] = {0xC51111, 0x132ED1, 0x117F2D, 0xED54BA, 0xF07D0D, 0xD6E0F0, 0x38FEDC};
-
 // un petit crewmate/imposteur : corps arrondi + visiere + sac a dos
 static void drawBean(int x, int y, KDColor col, bool left) {
   KDColor dark = KDColor::RGB24(0x1B1B25);
@@ -5868,149 +6078,366 @@ static void drawCorpse(int x, int y, KDColor col) {
   fCirc(x - 6, y, 2, KDColor::RGB24(0xF2F2F2));
   fCirc(x - 6, y + 3, 2, KDColor::RGB24(0xF2F2F2));
 }
+static void auLine(int x0, int y0, int x1, int y1, KDColor c) { // Bresenham
+  int dx = x1 - x0, dy = y1 - y0, sx = (dx > 0) - (dx < 0), sy = (dy > 0) - (dy < 0);
+  dx = dx < 0 ? -dx : dx; dy = dy < 0 ? -dy : dy;
+  int err = dx - dy;
+  while (true) {
+    if (x0 >= 0 && y0 >= 0 && x0 < SW && y0 < SH) px(x0, y0, c);
+    if (x0 == x1 && y0 == y1) break;
+    int e2 = err * 2;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+  }
+}
 
 struct AuBot {
-  float x, y, dx, dy;   // position + destination finale
-  int path[6], pi, pn;  // noeuds a traverser
-  int state;            // 0 marche, 1 tache, 2 erre, 3 panique
-  float t;              // timer de tache
+  float x, y, dx, dy;      // position + destination finale
+  int path[96], pi, pn;    // V5.26 : chemin BFS case par case (aucun mur a traverser)
+  int state;               // 0 marche, 1 tache, 3 panique
+  float t;                 // timer de tache
   bool alive, panic, witness, imp;
-  float flee;           // V5.20 : l'imposteur PNJ s'ecarte des cadavres qu'il decouvre
-  float stuck;          // V5.23 : anti-blocage — teleporte le bot coince apres 0.8 s
-  bool ghost;           // V5.23 : un bot mort devient un fantome (visible des fantomes)
-  int accuse;           // V5.22 : dernier vu sur la scene de crime (-1 personne, 0-5 bot, 6 joueur)
-  int tasks[4], taskI;  // SES 4 taches personnelles
+  float flee, stuck;
+  int accuse;              // dernier vu sur la scene (-1, 0..13 bot, 14 joueur)
+  int tasks[4], taskI;
+  bool ghost;
 };
-static AuBot auB[6];
-static float auBodyX[8], auBodyY[8]; static uint32_t auBodyC[8]; static int auBodyN = 0;
-static int auBodySus[8]; // V5.22 : qui trainait pres de chaque corps ? (0-5 bot, 6 joueur)
-static float auTaskBar = 0.0f; // 0..1 : progression de TOUTES les taches d'equipage
+static AuBot auB[AU_MAXBOT];
+static int auBotN = 5;      // V5.26 : nombre de PNJ (5 a 14, joueurs 6 a 15)
+static float auBodyX[16], auBodyY[16]; static uint32_t auBodyC[16]; static int auBodyN = 0;
+static int auBodySus[16];
+static float auTaskBar = 0.0f;
 
+// ---- V5.26 : BFS sur la grille — remplace les waypoints (plus jamais de mur traverse) ----
+static int auPar[AUW * AUH];
+static int auQ[AUW * AUH];
+static void auBFS(int sx, int sy) {
+  for (int i = 0; i < AUW * AUH; i++) auPar[i] = -2;
+  int head = 0, tail = 0;
+  if (sx < 0 || sy < 0 || sx >= AUW || sy >= AUH || auCell(sx, sy) == '#') return;
+  auQ[tail++] = sy * AUW + sx; auPar[sy * AUW + sx] = -1;
+  while (head < tail) {
+    int c = auQ[head++]; int x = c % AUW, y = c / AUW;
+    if (x > 0 && auPar[c - 1] == -2 && auCell(x - 1, y) != '#') { auPar[c - 1] = c; auQ[tail++] = c - 1; }
+    if (x < AUW - 1 && auPar[c + 1] == -2 && auCell(x + 1, y) != '#') { auPar[c + 1] = c; auQ[tail++] = c + 1; }
+    if (y > 0 && auPar[c - AUW] == -2 && auCell(x, y - 1) != '#') { auPar[c - AUW] = c; auQ[tail++] = c - AUW; }
+    if (y < AUH - 1 && auPar[c + AUW] == -2 && auCell(x, y + 1) != '#') { auPar[c + AUW] = c; auQ[tail++] = c + AUW; }
+  }
+}
 static void auSetDest(AuBot &b, float tx, float ty) {
   b.dx = tx; b.dy = ty;
-  int cur = auNearestNode(b.x, b.y);
-  int dst = auNearestNode(tx, ty);
-  auRouteTo(dst);
+  int sx = (int)(b.x / 8.0f), sy = (int)(b.y / 8.0f);
+  int gx = (int)(tx / 8.0f), gy = (int)(ty / 8.0f);
+  if (gx < 0 || gy < 0 || gx >= AUW || gy >= AUH) { b.pn = 0; b.pi = 0; return; }
+  auBFS(sx, sy);
   b.pn = 0; b.pi = 0;
-  int n = cur;
-  while (n != dst && b.pn < 5) { n = auNH[n]; if (n < 0) break; b.path[b.pn++] = n; }
+  int c = gy * AUW + gx;
+  if (auPar[c] == -2) return; // inaccessible : il reste sur place
+  static int rev[AUW * AUH];
+  int n = 0;
+  while (c >= 0 && n < AUW * AUH) { rev[n++] = c; c = auPar[c]; }
+  for (int i = n - 2; i >= 0 && b.pn < 96; i--) b.path[b.pn++] = rev[i];
 }
 static void auBotWalk(AuBot &b, float dt, float spd) {
-  // V5.23 : coince DANS un mur (kill, glissade...) ? on le remet proprement sur un noeud
-  if (!auFree(b.x, b.y)) {
-    int n = auNearestNode(b.x, b.y);
-    b.x = AU_NX[n] * 8.0f + 4.0f; b.y = AU_NY[n] * 8.0f + 4.0f;
-    auSetDest(b, b.dx, b.dy);
+  if (!auFree(b.x, b.y)) { // coince dans un mur : on le remet sur la case libre la plus proche
+    int bx = (int)(b.x / 8.0f), by = (int)(b.y / 8.0f);
+    for (int r = 0; r <= 2; r++)
+      for (int dy2 = -r; dy2 <= r; dy2++)
+        for (int dx2 = -r; dx2 <= r; dx2++) {
+          int X = bx + dx2, Y = by + dy2;
+          if (X >= 0 && Y >= 0 && X < AUW && Y < AUH && auCell(X, Y) != '#') {
+            b.x = X * 8.0f + 4.0f; b.y = Y * 8.0f + 4.0f;
+            auSetDest(b, b.dx, b.dy);
+            return;
+          }
+        }
     return;
   }
-  float tx = (b.pi < b.pn) ? AU_NX[b.path[b.pi]] * 8.0f + 4.0f : b.dx;
-  float ty = (b.pi < b.pn) ? AU_NY[b.path[b.pi]] * 8.0f + 4.0f : b.dy;
+  float tx, ty;
+  if (b.pi < b.pn) { int c = b.path[b.pi]; tx = (c % AUW) * 8.0f + 4.0f; ty = (c / AUW) * 8.0f + 4.0f; }
+  else { tx = b.dx; ty = b.dy; }
   float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
   if (dl < 2.0f) { if (b.pi < b.pn) b.pi++; return; }
-  if (b.pi >= b.pn && !auClearLine(b.x, b.y, b.dx, b.dy)) { // derniere etape coupee par un mur
-    b.stuck += dt;                                          // on repasse par les couloirs
-    auSetDest(b, b.dx, b.dy);
-    if (b.stuck > 0.8f) { // V5.23 : vraiment coince → il renonce et va au noeud le plus proche de sa cible
-      b.stuck = 0;
-      int n = auNearestNode(b.dx, b.dy);
-      auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
-    }
-    return;
-  }
   float nx = b.x + ddx / dl * spd * dt, ny = b.y + ddy / dl * spd * dt;
-  if (auFree(nx, ny)) { b.x = nx; b.y = ny; b.stuck = 0; return; }  // chemin libre
-  if (auFree(nx, b.y)) { b.x = nx; b.stuck = 0; return; }           // glisse le long du mur (x)
-  if (auFree(b.x, ny)) { b.y = ny; b.stuck = 0; return; }           // glisse le long du mur (y)
+  if (auFree(nx, ny)) { b.x = nx; b.y = ny; b.stuck = 0; return; }
+  if (auFree(nx, b.y)) { b.x = nx; b.stuck = 0; return; }
+  if (auFree(b.x, ny)) { b.y = ny; b.stuck = 0; return; }
   b.stuck += dt;
-  if (b.stuck > 0.8f) { // V5.23 : mur infranchissable → teleport de secours sur un noeud
-    b.stuck = 0;
-    int n = auNearestNode(b.x, b.y);
-    b.x = AU_NX[n] * 8.0f + 4.0f; b.y = AU_NY[n] * 8.0f + 4.0f;
-    auSetDest(b, b.dx, b.dy);
-  }
+  if (b.stuck > 0.8f) { b.stuck = 0; auSetDest(b, b.dx, b.dy); } // secours
 }
 static bool auBotArrived(AuBot &b) {
   float ddx = b.dx - b.x, ddy = b.dy - b.y;
   return (b.pi >= b.pn) && (ddx * ddx + ddy * ddy < 4.0f);
 }
-static void auPanicTo(AuBot &b) { // il fonce vers le bouton d'alerte
+static void auPanicTo(AuBot &b) { // il fonce au bouton pour signaler
   b.panic = true; b.state = 3;
-  auSetDest(b, AU_BTNX, AU_BTNY);
+  auSetDest(b, auBtnX, auBtnY);
 }
-static void auNextTask(AuBot &b) { // lui fixe sa tache suivante comme destination
+static void auNextTask(AuBot &b) { // sa tache suivante comme destination
   b.state = 0;
   if (b.taskI < 4) auSetDest(b, AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f);
-  else { // taches finies : il erre de salle en salle
-    int n = rnd(AUN);
-    auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
+  else { // taches finies : il erre vers une case au hasard
+    for (int tries = 0; tries < 20; tries++) {
+      int cx = rnd(AUW), cy = rnd(AUH);
+      if (auCell(cx, cy) != '#') { auSetDest(b, cx * 8.0f + 4.0f, cy * 8.0f + 4.0f); return; }
+    }
+    auSetDest(b, auBtnX, auBtnY);
   }
+}
+// ---- V5.26 : interfaces Among Us ----
+static int auVoteScreen() { // renvoie l'index du bot vote, -1 si passer/annuler
+  waitRelease();
+  int nSlots = auBotN + 1; // les bots + PASSER
+  int sel = 0; int res = -2;
+  bool pU = false, pD = false, pL = false, pR = false, pO = false, pB = false;
+  while (res == -2) {
+    pollKeys();
+    int col = sel % 5, row = sel / 5;
+    if (kLeft && !pL && col > 0) { int s = sel - 1; while (s != auBotN && !auB[s].alive) s--; sel = s; }
+    if (kRight && !pR && col < 4 && sel + 1 < nSlots) { int s = sel + 1; while (s != auBotN && !auB[s].alive) s++; if (s < nSlots) sel = s; }
+    if (kUp && !pU && sel >= 5) { int s = sel - 5; if (s == auBotN || auB[s].alive) sel = s; }
+    if (kDown && !pD && sel + 5 < nSlots) { int s = sel + 5; if (s == auBotN || auB[s].alive) sel = s; }
+    if (keyOK && !pO) res = (sel == auBotN) ? -1 : sel;
+    if (keyBack && !pB) res = -1;
+    pU = kUp; pD = kDown; pL = kLeft; pR = kRight; pO = keyOK; pB = keyBack;
+    fRect(0, 0, SW, SH, KDColor::RGB24(0x1B1B25));
+    fRect(0, 0, SW, 20, KDColor::RGB24(0x2E3A4A)); fRect(0, 18, SW, 2, KDColor::RGB24(0xC51111));
+    drawTextC(7, "QUI EST L'IMPOSTEUR ?", KDColor::RGB24(0xF5C518));
+    for (int i = 0; i < nSlots; i++) {
+      int bx = 4 + (i % 5) * 63, by = 26 + (i / 5) * 62;
+      if (i == auBotN) { // PASSER, centre en bas
+        bx = 134; by = 26 + 3 * 62;
+        if (by > SH - 40) by = SH - 40;
+      }
+      rRect(bx, by, 56, 56, 6, (i == sel) ? C_YEL : KDColor::RGB24(0x252C3A));
+      if (i == auBotN) { drawText(bx + 13, by + 26, "PASSER", (i == sel) ? C_YEL : KDColor::RGB24(0x8B94A3)); continue; }
+      int cx = bx + 28, cy = by + 22;
+      if (auB[i].alive) {
+        drawBean(cx, cy, KDColor::RGB24(AU_BOTC[i]), false);
+        drawText(bx + 4, by + 44, AU_NAMES[i], (i == sel) ? C_YEL : KDColor::RGB24(0xD6E0F0));
+      } else {
+        drawCorpse(cx, cy, KDColor::RGB24(AU_BOTC[i]));
+        drawText(bx + 12, by + 44, "MORT", C_GRE);
+      }
+    }
+    drawTextC(210, "OK:VOTER   RETOUR:PASSER", C_GRE);
+    blit();
+    Ion::Timing::msleep(30);
+  }
+  waitRelease();
+  return res;
+}
+static void auEjectScreen(int bi, bool wasImp, int impsLeft) { // bi = -1 pour TOI
+  const char *nm = (bi < 0) ? "TOI" : AU_NAMES[bi];
+  uint32_t col = (bi < 0) ? 0x38FEDC : AU_BOTC[bi];
+  int t = 0;
+  while (t < 2800) {
+    pollKeys();
+    if (keyOK) break;
+    fRect(0, 0, SW, SH, KDColor::RGB24(0x0A0A14));
+    for (int s = 0; s < 40; s++) px((s * 53 + t / 25) % SW, (s * 37 + s * s) % SH, KDColor::RGB24(0x8B94A3));
+    drawBean(SW - t / 10, 96 + (t / 40) % 10, KDColor::RGB24(col), false);
+    drawTextC(30, "EJECTION...", C_WHT);
+    drawTextC(130, nm, KDColor::RGB24(col));
+    drawTextC(150, wasImp ? "ETAIT L'IMPOSTEUR !" : "N'ETAIT PAS L'IMPOSTEUR", wasImp ? KDColor::RGB24(0xC51111) : C_WHT);
+    drawTextC(172, "IMPOSTEURS RESTANTS:", C_GRE);
+    drawNum(SW / 2 + 92, 172, impsLeft, C_ORG);
+    drawTextC(200, "OK:CONTINUER", C_GRE);
+    blit();
+    Ion::Timing::msleep(30);
+    t += 30;
+  }
+  waitRelease();
+}
+static bool auWiringGame(int taskIdx) { // V5.26 : CABLAGE — renvoie true si complete
+  waitRelease();
+  static const uint32_t WC[3] = {0xC51111, 0xF5C518, 0x38FEDC};
+  int perm[3] = {0, 1, 2};
+  int s = taskIdx * 7 + 5;
+  for (int i = 2; i > 0; i--) { int j = s % (i + 1); s = s * 13 + 5; int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp; }
+  bool done[3] = {false, false, false};
+  int cur = 0, sel = 0, flashT = 0;
+  bool ok = false, pU = false, pD = false, pO = false, pB = false;
+  while (!ok) {
+    pollKeys();
+    if (kUp && !pU && sel > 0) sel--;
+    if (kDown && !pD && sel < 2) sel++;
+    if (keyOK && !pO) {
+      if (perm[sel] == cur) { done[cur] = true; while (cur < 3 && done[cur]) cur++; if (cur >= 3) ok = true; }
+      else flashT = 400;
+    }
+    if (keyBack && !pB) { waitRelease(); return false; }
+    pU = kUp; pD = kDown; pO = keyOK; pB = keyBack;
+    fRect(40, 40, 240, 130, KDColor::RGB24(0x1B1B25));
+    if (flashT > 0) { flashT -= 33; fRect(40, 40, 240, 3, KDColor::RGB24(0xC51111)); fRect(40, 167, 240, 3, KDColor::RGB24(0xC51111)); }
+    drawTextC(48, "CABLAGE : RELIE LES FILS", C_YEL);
+    for (int w = 0; w < 3; w++) { // fils a gauche (ordre fixe), bornes a droite (melangees)
+      int y = 80 + w * 30;
+      fRect(70, y - 3, 10, 10, KDColor::RGB24(WC[w]));
+      fRect(240, y - 3, 10, 10, KDColor::RGB24(WC[perm[w]]));
+      if (w == sel) drawText(230, y - 3, ">", C_YEL);
+      if (done[w]) auLine(80, y, 240, 80 + perm[w] * 30, KDColor::RGB24(WC[w]));
+    }
+    drawTextC(178, "FLECHES:CHOISIR  OK:BRANCHER", C_GRE);
+    drawTextC(196, "RETOUR:ABANDONNER", C_GRE);
+    blit();
+    Ion::Timing::msleep(33);
+  }
+  waitRelease();
+  return true;
+}
+static void auCameraOverlay() { // mini-carte + points rouges
+  while (true) {
+    pollKeys();
+    if (!kExp || keyBack) break;
+    fRect(0, 0, SW, SH, KDColor::RGB24(0x101018));
+    int mx = 40, my = 24, sc = 4;
+    for (int cy = 0; cy < AUH; cy++)
+      for (int cx = 0; cx < AUW; cx++)
+        if (auCell(cx, cy) != '#') fRect(mx + cx * sc, my + cy * sc, sc, sc, KDColor::RGB24(0x39404E));
+    for (int i = 0; i < auBotN; i++) {
+      if (!auB[i].alive) continue;
+      fRect(mx + (int)(auB[i].x / 8) * sc - 1, my + (int)(auB[i].y / 8) * sc - 1, 4, 4, KDColor::RGB24(0xC51111));
+    }
+    drawTextC(4, "CAMERAS DE SURVEILLANCE", C_GRE);
+    drawTextC(206, "EXE:QUITTER", C_GRE);
+    blit();
+    Ion::Timing::msleep(30);
+  }
+  waitRelease();
+}
+static void auVitalsOverlay() { // etat de chaque PNJ en direct
+  while (true) {
+    pollKeys();
+    if (!kExp || keyBack) break;
+    bgPanel();
+    drawTextC(16, "SIGNES VITAUX", C_YEL);
+    int ry = 36;
+    for (int i = 0; i < auBotN && ry < 200; i++) {
+      drawText(24, ry, AU_NAMES[i], KDColor::RGB24(AU_BOTC[i]));
+      drawText(120, ry, auB[i].alive ? "VIVANT" : "MORT", auB[i].alive ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
+      ry += 13;
+    }
+    drawTextC(206, "EXE:QUITTER", C_GRE);
+    blit();
+    Ion::Timing::msleep(30);
+  }
+  waitRelease();
 }
 
 static void amongUsGame() {
+  // ================== LOBBY V5.26 : joueurs, imposteurs, carte ==================
+  int players = 10, imps = 2, mapSel = 0;
+  {
+    int row = 0; bool pU = false, pD = false, pL = false, pR = false, pOK = false, pB = false;
+    waitRelease();
+    bool started = false;
+    while (!started) {
+      pollKeys();
+      if (kUp && !pU && row > 0) row--;
+      if (kDown && !pD && row < 2) row++;
+      if (kLeft && !pL) {
+        if (row == 0 && players > 5) players--;
+        if (row == 1 && imps > 1) imps--;
+        if (row == 2 && mapSel > 0) mapSel--;
+      }
+      if (kRight && !pR) {
+        if (row == 0 && players < 15) players++;
+        if (row == 1 && imps < 3 && imps * 2 < players - 1) imps++;
+        if (row == 2 && mapSel < 5) mapSel++;
+      }
+      if (keyOK && !pOK) { started = true; }
+      if (keyBack && !pB) return;
+      if (kHome) return;
+      pU = kUp; pD = kDown; pL = kLeft; pR = kRight; pOK = keyOK; pB = keyBack;
+      bgPanel();
+      drawTextC(12, "AMONG US MICRO", C_YEL);
+      for (int r = 0; r < 3; r++) fRect(36, 40 + r * 24, 248, 20, (r == row) ? KDColor::RGB24(0x2E3A4A) : KDColor::RGB24(0x1B1B25));
+      drawText(56, 45, "< JOUEURS", C_WHT); drawText(216, 45, ">", C_WHT); drawNum(236, 45, players, C_YEL);
+      drawText(56, 69, "< IMPOSTEURS", C_WHT); drawText(216, 69, ">", C_WHT); drawNum(236, 69, imps, C_YEL);
+      drawText(56, 93, "< CARTE", C_WHT); drawText(216, 93, ">", C_WHT); drawText(236, 93, AU_MAPNAMES[mapSel], C_YEL);
+      rRect(SW / 2 - 70, 140, 140, 22, 8, C_YEL);
+      drawTextC(146, "OK JOUER", C_BLK);
+      drawTextC(180, "RETOUR:ANNULER", C_GRE);
+      blit();
+      Ion::Timing::msleep(40);
+    }
+    waitRelease();
+  }
+  // ================== MISE EN PLACE ==================
+  auBotN = players - 1;
+  AU_MAP = AU_MAPS[mapSel];
+  AU_TX = AU_TXS[mapSel]; AU_TY = AU_TYS[mapSel];
+  AU_VX = AU_VXS[mapSel]; AU_VY = AU_VYS[mapSel];
+  auBtnX = AU_BTX[mapSel] * 8.0f + 4.0f; auBtnY = AU_BTY[mapSel] * 8.0f + 4.0f;
+  auCamXc = AU_CAMX[mapSel]; auCamYc = AU_CAMY[mapSel];
+  auVitXc = AU_VITX[mapSel]; auVitYc = AU_VITY[mapSel];
+  auWallC = AU_WALLC[mapSel]; auFlooC = AU_FLOOC[mapSel];
   auBodyN = 0; auTaskBar = 0.0f;
-  bool meImp = (rnd(100) < 45); // 45% imposteur, sinon membre d'equipage
-  int impBot = rnd(6);          // l'imposteur PNJ (si on est equipage)
-  float px = 30 * 8.0f + 4.0f, py = 8 * 8.0f + 4.0f; // spawn cafeteria
+  float px = AU_SPAWX[mapSel] * 8.0f + 4.0f, py = AU_SPAWY[mapSel] * 8.0f + 4.0f;
   int playerDir = 1, pTasks[4], pTaskI = 0;
-  float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 2.6f, impKillCd = 7.0f;
-  bool gSus = false; // V5.20 : fausse accusation en attente — le prochain vote te condamne
-  bool pGhost = false; // V5.22 : tue ? tu deviens FANTOME : invisible, traverse les murs, finit ses taches
-  float auZoom = 1.0f; // V5.21 : 1 = normal, 0.5 = zoom arriere (touche -)
+  float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 3.0f;
+  float lightT = 0.0f, sabCd = 0.0f, fixProg = 0.0f; // V5.26 : sabotage lumieres
+  bool gSus = false, pGhost = false, doTally = false;
+  int myVote = -1;
+  float auZoom = 1.0f;
   for (int i = 0; i < 4; i++) { // MES taches (si equipage)
     int t = rnd(12);
     for (int j = 0; j < i; j++) if (pTasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
     pTasks[i] = t;
   }
-  const int startNodes[6] = {3, 7, 9, 12, 15, 21};
-  for (int i = 0; i < 6; i++) {
+  bool meImp = (rnd(100) < (100 * imps / players));
+  int impsAlive = imps;
+  auBFS(AU_SPAWX[mapSel], AU_SPAWY[mapSel]); // pour repartir les spawns
+  int impBotsLeft = meImp ? imps - 1 : imps;
+  for (int i = 0; i < auBotN; i++) {
     AuBot &b = auB[i];
-    b.x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
-    b.y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
-    b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.accuse = -1; b.stuck = 0; b.ghost = false;
-    b.imp = (!meImp && i == impBot);
-    b.taskI = 0; b.t = 0;
-    for (int k = 0; k < 4; k++) { // 4 taches personnelles par membre d'equipage
+    b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.stuck = 0;
+    b.accuse = -1; b.ghost = false; b.imp = false; b.taskI = 0; b.t = 0; b.pi = 0; b.pn = 0;
+    b.x = px; b.y = py;
+    for (int tries = 0; tries < 40; tries++) { // spawn sur une case atteignable
+      int c = rnd(AUW * AUH);
+      if (auPar[c] != -2) { b.x = (c % AUW) * 8.0f + 4.0f; b.y = (c / AUW) * 8.0f + 4.0f; break; }
+    }
+    for (int k = 0; k < 4; k++) { // SES 4 taches personnelles
       int t = rnd(12);
       for (int j = 0; j < k; j++) if (b.tasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
       b.tasks[k] = t;
     }
     auNextTask(b);
   }
-  float totalTasks = meImp ? 20.0f : 24.0f; // V5.22 : 6 equipages x 4 taches (toi compte si equipage)
-  bool pOK = false, pExp = false, pBack = false, pPlus = false, pMn = false;
-  int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 temoin/signale, 4 abandon, 5 equip gagne, 6 tue
+  for (int g = 0; g < 200 && impBotsLeft > 0; g++) { int i = rnd(auBotN); if (!auB[i].imp) { auB[i].imp = true; impBotsLeft--; } }
+  int crew = players - imps;
+  float totalTasks = crew * 4.0f; // V5.26 : l'EQUIPAGE entier doit finir
+  bool pOK = false, pExp = false, pBack = false, pPlus = false, pMn = false, pDiv = false;
+  int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 imp ejete, 4 abandon, 5 equipage gagne
   float dt = 0.033f;
+  float visR = 100.0f;
   while (!endScreen) {
     pollKeys();
     if (kHome) { endScreen = 4; break; }
+    gTime += dt;
     if (introT > 0) { // revelation du role
       introT -= dt;
       if (keyOK && !pOK) introT = 0;
-      pOK = keyOK;
       fRect(0, 90, SW, 60, KDColor::RGB24(0x1B1B25));
-      drawTextC(104, meImp ? "TU ES L'IMPOSTEUR" : "TU ES MEMBRE D'EQUIPAGE", meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
-      drawTextC(126, meImp ? "ELIMINE TOUT LE MONDE" : "FAIS TES 4 TACHES", C_GRE);
-      drawTextC(140, "PERSONNE NE DOIT TE VOIR", C_GRE);
+      drawTextC(100, AU_MAPNAMES[mapSel], C_GRE);
+      drawTextC(112, meImp ? "TU ES IMPOSTEUR" : "TU ES MEMBRE D'EQUIPAGE", meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
+      drawTextC(128, meImp ? "ELIMINE TOUT LE MONDE" : "FAIS TES 4 TACHES", C_GRE);
+      pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus; pMn = kMinus; pDiv = kDiv;
       blit();
       Ion::Timing::msleep(30);
       continue;
     }
-    gTime += dt;
+    // ---- timers ----
     killCd -= dt; if (killCd < 0) killCd = 0;
     ventCd -= dt; if (ventCd < 0) ventCd = 0;
-    impKillCd -= dt; if (impKillCd < 0) impKillCd = 0;
-    if (meetT > 0) { // REUNION : tout le monde s'arrete, puis les corps sont nettoyes
+    sabCd -= dt; if (sabCd < 0) sabCd = 0;
+    lightT -= dt; if (lightT < 0) lightT = 0;
+    visR = (lightT > 0 && !meImp) ? 45.0f : 100.0f; // V5.26 : sabotage lumieres
+    if (meetT > 0) { // REUNION : tout le monde attend le vote
       meetT -= dt;
-      if (meetT <= 0) {
-        if (gSus) { // V5.23 : ta fausse accusation te fait EJECTER... mais tu continues en FANTOME
-          pGhost = true; gSus = false;
-        } else {
-          auBodyN = 0;
-          for (int i = 0; i < 6; i++)
-            if (auB[i].alive) { auB[i].panic = false; auB[i].witness = false; auNextTask(auB[i]); }
-          killCd = 10.0f; impKillCd = 8.0f;
-        }
-      }
+      if (meetT <= 0) doTally = true;
     } else {
       // ---- deplacement joueur ----
       float spd = 68.0f * dt;
@@ -6018,7 +6445,7 @@ static void amongUsGame() {
       if (kLeft) dx -= spd; if (kRight) dx += spd;
       if (kUp) dy -= spd; if (kDown) dy += spd;
       if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
-      if (pGhost) { // V5.22 : le fantome traverse TOUT (mais pas la carte)
+      if (pGhost) { // le fantome traverse TOUT (mais pas la carte)
         px += dx; py += dy;
         if (px < 4) px = 4; if (px > AUW * 8 - 4) px = AUW * 8 - 4;
         if (py < 4) py = 4; if (py > AUH * 8 - 4) py = AUH * 8 - 4;
@@ -6026,48 +6453,66 @@ static void amongUsGame() {
         if (dx && auFree(px + dx, py)) px += dx;
         if (dy && auFree(px, py + dy)) py += dy;
       }
-      if (kMinus && !pMn) auZoom = (auZoom < 1.0f) ? 1.0f : 0.5f; // V5.21 : - = zoom arriere
-      // ---- OK : TUER (imposteur) ou FAIRE UNE TACHE (equipage) ----
+      if (kMinus && !pMn) auZoom = (auZoom < 1.0f) ? 1.0f : 0.5f; // zoom arriere
+      // ---- OK : TUER (imposteur), TACHE (equipage), BOUTON D'URGENCE ----
       if (keyOK) {
-        if (meImp) {
+        if (meImp && !pGhost) {
           if (!pOK && killCd <= 0) {
             float bd = 1e9; int bi = -1;
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < auBotN; i++) {
               if (!auB[i].alive) continue;
               float ddx = auB[i].x - px, ddy = auB[i].y - py;
               float d2 = ddx * ddx + ddy * ddy;
               if (d2 < bd) { bd = d2; bi = i; }
             }
             if (bi >= 0 && bd < 17 * 17) {
-              auB[bi].alive = false; auB[bi].ghost = true; // V5.23 : il devient fantome
-              if (auBodyN < 8) { // V5.23 : garde-fou debordement
+              auB[bi].alive = false; auB[bi].ghost = true;
+              if (auBodyN < 16) {
                 auBodyX[auBodyN] = auB[bi].x; auBodyY[auBodyN] = auB[bi].y;
-                auBodyC[auBodyN] = AU_COL[bi + 1];
-                auBodySus[auBodyN] = 6; auBodyN++; // V5.22 : c'est TOI le dernier vu sur la scene
+                auBodyC[auBodyN] = AU_BOTC[bi];
+                auBodySus[auBodyN] = AU_MAXBOT; auBodyN++; // c'est TOI le dernier vu
               }
               auKills++; killCd = 10.0f;
-              for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il accuse LE KILLEUR
+              for (int w = 0; w < auBotN; w++) { // TEMOIN a moins de 48 px : il accuse LE KILLEUR
                 if (!auB[w].alive) continue;
                 float wx = auB[w].x - px, wy = auB[w].y - py;
-                if (wx * wx + wy * wy < 48 * 48) { auB[w].witness = true; auB[w].accuse = 6; auPanicTo(auB[w]); }
+                if (wx * wx + wy * wy < 48 * 48) { auB[w].witness = true; auB[w].accuse = AU_MAXBOT; auPanicTo(auB[w]); }
               }
               bool anyAlive = false;
-              for (int i = 0; i < 6; i++) if (auB[i].alive) anyAlive = true;
+              for (int i = 0; i < auBotN; i++) if (auB[i].alive) anyAlive = true;
               if (!anyAlive) endScreen = 1;
             }
           }
-        } else if (pTaskI < 4) { // maintenir OK sur SA tache pour la faire
+        } else if (!meImp && pTaskI < 4) { // FAIRE SA TACHE
           float tx = AU_TX[pTasks[pTaskI]] * 8.0f + 4.0f, ty = AU_TY[pTasks[pTaskI]] * 8.0f + 4.0f;
           float ddx = tx - px, ddy = ty - py;
           if (ddx * ddx + ddy * ddy < 13 * 13) {
-            pTaskProg += dt / 4.0f;
-            if (pTaskProg >= 1.0f) { pTaskProg = 0; pTaskI++; auTaskBar += 1.0f / totalTasks; }
-            // V5.22 : tes taches finies ne suffisent plus — l'EQUIPAGE doit tout finir (barre 100%)
-          }
+            if (pTasks[pTaskI] % 3 == 0) { // V5.26 : une tache sur trois = CABLAGE
+              if (!pOK && auWiringGame(pTasks[pTaskI])) {
+                pTaskI++; auTaskBar += 1.0f / totalTasks;
+              }
+            } else {
+              pTaskProg += dt / 4.0f;
+              if (pTaskProg >= 1.0f) { pTaskProg = 0; pTaskI++; auTaskBar += 1.0f / totalTasks; }
+            }
+          } else { pTaskProg = 0; }
         }
-      }
-      // ---- VENTILO (EXE) : imposteur seulement ----
-      if (meImp && kExp && !pExp && ventCd <= 0) {
+        // BOUTON D'URGENCE (equipage vivant, pas en reunion)
+        if (!meImp && !pGhost && !pOK && meetT <= 0) {
+          float bdx = auBtnX - px, bdy = auBtnY - py;
+          if (bdx * bdx + bdy * bdy < 14 * 14) meetT = 12.0f;
+        }
+        // REPARER LES LUMIERES (salle des vitals) quand sabotage actif
+        if (!meImp && !pGhost && lightT > 0) {
+          float fdx = auVitXc * 8.0f + 4.0f - px, fdy = auVitYc * 8.0f + 4.0f - py;
+          if (fdx * fdx + fdy * fdy < 13 * 13) {
+            fixProg += dt / 2.0f;
+            if (fixProg >= 1.0f) { fixProg = 0; lightT = 0; }
+          } else fixProg = 0;
+        } else fixProg = 0;
+      } else fixProg = 0;
+      // ---- EXE : ventilos (imposteur) / CAMERAS ou VITALS (equipage) ----
+      if (meImp && !pGhost && kExp && !pExp && ventCd <= 0) {
         for (int i = 0; i < 5; i++) {
           float vx = AU_VX[i] * 8.0f + 4.0f, vy = AU_VY[i] * 8.0f + 4.0f;
           float ddx = vx - px, ddy = vy - py;
@@ -6078,64 +6523,25 @@ static void amongUsGame() {
           }
         }
       }
-    }
-    // ---- V5.21 : VOTE (+) : interface pour designer le suspect (fonctionne partout) ----
-    if (kPlus && !pPlus && !endScreen && !pGhost) { // un fantome ne vote pas
-      if (gSus) { // V5.23 : ejecte pour fausse accusation — mais tu continues en FANTOME
-        pGhost = true; gSus = false;
+      if (!meImp && !pGhost && kExp) {
+        float cdx = auCamXc * 8.0f + 4.0f - px, cdy = auCamYc * 8.0f + 4.0f - py;
+        float vdx = auVitXc * 8.0f + 4.0f - px, vdy = auVitYc * 8.0f + 4.0f - py;
+        if (cdx * cdx + cdy * cdy < 14 * 14) auCameraOverlay();
+        else if (vdx * vdx + vdy * vdy < 14 * 14) auVitalsOverlay();
       }
+      // ---- DIV : SABOTAGE DES LUMIERES (imposteur joueur) ----
+      if (meImp && !pGhost && kDiv && !pDiv && sabCd <= 0) { lightT = 25.0f; sabCd = 35.0f; }
+    }
+    // ---- VOTE (+) : reunion instantanee avec interface de choix ----
+    if (kPlus && !pPlus && !endScreen && !pGhost) {
+      if (gSus) { pGhost = true; gSus = false; auEjectScreen(-1, meImp, impsAlive - (meImp ? 1 : 0)); }
       else {
-        waitRelease();
-        // V5.24 : interface de vote STYLE SELECTION DE BRAWLER — les crewmates en grille
-        static const char *AU_NAMES[6] = {"BLEU", "VERT", "ROSE", "ORANGE", "BLANC", "CYAN"};
-        static const int VSX[7] = {48, 136, 224, 48, 136, 224, 136}; // coins des cases
-        static const int VSY[7] = {52, 52, 52, 108, 108, 108, 164};   // slot 6 = PASSER
-        int sel = 0, res = -2; // res : -2 vote en cours, -1 passe, sinon : bot vote
-        bool pU = false, pD = false, pL2 = false, pR2 = false, pO = false, pB2 = false;
-        while (res == -2) {
-          pollKeys();
-          // navigation en grille : gauche/droite en cycle, haut/bas par saut de ligne
-          if (kLeft && !pL2) { int s = sel; do { s = (s + 6) % 7; } while (s != 6 && !auB[s].alive); sel = s; }
-          if (kRight && !pR2) { int s = sel; do { s = (s + 1) % 7; } while (s != 6 && !auB[s].alive); sel = s; }
-          if (kUp && !pU && sel >= 3) { int s = sel - 3; if (s == 6 || auB[s].alive) sel = s; }
-          if (kDown && !pD && sel + 3 <= 6) { int s = sel + 3; if (s == 6 || auB[s].alive) sel = s; }
-          if (keyOK && !pO) res = (sel == 6) ? -1 : sel;
-          if (keyBack && !pB2) res = -1;
-          pU = kUp; pD = kDown; pL2 = kLeft; pR2 = kRight; pO = keyOK; pB2 = keyBack;
-          // ---- ecran de vote : une case par crewmate (son cadavre s'il est mort) ----
-          fRect(0, 0, SW, SH, KDColor::RGB24(0x1B1B25));
-          fRect(0, 0, SW, 22, KDColor::RGB24(0x2E3A4A));
-          fRect(0, 20, SW, 2, KDColor::RGB24(0xC51111));
-          drawTextC(8, "QUI EST L'IMPOSTEUR ?", KDColor::RGB24(0xF5C518));
-          for (int i = 0; i < 7; i++) {
-            int bx = VSX[i], by = VSY[i];
-            rRect(bx, by, 48, 52, 6, (i == sel) ? C_YEL : KDColor::RGB24(0x252C3A));
-            if (i == 6) { // PASSER
-              drawText(bx + 8, by + 22, "PASSER", (i == sel) ? C_YEL : KDColor::RGB24(0x8B94A3));
-              continue;
-            }
-            int cx = bx + 24, cy = by + 22;
-            if (auB[i].alive) { // le crewmate, bien visible
-              drawBean(cx, cy, KDColor::RGB24(AU_COL[i + 1]), false);
-              drawText(bx + 6, by + 42, AU_NAMES[i], (i == sel) ? C_YEL : KDColor::RGB24(0xD6E0F0));
-            } else { // mort : son cadavre, grise et non selectionnable
-              drawCorpse(cx, cy, KDColor::RGB24(AU_COL[i + 1]));
-              drawText(bx + 10, by + 42, "MORT", C_GRE);
-            }
-          }
-          drawTextC(202, "OK:VOTER   RETOUR:PASSER", C_GRE);
-          blit();
-          Ion::Timing::msleep(30);
-        }
-        waitRelease();
-        if (res >= 0) {
-          if (auB[res].imp) endScreen = 3; // bien joue : l'imposteur est demasque !
-          else { auB[res].alive = false; auB[res].ghost = true; gSus = true; } // accuse a tort... tu restes SUS
-        }
+        int v = auVoteScreen();
+        if (v >= 0 || meetT > 0) { myVote = v; doTally = true; }
       }
     }
     // ---- pause ----
-    if (keyBack && !pBack) {
+    if (keyBack && !pBack && !endScreen) {
       waitRelease();
       bool resumed = false;
       while (!resumed) {
@@ -6145,305 +6551,371 @@ static void amongUsGame() {
         Ion::Timing::msleep(40);
       }
     }
-    // ---- V5.22 : qui traine pres de chaque corps ? (dernier vu sur la scene de crime) ----
+    // ---- qui traine pres de chaque corps ? ----
     for (int c = 0; c < auBodyN; c++)
-      for (int v = 0; v < 7; v++) {
-        float vx0 = (v == 6) ? px : auB[v].x, vy0 = (v == 6) ? py : auB[v].y;
-        bool va = (v == 6) ? !pGhost : auB[v].alive;
+      for (int v = 0; v <= auBotN; v++) {
+        float vx0 = (v == auBotN) ? px : auB[v].x, vy0 = (v == auBotN) ? py : auB[v].y;
+        bool va = (v == auBotN) ? !pGhost : auB[v].alive;
         if (!va) continue;
         float ddx = auBodyX[c] - vx0, ddy = auBodyY[c] - vy0;
-        if (ddx * ddx + ddy * ddy < 40 * 40) auBodySus[c] = v;
+        if (ddx * ddx + ddy * ddy < 40 * 40) auBodySus[c] = (v == auBotN) ? AU_MAXBOT : v;
       }
-    // ================== BOTS ==================
-    for (int i = 0; i < 6 && !endScreen; i++) {
-      AuBot &b = auB[i];
-      if (meetT > 0) continue;
-      if (!b.alive) { // V5.23 : un bot mort devient FANTOME : il erre a travers les murs
-        if (!b.ghost) continue;
+    // ================== BOOTS : IA des PNJ ==================
+    if (meetT <= 0 && !doTally) {
+      for (int i = 0; i < auBotN; i++) {
+        AuBot &b = auB[i];
+        if (!b.alive) { // FANTOME errant : traverse les murs
+          b.t -= dt;
+          if (b.t <= 0) {
+            b.t = 1.5f + rnd(20) * 0.1f;
+            b.dx = rnd(3) - 1; b.dy = rnd(3) - 1;
+            if (!b.dx && !b.dy) b.dx = 1;
+          }
+          float mv = 45.0f * dt;
+          b.x += b.dx * mv; b.y += b.dy * mv;
+          if (b.x < 4 || b.x > AUW * 8 - 4) { b.dx = -b.dx; b.x += b.dx * mv * 2; }
+          if (b.y < 4 || b.y > AUH * 8 - 4) { b.dy = -b.dy; b.y += b.dy * mv * 2; }
+          if (b.taskI < 4) { b.taskI = 4; } // ses taches sont mortes avec lui
+          continue;
+        }
         b.t -= dt;
-        if (b.t <= 0) { b.t = 2.0f + rnd(4); b.dx = rnd(AUW) * 8.0f + 4.0f; b.dy = rnd(AUH) * 8.0f + 4.0f; }
-        float ddx = b.dx - b.x, ddy = b.dy - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
-        if (dl > 3.0f) { b.x += ddx / dl * 20.0f * dt; b.y += ddy / dl * 20.0f * dt; }
-        continue;
-      }
-      if (b.panic) { // il fonce au bouton pour signaler
-        auBotWalk(b, dt, 54.0f);
-        float ddx = AU_BTNX - b.x, ddy = AU_BTNY - b.y;
-        if (ddx * ddx + ddy * ddy < 10 * 10) {
-          if (b.witness && b.accuse >= 0) { // V5.22 : accusation nominative du temoin
-            if (b.accuse == 6) { pGhost = true; gSus = false; } // V5.23 : vu sur la scene = EJECTE... en fantome
-            else if (auB[b.accuse].imp) endScreen = 3; // l'imposteur est demasque
-            else auB[b.accuse].alive = false, auB[b.accuse].ghost = true; // innocent ejete sur temoignage (fantome)
-            b.panic = false; b.witness = false; b.accuse = -1; b.state = 0; auNextTask(b);
+        if (b.stuck > 0) b.stuck -= dt;
+        if (b.flee > 0) b.flee -= dt;
+        if (b.panic) { // panique : fonce au bouton d'urgence
+          auSetDest(b, auBtnX, auBtnY);
+          if (auBotArrived(b)) {
+            b.panic = false;
+            meetT = 12.0f; // REUNION declenchee par le bot
           }
-          else if (b.witness) endScreen = 3; // un TEMOIN direct : ejection !
-          else { meetT = 3.0f; b.panic = false; b.state = 0; auNextTask(b); } // corps signale : reunion sans coupable
+          auBotWalk(b, dt, 60.0f);
+          continue;
         }
-        continue;
-      }
-      // un bot vivant passe pres d'un cadavre ? il va le signaler (le corps ne designe personne)
-      b.flee -= dt; if (b.flee < 0) b.flee = 0;
-      for (int c = 0; c < auBodyN; c++) {
-        float ddx = auBodyX[c] - b.x, ddy = auBodyY[c] - b.y;
-        if (ddx * ddx + ddy * ddy < 30 * 30) {
-          if (b.imp) { // V5.20 : l'imposteur PNJ ne DECLARE JAMAIS un corps : il s'en ecarte
-            if (b.flee <= 0) {
-              int n = rnd(AUN);
-              auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
-              b.state = 0; b.flee = 4.0f;
+        // decouverte d'un corps ?
+        for (int c = 0; c < auBodyN; c++) {
+          float ddx = auBodyX[c] - b.x, ddy = auBodyY[c] - b.y;
+          if (ddx * ddx + ddy * ddy < 44 * 44 && b.t <= 0) {
+            b.t = 4.0f; // ne re-decouvre pas tout de suite
+            if (b.imp) { // un imposteur ne signale JAMAIS : il s'ecarte
+              b.flee = 4.0f;
+              int rx = rnd(AUW), ry = rnd(AUH);
+              if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
+            } else {
+              int sus = auBodySus[c];
+              if (sus == i) sus = -1;
+              if (sus >= 0 && sus != AU_MAXBOT && !auB[sus].alive) sus = -1; // suspect deja mort
+              if (sus == AU_MAXBOT && pGhost) sus = -1; // le fantome joueur n'est plus montrable
+              b.accuse = sus; b.witness = (sus >= 0);
+              auPanicTo(b);
             }
-          } else { // V5.22 : il signale ET designe le dernier vu sur la scene de crime
-            int s = auBodySus[c];
-            if (s == i) s = -1;                           // lui-meme : pas d'accusation
-            if (s >= 0 && s < 6 && !auB[s].alive) s = -1; // suspect deja mort
-            if (s == 6 && pGhost) s = -1;
-            b.witness = false; b.accuse = s; auPanicTo(b);
-          }
-          break;
-        }
-      }
-      if (b.panic) continue;
-      // l'imposteur PNJ chasse quand il est seul avec quelqu'un
-      if (b.imp && impKillCd <= 0) {
-        bool victim = false;
-        float vx = 0, vy = 0;
-        for (int v = 0; v < 6 && !victim; v++) { // victime : un bot d'equipage isole
-          if (v == i || !auB[v].alive || auB[v].imp) continue;
-          float ddx = auB[v].x - b.x, ddy = auB[v].y - b.y;
-          if (ddx * ddx + ddy * ddy < 14 * 14) {
-            victim = true; vx = auB[v].x; vy = auB[v].y;
-            for (int w = 0; w < 6; w++) { // personne d'autre autour ?
-              if (w == i || w == v || !auB[w].alive) continue;
-              float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
-              if (wx * wx + wy * wy < 70 * 70) { victim = false; break; }
-            }
-            float wx = px - b.x, wy = py - b.y; // le joueur compte comme temoin (pas le fantome)
-            if (!pGhost && wx * wx + wy * wy < 70 * 70) victim = false;
+            break;
           }
         }
-        if (!victim && !pGhost) { // sinon... TOI, si personne ne regarde (un fantome ne compte pas)
-          float ddx = px - b.x, ddy = py - b.y;
-          if (ddx * ddx + ddy * ddy < 14 * 14) {
-            victim = true; vx = px; vy = py;
-            for (int w = 0; w < 6; w++) {
-              if (w == i || !auB[w].alive) continue;
-              float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
-              if (wx * wx + wy * wy < 70 * 70) { victim = false; break; }
+        if (b.panic) continue;
+        if (b.imp && b.flee <= 0) { // IMPOSTEUR PNJ
+          if (lightT <= 0 && rnd(2000) == 0) { lightT = 25.0f; } // sabotage spontane
+          if (b.taskI >= 4 || b.t > 0) { // taches finies ou "pause" : TRAQUE le plus proche
+            float bd = 1e9; int vic = -1;
+            bool vicIsPlayer = false;
+            for (int v = 0; v < auBotN; v++) {
+              if (v == i || !auB[v].alive || auB[v].imp) continue;
+              float ddx = auB[v].x - b.x, ddy = auB[v].y - b.y;
+              float d2 = ddx * ddx + ddy * ddy;
+              if (d2 < bd) { bd = d2; vic = v; }
             }
-          }
-        }
-        if (victim) {
-          if (vx == px && vy == py) { // V5.22 : il t'a eu... mais tu deviens FANTOME !
-            pGhost = true;
-            if (auBodyN < 8) {
-              auBodyX[auBodyN] = px; auBodyY[auBodyN] = py; auBodyC[auBodyN] = 0x38FEDC;
-              auBodySus[auBodyN] = i; auBodyN++; // ton corps designe l'imposteur
+            if (!meImp && !pGhost) {
+              float ddx = px - b.x, ddy = py - b.y;
+              float d2 = ddx * ddx + ddy * ddy;
+              if (d2 < bd) { bd = d2; vicIsPlayer = true; }
             }
-            impKillCd = 9.0f;
-          }
-          else {
-            for (int v = 0; v < 6; v++)
-              if (auB[v].alive && !auB[v].imp && auB[v].x == vx && auB[v].y == vy) {
-                auB[v].alive = false; auB[v].ghost = true; // V5.23 : fantome
-                if (auBodyN < 8) {
-                  auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1];
-                  auBodySus[auBodyN] = i; auBodyN++; // V5.22 : l'imposteur etait sur la scene
-                }
-                for (int w = 0; w < 6; w++) { // temoins : ils accusent LE KILLEUR
-                  if (w == i || w == v || !auB[w].alive || auB[w].imp) continue;
-                  float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
-                  if (wx * wx + wy * wy < 60 * 60) { auB[w].witness = true; auB[w].accuse = i; auPanicTo(auB[w]); }
-                }
+            // victime isolee (pas de temoin a 70 px) ?
+            if (vic >= 0 || vicIsPlayer) {
+              float vx0 = vicIsPlayer ? px : auB[vic].x, vy0 = vicIsPlayer ? py : auB[vic].y;
+              bool isolated = true;
+              for (int w = 0; w < auBotN; w++) {
+                if (w == i || !auB[w].alive || w == vic) continue;
+                float wx = auB[w].x - vx0, wy = auB[w].y - vy0;
+                if (wx * wx + wy * wy < 70 * 70) { isolated = false; break; }
               }
-            impKillCd = 9.0f;
+              if (!vicIsPlayer && !pGhost) {
+                float wx = px - vx0, wy = py - vy0;
+                if (wx * wx + wy * wy < 70 * 70) isolated = false;
+              }
+              if (isolated && bd < 26 * 26) { // KILL !
+                if (vicIsPlayer) { endScreen = 1; break; }
+                auB[vic].alive = false; auB[vic].ghost = true;
+                if (auBodyN < 16) {
+                  auBodyX[auBodyN] = auB[vic].x; auBodyY[auBodyN] = auB[vic].y;
+                  auBodyC[auBodyN] = AU_BOTC[vic]; auBodySus[auBodyN] = i; auBodyN++;
+                }
+                b.flee = 4.0f;
+                int rx = rnd(AUW), ry = rnd(AUH);
+                if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
+                b.t = 1.5f;
+              } else if (bd < 300 * 300) { // approche
+                auSetDest(b, vx0, vy0);
+              }
+            }
+          } else { // fait SEMBLANT de faire ses taches
+            float tx = AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, ty = AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f;
+            auSetDest(b, tx, ty);
+            if (auBotArrived(b)) { b.taskI++; b.t = 2.0f + rnd(30) * 0.1f; }
+          }
+        } else if (!b.imp) { // CREW PNJ
+          if (lightT > 0) { // sabotage actif : le plus proche va reparer
+            float myd = (b.x - auVitXc * 8.0f - 4.0f) * (b.x - auVitXc * 8.0f - 4.0f) + (b.y - auVitYc * 8.0f - 4.0f) * (b.y - auVitYc * 8.0f - 4.0f);
+            bool iGo = true;
+            for (int w = 0; w < auBotN; w++) {
+              if (w == i || !auB[w].alive || auB[w].imp) continue;
+              float wd = (auB[w].x - auVitXc * 8.0f - 4.0f) * (auB[w].x - auVitXc * 8.0f - 4.0f) + (auB[w].y - auVitYc * 8.0f - 4.0f) * (auB[w].y - auVitYc * 8.0f - 4.0f);
+              if (wd < myd) { iGo = false; break; }
+            }
+            if (iGo) {
+              auSetDest(b, auVitXc * 8.0f + 4.0f, auVitYc * 8.0f + 4.0f);
+              if (auBotArrived(b)) { lightT = 0; }
+              auBotWalk(b, dt, 55.0f);
+              continue;
+            }
+          }
+          if (b.taskI < 4) {
+            float tx = AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, ty = AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f;
+            auSetDest(b, tx, ty);
+            if (auBotArrived(b)) {
+              if (b.state == 1) { b.t -= dt; if (b.t <= 0) { b.taskI++; auTaskBar += 1.0f / totalTasks; } }
+              else { b.state = 1; b.t = 4.0f; }
+            } else b.state = 0;
+          } else { // ses taches sont finies : erre tranquille
+            if (auBotArrived(b) || b.pn == 0) {
+              int rx = rnd(AUW), ry = rnd(AUH);
+              if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
+            }
           }
         }
+        auBotWalk(b, dt, 55.0f);
+        auBotArrived(b);
       }
-      if (endScreen) break;
-      if (b.state == 1) { // il fait sa tache
-        b.t -= dt;
-        if (b.t <= 0) {
-          b.taskI++;
-          if (!b.imp) auTaskBar += 1.0f / totalTasks; // les taches de l'imposteur ne comptent pas
-          auNextTask(b);
+    }
+    // ---- conditions de victoire ----
+    if (!endScreen) {
+      int crewN = (!meImp && !pGhost ? 1 : 0);
+      int impN = (meImp && !pGhost ? 1 : 0);
+      for (int i = 0; i < auBotN; i++) {
+        if (!auB[i].alive) continue;
+        if (auB[i].imp) impN++; else crewN++;
+      }
+      if (crewN == 0) endScreen = 1;
+      else if (impN == 0) endScreen = 3;
+      else if (auTaskBar >= 0.999f) endScreen = meImp ? 2 : 5;
+    }
+    // ================== DEPOUILLEMENT DES VOTES ==================
+    if (doTally && !endScreen) {
+      int votes[AU_MAXBOT + 1] = {0};
+      if (myVote >= 0 && myVote <= auBotN) votes[myVote]++;
+      // mon vote sur le joueur ?
+      if (myVote == AU_MAXBOT) votes[AU_MAXBOT]++; // impossible via l'interface, securite
+      int wVote = -1;
+      for (int i = 0; i < auBotN; i++) { // les temoins accusent
+        AuBot &b = auB[i];
+        if (!b.alive || b.imp) continue;
+        if (b.witness && b.accuse >= 0 && b.accuse <= auBotN) {
+          if (b.accuse < auBotN && !auB[b.accuse].alive) continue;
+          votes[b.accuse]++;
+          if (wVote < 0) wVote = b.accuse;
+        }
+      }
+      for (int i = 0; i < auBotN; i++) { // les autres suivent ou s'abstiennent
+        AuBot &b = auB[i];
+        if (!b.alive || b.imp) continue;
+        if (b.witness && b.accuse >= 0) continue;
+        if (gSus) { votes[AU_MAXBOT]++; continue; } // mefiance generale contre TOI
+        if (wVote >= 0 && rnd(100) < 70) votes[wVote]++;
+        else if (rnd(100) < 35) {
+          int cand = rnd(auBotN);
+          if (auB[cand].alive && !auB[cand].imp) votes[cand]++;
+        }
+      }
+      int best = -1, bestV = 0;
+      for (int c = 0; c <= auBotN; c++) {
+        if (c == AU_MAXBOT && (meImp || pGhost)) continue;
+        if (c < auBotN && !auB[c].alive) continue;
+        if (votes[c] > bestV) { bestV = votes[c]; best = c; }
+      }
+      if (best == AU_MAXBOT) { // TOI ejecte
+        pGhost = true;
+        auEjectScreen(-1, meImp, impsAlive - (meImp ? 1 : 0));
+        if (meImp) impsAlive--;
+      } else if (best >= 0) { // un bot ejecte
+        bool wasImp = auB[best].imp;
+        auB[best].alive = false; auB[best].ghost = true;
+        auEjectScreen(best, wasImp, impsAlive - (wasImp ? 1 : 0));
+        if (wasImp) impsAlive--;
+        if (myVote == best && !wasImp) gSus = true; // FAUSSE ACCUSATION
+        if (impsAlive <= 0) endScreen = 3;
+      }
+      // cleanup de la reunion
+      auBodyN = 0;
+      myVote = -1; doTally = false; meetT = 0;
+      for (int i = 0; i < auBotN; i++) {
+        auB[i].panic = false; auB[i].witness = false; auB[i].accuse = -1;
+        auB[i].state = 0; auB[i].t = 0;
+        if (auB[i].alive && !auB[i].imp && auB[i].taskI < 4) auNextTask(auB[i]);
+      }
+      killCd = 10.0f; ventCd = 0; sabCd = 15.0f;
+    }
+    // ================== RENDU ==================
+    float z = auZoom; // 1.0 ou 0.5 (zoom arriere)
+    float ts = 8.0f * z;
+    float vpW = SW / z, vpH = (SH - 40) / z;
+    float camX = px - vpW / 2, camY = py - vpH / 2;
+    if (camX < 0) camX = 0; if (camX > AUW * 8 - vpW) camX = AUW * 8 - vpW;
+    if (camY < 0) camY = 0; if (camY > AUH * 8 - vpH) camY = AUH * 8 - vpH;
+    if (vpW > AUW * 8) camX = (AUW * 8 - vpW) / 2;
+    if (vpH > AUH * 8) camY = (AUH * 8 - vpH) / 2;
+    fRect(0, 0, SW, SH - 40, KDColor::RGB24(0x232833));
+    // carte (spans de cellules identiques)
+    int c0x = (int)(camX / 8) - 1, c1x = (int)((camX + vpW) / 8) + 1;
+    int c0y = (int)(camY / 8) - 1, c1y = (int)((camY + vpH) / 8) + 1;
+    if (c0x < 0) c0x = 0; if (c0y < 0) c0y = 0;
+    if (c1x > AUW - 1) c1x = AUW - 1; if (c1y > AUH - 1) c1y = AUH - 1;
+    for (int cy = c0y; cy <= c1y; cy++) {
+      int cx = c0x;
+      while (cx <= c1x) {
+        if (auCell(cx, cy) == ' ') { cx++; continue; }
+        int sx = cx;
+        while (cx <= c1x && auCell(cx, cy) != ' ') cx++;
+        fRect((sx * 8 - camX) * z, (cy * 8 - camY) * z, (cx - sx) * ts, ts, KDColor::RGB24(auFlooC));
+        for (int k = sx; k < cx; k++)
+          if (auCell(k, cy) == '#') fRect((k * 8 - camX) * z, (cy * 8 - camY) * z, ts, ts, KDColor::RGB24(auWallC));
+      }
+    }
+    // taches / vents / bouton / spot cameras / vitals
+    for (int i = 0; i < 12; i++) {
+      float tx = AU_TX[i] * 8.0f - camX, ty = AU_TY[i] * 8.0f - camY;
+      fRect(tx * z, ty * z, ts, ts, KDColor::RGB24(0x2FBF71));
+    }
+    for (int i = 0; i < 5; i++) {
+      float vx = AU_VX[i] * 8.0f - camX, vy = AU_VY[i] * 8.0f - camY;
+      oCirc((vx + 4) * z, (vy + 4) * z, 5 * z, false, meImp && !pGhost ? KDColor::RGB24(0x888899) : C_GRE);
+    }
+    fRect((auBtnX - 6 - camX) * z, (auBtnY - 6 - camY) * z, 12 * z, 12 * z, KDColor::RGB24(0xC51111));
+    oCirc((auCamXc * 8 + 4 - camX) * z, (auCamYc * 8 + 4 - camY) * z, 5 * z, true, KDColor::RGB24(0x3FC1FF));
+    oCirc((auVitXc * 8 + 4 - camX) * z, (auVitYc * 8 + 4 - camY) * z, 5 * z, true, KDColor::RGB24(0x38FEDC));
+    if (lightT > 0) oCirc((auVitXc * 8 + 4 - camX) * z, (auVitYc * 8 + 4 - camY) * z, 8 * z, false, KDColor::RGB24(0xF07D0D));
+    // cadavres (visibles seulement dans le champ de vision)
+    for (int c = 0; c < auBodyN; c++) {
+      float d = (auBodyX[c] - px) * (auBodyX[c] - px) + (auBodyY[c] - py) * (auBodyY[c] - py);
+      if (!pGhost && d > visR * visR) continue;
+      if (!pGhost && !auClearLine(px, py, auBodyX[c], auBodyY[c])) continue;
+      drawCorpse((auBodyX[c] - camX) * z, (auBodyY[c] - camY) * z, KDColor::RGB24(auBodyC[c]));
+    }
+    // PNJ vivants
+    for (int i = 0; i < auBotN; i++) {
+      AuBot &b = auB[i];
+      if (!b.alive) {
+        if (pGhost) { // les fantomes voient les fantomes
+          oCirc((b.x - camX) * z, (b.y - camY) * z, 5.0f * z, false, KDColor::RGB24(AU_BOTC[i]));
         }
         continue;
       }
-      auBotWalk(b, dt, 30.0f);
-      if (auBotArrived(b)) {
-        if (b.imp && impKillCd <= 0) { // V5.20 : l'imposteur PNJ FAIT SEMBLANT de faire ses
-          // taches... et des que son kill est pret, il se met a TRAQUER le plus proche
-          float bd = 1e9; int vi = -1;
-          for (int v = 0; v < 6; v++) {
-            if (!auB[v].alive || auB[v].imp) continue;
-            float ddx = auB[v].x - b.x, ddy = auB[v].y - b.y;
-            float d2 = ddx * ddx + ddy * ddy;
-            if (d2 < bd) { bd = d2; vi = v; }
-          }
-          if (vi >= 0) auSetDest(b, auB[vi].x, auB[vi].y); // il se dirige vers sa victime
-          else if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
-          else auNextTask(b);
-        }
-        else if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
-        else auNextTask(b); // taches finies : il erre
-      }
+      float d = (b.x - px) * (b.x - px) + (b.y - py) * (b.y - py);
+      if (!pGhost && (d > visR * visR || !auClearLine(px, py, b.x, b.y))) continue;
+      drawBean((b.x - camX) * z, (b.y - camY) * z, KDColor::RGB24(AU_BOTC[i]), false);
     }
-    { // V5.22 : plus aucun equipage debout ? l'imposteur gagne
-      int crewN = (!meImp && !pGhost) ? 1 : 0;
-      for (int i = 0; i < 6; i++) if (auB[i].alive && !auB[i].imp) crewN++;
-      if (crewN == 0) endScreen = 1;
-    }
-    if (auTaskBar >= 1.0f) endScreen = meImp ? 2 : 5; // taches finies : l'equipage gagne
-    pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus; pMn = kMinus;
-
-    // ===================== RENDU =====================
-    float z = auZoom; // V5.21 : zoom (1 = normal, 0.5 = vue large)
-    int ts = (z < 1.0f) ? 4 : 8;  // taille d'une case a l'ecran
-    int vpW = (int)(SW / z), vpH = (int)(SH / z);
-    int camX = (int)px - vpW / 2; int mX = AUW * 8 - vpW; if (mX < 0) mX = 0;
-    if (camX < 0) camX = 0; if (camX > mX) camX = mX;
-    int camY = (int)py - vpH / 2; int mY = AUH * 8 - vpH; if (mY < 0) mY = 0;
-    if (camY < 0) camY = 0; if (camY > mY) camY = mY;
-    fRect(0, 0, SW, SH, KDColor::RGB24(0x232833)); // fond (hors carte en zoom arriere)
-    int cX0 = camX / 8, cY0 = camY / 8, cX1 = (camX + vpW) / 8, cY1 = (camY + vpH) / 8;
-    for (int cy = cY0; cy <= cY1 && cy < AUH; cy++) { // carte en spans (perf)
-      int x0 = cX0;
-      while (x0 <= cX1 && x0 < AUW) {
-        char c = auCell(x0, cy); int x1 = x0;
-        while (x1 + 1 <= cX1 && x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
-        int rx = (int)((x0 * 8 - camX) * z), rw = (int)((x1 - x0 + 1) * 8 * z), ry = (int)((cy * 8 - camY) * z);
-        if (rx < 0) { rw += rx; rx = 0; }
-        if (rx + rw > SW) rw = SW - rx;
-        if (rw > 0) fRect(rx, ry, rw, ts, (c == '#') ? KDColor::RGB24(0x2E3A4A) : KDColor::RGB24(0x8B94A3));
-        x0 = x1 + 1;
-      }
-    }
-    for (int k = 0; k < 12; k++) { // taches
-      int rx = (int)((AU_TX[k] * 8 + 4 - camX) * z), ry = (int)((AU_TY[k] * 8 + 4 - camY) * z);
-      int qs = (z < 1.0f) ? 3 : 6;
-      if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
-      fRect(rx - qs / 2, ry - qs / 2, qs, qs, KDColor::RGB24(0xF5C518));
-      fRect(rx - qs / 2 + 1, ry - qs / 2 + 1, qs - 2, qs - 2, KDColor::RGB24(0xB08A10));
-    }
-    if (!meImp && pTaskI < 4 && ((int)(gTime * 4) % 2)) { // MA tache courante clignote
-      int rx = (int)((AU_TX[pTasks[pTaskI]] * 8 + 4 - camX) * z), ry = (int)((AU_TY[pTasks[pTaskI]] * 8 + 4 - camY) * z);
-      int qs = (z < 1.0f) ? 5 : 12;
-      fRect(rx - qs / 2, ry - qs / 2, qs, qs, KDColor::RGB24(0xF5C518));
-    }
-    for (int i = 0; i < 5; i++) { // ventilos
-      int rx = (int)((AU_VX[i] * 8 - camX) * z), ry = (int)((AU_VY[i] * 8 - camY) * z);
-      if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
-      int vs = (z < 1.0f) ? 4 : 8;
-      fRect(rx, ry, vs, vs, KDColor::RGB24(0x55606E));
-      fRect(rx + 1, ry + vs / 3, vs - 2, 1, KDColor::RGB24(0x2E3A4A));
-      fRect(rx + 1, ry + 2 * vs / 3, vs - 2, 1, KDColor::RGB24(0x2E3A4A));
-    }
-    int brx = (int)((AU_BTNX - camX) * z), bry = (int)((AU_BTNY - camY) * z);
-    fCirc(brx, bry, (z < 1.0f) ? 3 : 5, KDColor::RGB24(0xC51111));
-    fRing(brx, bry, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0x7A0A0A));
-    // vision limitee : ~100 px ET ligne de visee libre (un fantome voit TOUT)
-    for (int c = 0; c < auBodyN; c++) {
-      float ddx = auBodyX[c] - px, ddy = auBodyY[c] - py;
-      if (!pGhost && (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auBodyX[c], auBodyY[c]))) continue;
-      int rx = (int)((auBodyX[c] - camX) * z), ry = (int)((auBodyY[c] - camY) * z);
-      if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(auBodyC[c]));
-      else drawCorpse(rx, ry, KDColor::RGB24(auBodyC[c]));
-    }
-    for (int i = 0; i < 6; i++) {
-      if (!auB[i].alive) continue;
-      float ddx = auB[i].x - px, ddy = auB[i].y - py;
-      if (!pGhost && (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auB[i].x, auB[i].y))) continue;
-      int rx = (int)((auB[i].x - camX) * z), ry = (int)((auB[i].y - camY) * z);
-      if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(AU_COL[i + 1]));
-      else drawBean(rx, ry, KDColor::RGB24(AU_COL[i + 1]), auB[i].x > px);
-      if (auB[i].panic) drawText(rx + 6, ry - 16, "!", KDColor::RGB24(0xC51111));
-      else if (auB[i].state == 1) drawText(rx + 6, ry - 16, "...", KDColor::RGB24(0xF5C518));
-    }
-    if (pGhost) // V5.23 : les fantomes des bots morts — visibles UNIQUEMENT par un fantome
-      for (int i = 0; i < 6; i++) {
-        if (auB[i].alive || !auB[i].ghost) continue;
-        int rx = (int)((auB[i].x - camX) * z), ry = (int)((auB[i].y - camY) * z);
-        oCirc(rx, ry - 1, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0xE8F1F7), KDColor::RGB24(AU_COL[i + 1]));
-        fRect(rx - 2, ry - 2, 1, 2, KDColor::RGB24(0x1B1B25)); fRect(rx + 1, ry - 2, 1, 2, KDColor::RGB24(0x1B1B25));
-      }
-    if (pGhost) { // V5.22 : toi en fantome — un voile blanc, personne ne te voit
-      int gx = (int)((px - camX) * z), gy = (int)((py - camY) * z);
-      oCirc(gx, gy - 1, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0xE8F1F7), KDColor::RGB24(0x9ACAD5));
-      fRect(gx - 2, gy - 2, 1, 2, KDColor::RGB24(0x1B1B25)); fRect(gx + 1, gy - 2, 1, 2, KDColor::RGB24(0x1B1B25)); // yeux
-    } else if (z < 1.0f) { // toi, en petit en zoom arriere
-      fCirc((int)((px - camX) * z), (int)((py - camY) * z), 3, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
-      fRect((int)((px - camX) * z), (int)((py - camY) * z) - 2, 2, 1, KDColor::RGB24(0xC6F0F7));
-    } else drawBean((int)px - camX, (int)py - camY, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), playerDir == 0);
-    // ---- V5.22 : plus de gris ! un rond jaune tres clair marque ta zone de vision ----
-    if (!pGhost) fRing((int)((px - camX) * z), (int)((py - camY) * z), (int)(100 * z), KDColor::RGB24(0xFFF3A8));
-    // HUD haut : barre des taches d'equipage
-    fRect(0, 0, SW, 13, KDColor::RGB24(0x1B1B25));
-    fRect(4, 3, 190, 7, KDColor::RGB24(0x3A3A4A));
-    fRect(5, 4, (int)(188 * auTaskBar), 5, KDColor::RGB24(0x38E05C));
-    drawText(198, 3, "EQ:", KDColor::RGB24(0xD6E0F0));
-    int aliveN = 0; for (int i = 0; i < 6; i++) if (auB[i].alive) aliveN++;
-    drawNum(224, 3, aliveN, KDColor::RGB24(0xD6E0F0));
-    // HUD bas : selon le role
-    fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
-    if (pGhost) { // V5.22 : HUD fantome
-      drawText(4, SH - 10, "FANTOME : OK:TACHE, MURS LIBRES", KDColor::RGB24(0x9ACAD5));
-    } else if (meImp) {
-      drawText(4, SH - 10, "OK:TUER EXE:VENT +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
-      fRect(192, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
-      fRect(193, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
+    // joueur
+    if (pGhost) {
+      oCirc((px - camX) * z, (py - camY) * z, 6.0f * z, false, C_WHT);
+      oCirc((px - camX) * z, (py - camY) * z - 2, 2.0f * z, true, C_WHT);
     } else {
-      if (pTaskI < 4) drawText(4, SH - 10, "OK:TACHE +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
-      else drawText(4, SH - 10, "TACHES PERSO OK : AIDE L'EQUIPAGE", KDColor::RGB24(0xD6E0F0));
-      if (pTaskI < 4) {
-        fRect(236, SH - 9, 60, 7, KDColor::RGB24(0x3A3A4A));
-        fRect(237, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));
-        drawNum(300, SH - 10, pTaskI + 1, C_ORG);
+      drawBean((px - camX) * z, (py - camY) * z, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), (playerDir == 0);
+    }
+    // ---- POLYGONE DE VISION (raycast arrete par les murs) ----
+    if (!pGhost) {
+      float ray[40][2];
+      for (int r = 0; r < 40; r++) {
+        float ang = r * 0.15708f;
+        float c = fcosf(ang), s = fsinf(ang);
+        float d = 5.0f;
+        while (d < visR) {
+          if (auSolidPx(px + c * d, py + s * d)) break;
+          d += 5.0f;
+        }
+        if (d > visR) d = visR;
+        ray[r][0] = (px + c * d - camX) * z;
+        ray[r][1] = (py + s * d - camY) * z;
+      }
+      for (int r = 0; r < 40; r++) {
+        int r2 = (r + 1) % 40;
+        auLine(ray[r][0], ray[r][1], ray[r2][0], ray[r2][1], KDColor::RGB24(0xFFF3A8));
       }
     }
-    if (gSus) drawText(256, 3, "SUS!", KDColor::RGB24(0xC51111)); // V5.20 : tu es suspect
-    if (meetT > 0) { // bandeau reunion
-      fRect(0, 100, SW, 40, KDColor::RGB24(0x1B1B25));
-      drawTextC(112, "REUNION : CORPS SIGNALE", KDColor::RGB24(0xC51111));
-      drawTextC(128, "PERSONNE N'AVOUEE...", C_GRE);
+    // ================== HUD ==================
+    fRect(0, SH - 40, SW, 40, KDColor::RGB24(0x1B1B25));
+    // barre de taches globale
+    fRect(8, SH - 36, 144, 8, KDColor::RGB24(0x2A2F3A));
+    fRect(8, SH - 36, (int)(144 * auTaskBar), 8, KDColor::RGB24(0x2FBF71));
+    drawNum(158, SH - 37, (int)(auTaskBar * 100), C_GRE); drawText(180, SH - 37, "%", C_GRE);
+    // equipage vivant
+    int aliveN = (!pGhost ? 1 : 0);
+    for (int i = 0; i < auBotN; i++) if (auB[i].alive) aliveN++;
+    drawText(8, SH - 24, "EQ:", C_WHT); drawNum(28, SH - 24, aliveN, C_WHT);
+    drawNum(44, SH - 24, (int)gTime, C_GRE); drawText(76, SH - 24, "s", C_GRE);
+    if (gSus) drawTextC(4, "SUS!", KDColor::RGB24(0xC51111));
+    if (meetT > 0) {
+      drawTextC(16, "REUNION ! VOTE (+)", KDColor::RGB24(0xF07D0D));
+      drawNum(296, 16, (int)meetT + 1, C_YEL);
     }
+    if (lightT > 0) drawTextC(28, "LUMIERES SABOTEES !", KDColor::RGB24(0xF07D0D));
+    // ligne du bas selon le role
+    if (pGhost) {
+      drawTextC(SH - 12, "FANTOME : OK:TACHE  MURS LIBRES", C_WHT);
+      if (pTaskI < 4) { drawText(220, SH - 37, "T", C_GRE); drawNum(230, SH - 37, pTaskI + 1, C_ORG); }
+    } else if (meImp) {
+      drawTextC(SH - 12, "OK:TUER EXE:VENT DIV:SABOTAGE +:VOTE -:ZOOM", C_WHT);
+      if (killCd > 0) { fRect(8, SH - 6, 60, 4, KDColor::RGB24(0x2A2F3A)); fRect(8, SH - 6, (int)(60 * (1.0f - killCd / 10.0f)), 4, KDColor::RGB24(0xC51111)); }
+      if (sabCd > 0) { fRect(72, SH - 6, 60, 4, KDColor::RGB24(0x2A2F3A)); fRect(72, SH - 6, (int)(60 * (1.0f - sabCd / 35.0f)), 4, KDColor::RGB24(0xF07D0D)); }
+    } else {
+      if (pTaskI < 4) {
+        drawTextC(SH - 12, "OK:TACHE +:VOTE -:ZOOM", C_WHT);
+        drawNum(300, SH - 12, pTaskI + 1, C_ORG);
+        if (pTaskProg > 0) { fRect(200, SH - 6, 80, 4, KDColor::RGB24(0x2A2F3A)); fRect(200, SH - 6, (int)(80 * pTaskProg), 4, C_YEL); }
+      } else drawTextC(SH - 12, "TACHES PERSO OK : AIDE L'EQUIPAGE", C_WHT);
+      if (fixProg > 0) { fRect(200, SH - 6, 80, 4, KDColor::RGB24(0x2A2F3A)); fRect(200, SH - 6, (int)(80 * fixProg), 4, KDColor::RGB24(0x38FEDC)); }
+    }
+    pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus; pMn = kMinus; pDiv = kDiv;
     blit();
     Ion::Timing::msleep(30);
   }
-  // ------------------ ecran de fin ------------------
-  bool won = (endScreen == 1) || (!meImp && (endScreen == 2 || endScreen == 3 || endScreen == 5));
-  if (endScreen >= 1 && endScreen <= 3) {
-    if (won) {
-      auWins++;
-      if (meImp && endScreen == 1) {
-        int secs = (int)gTime;
-        if (auBestS == 0 || secs < auBestS) auBestS = secs;
-      }
-    }
-    saveAcc();
+  // ================== ECRAN DE FIN ==================
+  bool won = (endScreen == 1 && meImp) || (!meImp && (endScreen == 2 || endScreen == 3 || endScreen == 5));
+  if (won) auWins++;
+  if (meImp && endScreen == 1 && (auBestS == 0 || gTime < auBestS)) auBestS = (int)gTime;
+  saveAcc();
+  waitRelease();
+  bool prevOK = false;
+  while (true) {
+    pollKeys();
+    if (keyOK && !prevOK) { waitRelease(); break; }
+    prevOK = keyOK;
+    bgPanel();
+    drawTextC(20, won ? "VICTOIRE !" : "DEFAITE...", won ? C_YEL : KDColor::RGB24(0xC51111));
+    if (endScreen == 1) drawTextC(48, meImp ? "EQUIPAGE ELIMINE" : "TOUT L'EQUIPAGE EST MORT", C_WHT);
+    if (endScreen == 2) drawTextC(48, meImp ? "L'EQUIPAGE A FINI SES TACHES" : "TOUTES LES TACHES SONT FINIES", C_WHT);
+    if (endScreen == 3) drawTextC(48, meImp ? "UN TEMOIN T'A SIGNALE !" : "L'IMPOSTEUR A ETE EJECTE", C_WHT);
+    if (endScreen == 4) drawTextC(48, "ABANDON", C_WHT);
+    if (endScreen == 5) drawTextC(48, "TOUT L'EQUIPAGE A FINI SES TACHES", C_WHT);
+    drawTextC(76, AU_MAPNAMES[mapSel], C_GRE);
+    char sbuf[40];
+    snprintf(sbuf, 40, "TA TACHE:%d/4", pTaskI); drawTextC(96, sbuf, C_WHT);
+    snprintf(sbuf, 40, "TACHES EQUIPE:%d%%", (int)(auTaskBar * 100)); drawTextC(112, sbuf, C_WHT);
+    snprintf(sbuf, 40, "TEMPS:%ds", (int)gTime); drawTextC(128, sbuf, C_WHT);
+    snprintf(sbuf, 40, "VICTOIRES AU:%d", auWins); drawTextC(148, sbuf, C_YEL);
+    snprintf(sbuf, 40, "KILLS AU:%d", auKills); drawTextC(164, sbuf, C_ORG);
+    rRect(SW / 2 - 70, 190, 140, 22, 8, C_YEL);
+    drawTextC(196, "OK RETOUR", C_BLK);
+    blit();
+    Ion::Timing::msleep(30);
   }
-  if (endScreen == 5) { auWins++; saveAcc(); }
-  if (endScreen >= 6 && endScreen <= 8) saveAcc();
-  bgPanel();
-  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen >= 6 && endScreen <= 8) ? "ELIMINE..." : "PERDU !";
-  const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE"
-                 : (endScreen == 2 && meImp) ? "L'EQUIPAGE A FINI SES TACHES"
-                 : (endScreen == 2 && !meImp) ? "TOUTES LES TACHES SONT FINIES"
-                 : (endScreen == 3) ? (meImp ? "UN TEMOIN T'A SIGNALE !" : "L'IMPOSTEUR A ETE EJECTE")
-                 : (endScreen == 5) ? "TOUT L'EQUIPAGE A FINI SES TACHES"
-                 : (endScreen == 6) ? "L'IMPOSTEUR T'A EU..."
-                 : (endScreen == 7) ? "FAUSSE ACCUSATION : EJECTE"
-                 : (endScreen == 8) ? "VU SUR LA SCENE : EJECTE" : "";
-  drawTextC(60, t1, won ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
-  drawTextC(80, t2, C_WHT);
-  drawTextC(130, "VICTOIRES AU TOTAL:", C_GRE); drawNum(SW / 2 + 100, 130, auWins, C_ORG);
-  drawTextC(148, "KILLS AU TOTAL:", C_GRE); drawNum(SW / 2 + 84, 148, auKills, C_ORG);
-  rRect(SW / 2 - 70, 184, 140, 24, 8, C_YEL);
-  drawTextC(190, "OK RETOUR", C_BLK);
-  blit();
-  prevOK = true;
-  while (true) { pollKeys(); if (keyOK && !prevOK) break; prevOK = keyOK; Ion::Timing::msleep(60); }
-  prevOK = false;
 }
+
 
 // ------------------------- LANCEUR : 2 jeux dans l'app ----------------
 static int launcherScreen() {

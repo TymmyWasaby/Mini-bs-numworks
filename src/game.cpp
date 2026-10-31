@@ -29,6 +29,7 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include "epsilon_files.h" // sauvegarde dans le systeme de fichiers d'Epsilon (methode NumPlay)
+#include <cstdio> // V5.26 : snprintf (stats de fin)
 
 // L'identite NWA (eadk_app_name / eadk_api_level) est dans src/app_id.c :
 // un petit fichier C pur compile sans LTO, car le LTO C++ perd
@@ -1517,7 +1518,8 @@ static bool loadAcc() {
       auWins = (buf[p] << 8) | buf[p + 1]; p += 2;
       auKills = (buf[p] << 8) | buf[p + 1]; p += 2;
       auBestS = (buf[p] << 8) | buf[p + 1]; p += 2;
-      if (auWins < 0) auWins = 0; if (auKills < 0) auKills = 0;
+      if (auWins < 0) auWins = 0;
+      if (auKills < 0) auKills = 0;
       if (auBestS < 0 || auBestS > 9999) auBestS = 0;
     }
   }
@@ -1926,11 +1928,11 @@ static float matchTr() {
 static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human, float aiSkill) {
   Ent &e = ents[entCount++];
   const BrawlerDef &d = BRAWLERS[bIdx];
-  int lvl = 1; bool star = false, gad = false;
+  int lvl = 1; bool star = false;
   if (accIdx >= 0) {
-    lvl = acc.b[accIdx].level; star = acc.b[accIdx].starPower; gad = acc.b[accIdx].gadget;
+    lvl = acc.b[accIdx].level; star = acc.b[accIdx].starPower;
   } else {
-    lvl = 1 + (int)(aiSkill * 9); star = aiSkill > 0.4f; gad = true;
+    lvl = 1 + (int)(aiSkill * 9); star = aiSkill > 0.4f;
   }
   float mul = lvlMul(lvl);
   if (star && d.star == STAR_HP) mul *= 1.05f;
@@ -5611,13 +5613,13 @@ static void trainingMode(int myBrawler) {
     if (kUp) aim = 0;
     if (kDown) aim = 3.14159f;
     // visee auto vers la cible la plus proche
-    float best = 1e9, ax = aim, ay = 0;
+    float best = 1e9, ax = aim;
     for (int i = 0; i < 4; i++)
       if (tg[i].alive) {
         float dx = tg[i].x - px_, dy = tg[i].y - py_, dd = dx * dx + dy * dy;
         if (dd < best) { best = dd; ax = atan2f(dy, dx); }
       }
-    aim = ax; ay = ax;
+    aim = ax;
     if (keyOK && !prevOK && ammo >= 1) {
       shots++;
       ammo -= 1;
@@ -6192,7 +6194,7 @@ static int auVoteScreen() { // renvoie l'index du bot vote, -1 si passer/annuler
   bool pU = false, pD = false, pL = false, pR = false, pO = false, pB = false;
   while (res == -2) {
     pollKeys();
-    int col = sel % 5, row = sel / 5;
+    int col = sel % 5;
     if (kLeft && !pL && col > 0) { int s = sel - 1; while (s != auBotN && !auB[s].alive) s--; sel = s; }
     if (kRight && !pR && col < 4 && sel + 1 < nSlots) { int s = sel + 1; while (s != auBotN && !auB[s].alive) s++; if (s < nSlots) sel = s; }
     if (kUp && !pU && sel >= 5) { int s = sel - 5; if (s == auBotN || auB[s].alive) sel = s; }
@@ -6442,13 +6444,18 @@ static void amongUsGame() {
       // ---- deplacement joueur ----
       float spd = 68.0f * dt;
       float dx = 0, dy = 0;
-      if (kLeft) dx -= spd; if (kRight) dx += spd;
-      if (kUp) dy -= spd; if (kDown) dy += spd;
-      if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
+      if (kLeft) dx -= spd;
+      if (kRight) dx += spd;
+      if (kUp) dy -= spd;
+      if (kDown) dy += spd;
+      if (dx < 0) playerDir = 0;
+      if (dx > 0) playerDir = 1;
       if (pGhost) { // le fantome traverse TOUT (mais pas la carte)
         px += dx; py += dy;
-        if (px < 4) px = 4; if (px > AUW * 8 - 4) px = AUW * 8 - 4;
-        if (py < 4) py = 4; if (py > AUH * 8 - 4) py = AUH * 8 - 4;
+        if (px < 4) px = 4;
+        if (px > AUW * 8 - 4) px = AUW * 8 - 4;
+        if (py < 4) py = 4;
+        if (py > AUH * 8 - 4) py = AUH * 8 - 4;
       } else {
         if (dx && auFree(px + dx, py)) px += dx;
         if (dy && auFree(px, py + dy)) py += dy;
@@ -6766,16 +6773,20 @@ static void amongUsGame() {
     float ts = 8.0f * z;
     float vpW = SW / z, vpH = (SH - 40) / z;
     float camX = px - vpW / 2, camY = py - vpH / 2;
-    if (camX < 0) camX = 0; if (camX > AUW * 8 - vpW) camX = AUW * 8 - vpW;
-    if (camY < 0) camY = 0; if (camY > AUH * 8 - vpH) camY = AUH * 8 - vpH;
+    if (camX < 0) camX = 0;
+    if (camX > AUW * 8 - vpW) camX = AUW * 8 - vpW;
+    if (camY < 0) camY = 0;
+    if (camY > AUH * 8 - vpH) camY = AUH * 8 - vpH;
     if (vpW > AUW * 8) camX = (AUW * 8 - vpW) / 2;
     if (vpH > AUH * 8) camY = (AUH * 8 - vpH) / 2;
     fRect(0, 0, SW, SH - 40, KDColor::RGB24(0x232833));
     // carte (spans de cellules identiques)
     int c0x = (int)(camX / 8) - 1, c1x = (int)((camX + vpW) / 8) + 1;
     int c0y = (int)(camY / 8) - 1, c1y = (int)((camY + vpH) / 8) + 1;
-    if (c0x < 0) c0x = 0; if (c0y < 0) c0y = 0;
-    if (c1x > AUW - 1) c1x = AUW - 1; if (c1y > AUH - 1) c1y = AUH - 1;
+    if (c0x < 0) c0x = 0;
+    if (c0y < 0) c0y = 0;
+    if (c1x > AUW - 1) c1x = AUW - 1;
+    if (c1y > AUH - 1) c1y = AUH - 1;
     for (int cy = c0y; cy <= c1y; cy++) {
       int cx = c0x;
       while (cx <= c1x) {
@@ -6794,12 +6805,12 @@ static void amongUsGame() {
     }
     for (int i = 0; i < 5; i++) {
       float vx = AU_VX[i] * 8.0f - camX, vy = AU_VY[i] * 8.0f - camY;
-      oCirc((vx + 4) * z, (vy + 4) * z, 5 * z, false, meImp && !pGhost ? KDColor::RGB24(0x888899) : C_GRE);
+      fRing((int)((vx + 4) * z), (int)((vy + 4) * z), (int)(5 * z), meImp && !pGhost ? KDColor::RGB24(0x888899) : C_GRE);
     }
     fRect((auBtnX - 6 - camX) * z, (auBtnY - 6 - camY) * z, 12 * z, 12 * z, KDColor::RGB24(0xC51111));
-    oCirc((auCamXc * 8 + 4 - camX) * z, (auCamYc * 8 + 4 - camY) * z, 5 * z, true, KDColor::RGB24(0x3FC1FF));
-    oCirc((auVitXc * 8 + 4 - camX) * z, (auVitYc * 8 + 4 - camY) * z, 5 * z, true, KDColor::RGB24(0x38FEDC));
-    if (lightT > 0) oCirc((auVitXc * 8 + 4 - camX) * z, (auVitYc * 8 + 4 - camY) * z, 8 * z, false, KDColor::RGB24(0xF07D0D));
+    fCirc((int)((auCamXc * 8 + 4 - camX) * z), (int)((auCamYc * 8 + 4 - camY) * z), (int)(5 * z), KDColor::RGB24(0x3FC1FF));
+    fCirc((int)((auVitXc * 8 + 4 - camX) * z), (int)((auVitYc * 8 + 4 - camY) * z), (int)(5 * z), KDColor::RGB24(0x38FEDC));
+    if (lightT > 0) fRing((int)((auVitXc * 8 + 4 - camX) * z), (int)((auVitYc * 8 + 4 - camY) * z), (int)(8 * z), KDColor::RGB24(0xF07D0D));
     // cadavres (visibles seulement dans le champ de vision)
     for (int c = 0; c < auBodyN; c++) {
       float d = (auBodyX[c] - px) * (auBodyX[c] - px) + (auBodyY[c] - py) * (auBodyY[c] - py);
@@ -6812,7 +6823,7 @@ static void amongUsGame() {
       AuBot &b = auB[i];
       if (!b.alive) {
         if (pGhost) { // les fantomes voient les fantomes
-          oCirc((b.x - camX) * z, (b.y - camY) * z, 5.0f * z, false, KDColor::RGB24(AU_BOTC[i]));
+          fRing((int)((b.x - camX) * z), (int)((b.y - camY) * z), (int)(5.0f * z), KDColor::RGB24(AU_BOTC[i]));
         }
         continue;
       }
@@ -6822,10 +6833,10 @@ static void amongUsGame() {
     }
     // joueur
     if (pGhost) {
-      oCirc((px - camX) * z, (py - camY) * z, 6.0f * z, false, C_WHT);
-      oCirc((px - camX) * z, (py - camY) * z - 2, 2.0f * z, true, C_WHT);
+      fRing((int)((px - camX) * z), (int)((py - camY) * z), (int)(6.0f * z), C_WHT);
+      fCirc((int)((px - camX) * z), (int)((py - camY) * z - 2), (int)(2.0f * z), C_WHT);
     } else {
-      drawBean((px - camX) * z, (py - camY) * z, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), (playerDir == 0);
+      drawBean((px - camX) * z, (py - camY) * z, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), (playerDir == 0));
     }
     // ---- POLYGONE DE VISION (raycast arrete par les murs) ----
     if (!pGhost) {

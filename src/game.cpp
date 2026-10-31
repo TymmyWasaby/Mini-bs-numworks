@@ -1614,6 +1614,7 @@ struct Ent {
   bool isPet; int petOwner; uint8_t petKind; float petLife; // creature invoquee (0=ours 1=tourelle 2=station de soin)
   float stealthT, shieldT; // invisibilite (Leon/Sandy) et bouclier (Rosa)
   float slowT; // ralenti (drones de Bea, spray d Emz, balles de Piper)
+  float poisonT; // V5.23 : poison de Byron — degats continus
   float stunT; // V5.19 : etourdi par le taser de Buzz — ni bouger, ni tirer
   float blindT; // V5.13b : aveugle (super de Jacky) : ne voit plus rien, erre sans tirer
   float atkCharge; // charge de Hank : maintenir l'attaque pour gonfler le ballon
@@ -1946,7 +1947,7 @@ static void addEnt(int bIdx, int accIdx, int team, float x, float y, bool human,
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
   e.isPet = false; e.petOwner = -1; e.petKind = 0; e.petLife = 0; e.beaCharge = false;
   e.aiRvIdx = -1; e.aiRvT = 0; e.aiTilt = 0; // V5.17
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
 }
 
 // invoque une creature devant son proprietaire (super de Nita, Jessie, Penny, 8-Bit, Pam)
@@ -1976,7 +1977,7 @@ static void spawnPet(Ent &owner, int kind) {
   e.aiSkill = 0.8f; e.stuckT = 0; e.aiRole = 0; e.aiOnObj = 0;
   e.burstLeft = 0; e.burstTickT = 0; e.burstAng = 0; e.burstMul = 1;
   e.walkT = 0; e.lastHitT = 0; e.attackT = 0; e.drawDone = false;
-  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
+  e.stealthT = 0; e.shieldT = 0; e.slowT = 0; e.stunT = 0; e.blindT = 0; e.poisonT = 0; e.atkCharge = 0; e.upStage = 0; e.mechT = 0; e.dmgDone = 0; e.cubes = 0; e.isBoss = 0; e.aiPers = (uint8_t)rnd(3); e.tpCd = 0;
   e.isPet = true; e.petOwner = (&owner - ents); e.petKind = (uint8_t)kind;
   e.petLife = (kind == 3) ? 20.0f : ((kind == 4) ? 12.0f : ((kind == 6) ? 12.0f : 25.0f));
   spawnParts(e.x, e.y, 1, 6);
@@ -2368,6 +2369,12 @@ static void doSuper(Ent &e, float ang) {
       }
       break; }
     case SUP_HEAL: {
+      if (e.brawlerIdx == 46) { // V5.23 : BYRON — lance une POTION : soigne les allies touches, brule les ennemis
+        gForceLob = true;
+        fireProj(e, ang, true, mul, 0.9f, 0.85f);
+        gForceLob = false;
+        break;
+      }
       if (e.brawlerIdx == 38) { // Pearl : onde de choc - casse les murs proches et REPOUSSE (pas de soin)
         breakWalls(e.x, e.y, 70);
         for (int i = 0; i < entCount; i++) {
@@ -3214,6 +3221,11 @@ static void updateMatch(float dt) {
     if (e.isBoss) e.mechT = 1.0f; // le boss du Siege reste en mega robot
     e.tpCd -= dt; // recharge du teleporteur
     if (e.slowT > 0) e.slowT -= dt;
+    if (e.poisonT > 0) { // V5.23 : poison de Byron — il ronge sans tuer
+      e.poisonT -= dt;
+      e.hp -= 320.0f * dt; e.regenT = 0;
+      if (e.hp < 1.0f) e.hp = 1.0f; // le poison laisse toujours 1 PV : il acheve pas
+    }
     if (e.stunT > 0) e.stunT -= dt; // V5.19 : taser de Buzz
     if (e.blindT > 0) e.blindT -= dt; // V5.13b : aveuglement (super de Jacky)
     if (e.hyperT > 0) e.hyperT -= dt;
@@ -3522,25 +3534,22 @@ static void updateMatch(float dt) {
           float ddx = t.x - p.x, ddy = t.y - p.y;
           if (ddx * ddx + ddy * ddy < R * R) damageEnt(t, p.dmg, ents[p.owner]);
         }
-        // V5.19 : les explosions REPOUSSENT les brawlers ennemis (et l'ecran glisse dans
-        // le sens du recul pour TOI). Les explosions de MORT de brawler restent purement
-        // visuelles : elles ne repoussent personne (elles ne passent pas par ici).
-        {
-          float kR = R + 42.0f;
+        // V5.23 : POTION DE BYRON — les ALLIES touches par la zone sont SOIGNES
+        if (p.fromSuper && p.bIdx == 46) {
           for (int j = 0; j < entCount; j++) {
             Ent &t = ents[j];
-            if (!t.alive || t.team == p.team || t.isPet) continue;
+            if (!t.alive || t.team != p.team) continue;
             float ddx = t.x - p.x, ddy = t.y - p.y;
-            float dd = sqrtf(ddx * ddx + ddy * ddy);
-            if (dd > 1 && dd < kR) {
-              float push = (p.fromSuper ? 54.0f : 36.0f) * (1.0f - dd / kR);
-              moveEnt(t, ddx / dd * push, ddy / dd * push);
-              if (t.isHuman) { // le recul s'affiche : l'ecran part du cote ou on vole
-                shakeDX = ddx / dd * 4; shakeDY = ddy / dd * 4; shakeT = 170; shakeMag = 3;
-              }
+            if (ddx * ddx + ddy * ddy < R * R && t.hp < t.maxHP) {
+              float h = fminf(t.maxHP - t.hp, p.dmg * 0.9f);
+              t.hp += h;
+              addPop(t.x, t.y - 14, (int)h);
+              spawnParts(t.x, t.y, 1, 4);
             }
           }
         }
+        // V5.23 : les explosions ne REPOUSSENT plus personne (tirs normaux, lanceurs,
+        // super de Barley...) — seules les poussettes exprès (Gale, Pearl...) deplacent.
         if (mode == MODE_HEIST)
           for (int s = 0; s < MAX_SAFE; s++) {
             if (safes[s].hp <= 0 || safes[s].team == p.team) continue;
@@ -3565,6 +3574,8 @@ static void updateMatch(float dt) {
           dm *= 0.5f + fminf(1.0f, p.travelled / fmaxf(1.0f, p.range));
         // drones de Bea / spray d'Emz (super) : la cible est ralentie
         if (p.fromSuper && (ents[p.owner].brawlerIdx == 24 || ents[p.owner].brawlerIdx == 19)) t.slowT = 2.5f;
+        // V5.23 : BYRON — son attaque EMPOISONNE la cible pendant 3 s
+        if (!p.fromSuper && p.bIdx == 46) t.poisonT = 3.0f;
         // V5.16 : Bea — si sa balle touche, la suivante est CHARGEE (degats x3)
         if (ents[p.owner].brawlerIdx == 24 && !p.fromSuper) ents[p.owner].beaCharge = true;
         if (p.pierce) { // onde perforante : chaque cible touchee une seule fois
@@ -5865,12 +5876,14 @@ struct AuBot {
   float t;              // timer de tache
   bool alive, panic, witness, imp;
   float flee;           // V5.20 : l'imposteur PNJ s'ecarte des cadavres qu'il decouvre
+  float stuck;          // V5.23 : anti-blocage — teleporte le bot coince apres 0.8 s
+  bool ghost;           // V5.23 : un bot mort devient un fantome (visible des fantomes)
   int accuse;           // V5.22 : dernier vu sur la scene de crime (-1 personne, 0-5 bot, 6 joueur)
   int tasks[4], taskI;  // SES 4 taches personnelles
 };
 static AuBot auB[6];
-static float auBodyX[6], auBodyY[6]; static uint32_t auBodyC[6]; static int auBodyN = 0;
-static int auBodySus[6]; // V5.22 : qui trainait pres de chaque corps ? (0-5 bot, 6 joueur)
+static float auBodyX[8], auBodyY[8]; static uint32_t auBodyC[8]; static int auBodyN = 0;
+static int auBodySus[8]; // V5.22 : qui trainait pres de chaque corps ? (0-5 bot, 6 joueur)
 static float auTaskBar = 0.0f; // 0..1 : progression de TOUTES les taches d'equipage
 
 static void auSetDest(AuBot &b, float tx, float ty) {
@@ -5883,17 +5896,38 @@ static void auSetDest(AuBot &b, float tx, float ty) {
   while (n != dst && b.pn < 5) { n = auNH[n]; if (n < 0) break; b.path[b.pn++] = n; }
 }
 static void auBotWalk(AuBot &b, float dt, float spd) {
+  // V5.23 : coince DANS un mur (kill, glissade...) ? on le remet proprement sur un noeud
+  if (!auFree(b.x, b.y)) {
+    int n = auNearestNode(b.x, b.y);
+    b.x = AU_NX[n] * 8.0f + 4.0f; b.y = AU_NY[n] * 8.0f + 4.0f;
+    auSetDest(b, b.dx, b.dy);
+    return;
+  }
   float tx = (b.pi < b.pn) ? AU_NX[b.path[b.pi]] * 8.0f + 4.0f : b.dx;
   float ty = (b.pi < b.pn) ? AU_NY[b.path[b.pi]] * 8.0f + 4.0f : b.dy;
   float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
   if (dl < 2.0f) { if (b.pi < b.pn) b.pi++; return; }
-  // V5.22 : un mur sur la trajectoire ? on recalcule l'itineraire depuis ici
-  if (!auClearLine(b.x, b.y, tx, ty)) { auSetDest(b, b.dx, b.dy); return; }
+  if (b.pi >= b.pn && !auClearLine(b.x, b.y, b.dx, b.dy)) { // derniere etape coupee par un mur
+    b.stuck += dt;                                          // on repasse par les couloirs
+    auSetDest(b, b.dx, b.dy);
+    if (b.stuck > 0.8f) { // V5.23 : vraiment coince → il renonce et va au noeud le plus proche de sa cible
+      b.stuck = 0;
+      int n = auNearestNode(b.dx, b.dy);
+      auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
+    }
+    return;
+  }
   float nx = b.x + ddx / dl * spd * dt, ny = b.y + ddy / dl * spd * dt;
-  if (auFree(nx, ny)) { b.x = nx; b.y = ny; return; }        // chemin libre
-  if (auFree(nx, b.y)) { b.x = nx; return; }                 // glisse le long du mur (x)
-  if (auFree(b.x, ny)) { b.y = ny; return; }                 // glisse le long du mur (y)
-  auSetDest(b, b.dx, b.dy);                                  // bloque : on repart par les couloirs
+  if (auFree(nx, ny)) { b.x = nx; b.y = ny; b.stuck = 0; return; }  // chemin libre
+  if (auFree(nx, b.y)) { b.x = nx; b.stuck = 0; return; }           // glisse le long du mur (x)
+  if (auFree(b.x, ny)) { b.y = ny; b.stuck = 0; return; }           // glisse le long du mur (y)
+  b.stuck += dt;
+  if (b.stuck > 0.8f) { // V5.23 : mur infranchissable → teleport de secours sur un noeud
+    b.stuck = 0;
+    int n = auNearestNode(b.x, b.y);
+    b.x = AU_NX[n] * 8.0f + 4.0f; b.y = AU_NY[n] * 8.0f + 4.0f;
+    auSetDest(b, b.dx, b.dy);
+  }
 }
 static bool auBotArrived(AuBot &b) {
   float ddx = b.dx - b.x, ddy = b.dy - b.y;
@@ -5932,7 +5966,7 @@ static void amongUsGame() {
     AuBot &b = auB[i];
     b.x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
     b.y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
-    b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.accuse = -1;
+    b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.accuse = -1; b.stuck = 0; b.ghost = false;
     b.imp = (!meImp && i == impBot);
     b.taskI = 0; b.t = 0;
     for (int k = 0; k < 4; k++) { // 4 taches personnelles par membre d'equipage
@@ -5968,8 +6002,9 @@ static void amongUsGame() {
     if (meetT > 0) { // REUNION : tout le monde s'arrete, puis les corps sont nettoyes
       meetT -= dt;
       if (meetT <= 0) {
-        if (gSus) endScreen = 7; // V5.20 : ta fausse accusation a ete decelée — c'est TOI qui es ejete
-        else {
+        if (gSus) { // V5.23 : ta fausse accusation te fait EJECTER... mais tu continues en FANTOME
+          pGhost = true; gSus = false;
+        } else {
           auBodyN = 0;
           for (int i = 0; i < 6; i++)
             if (auB[i].alive) { auB[i].panic = false; auB[i].witness = false; auNextTask(auB[i]); }
@@ -6004,10 +6039,12 @@ static void amongUsGame() {
               if (d2 < bd) { bd = d2; bi = i; }
             }
             if (bi >= 0 && bd < 17 * 17) {
-              auB[bi].alive = false;
-              auBodyX[auBodyN] = auB[bi].x; auBodyY[auBodyN] = auB[bi].y;
-              auBodyC[auBodyN] = AU_COL[bi + 1];
-              auBodySus[auBodyN] = 6; auBodyN++; // V5.22 : c'est TOI le dernier vu sur la scene
+              auB[bi].alive = false; auB[bi].ghost = true; // V5.23 : il devient fantome
+              if (auBodyN < 8) { // V5.23 : garde-fou debordement
+                auBodyX[auBodyN] = auB[bi].x; auBodyY[auBodyN] = auB[bi].y;
+                auBodyC[auBodyN] = AU_COL[bi + 1];
+                auBodySus[auBodyN] = 6; auBodyN++; // V5.22 : c'est TOI le dernier vu sur la scene
+              }
               auKills++; killCd = 10.0f;
               for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il accuse LE KILLEUR
                 if (!auB[w].alive) continue;
@@ -6044,7 +6081,9 @@ static void amongUsGame() {
     }
     // ---- V5.21 : VOTE (+) : interface pour designer le suspect (fonctionne partout) ----
     if (kPlus && !pPlus && !endScreen && !pGhost) { // un fantome ne vote pas
-      if (gSus) endScreen = 7; // tu avais deja fait ejecter un innocent : c'est TOI
+      if (gSus) { // V5.23 : ejecte pour fausse accusation — mais tu continues en FANTOME
+        pGhost = true; gSus = false;
+      }
       else {
         waitRelease();
         static const char *AU_NAMES[6] = {"ROUGE", "BLEU", "VERT", "ROSE", "ORANGE", "BLANC"};
@@ -6079,7 +6118,7 @@ static void amongUsGame() {
         waitRelease();
         if (res >= 0) {
           if (auB[res].imp) endScreen = 3; // bien joue : l'imposteur est demasque !
-          else { auB[res].alive = false; gSus = true; } // accuse a tort... tu restes SUS
+          else { auB[res].alive = false; auB[res].ghost = true; gSus = true; } // accuse a tort... tu restes SUS
         }
       }
     }
@@ -6106,15 +6145,23 @@ static void amongUsGame() {
     // ================== BOTS ==================
     for (int i = 0; i < 6 && !endScreen; i++) {
       AuBot &b = auB[i];
-      if (!b.alive || meetT > 0) continue;
+      if (meetT > 0) continue;
+      if (!b.alive) { // V5.23 : un bot mort devient FANTOME : il erre a travers les murs
+        if (!b.ghost) continue;
+        b.t -= dt;
+        if (b.t <= 0) { b.t = 2.0f + rnd(4); b.dx = rnd(AUW) * 8.0f + 4.0f; b.dy = rnd(AUH) * 8.0f + 4.0f; }
+        float ddx = b.dx - b.x, ddy = b.dy - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
+        if (dl > 3.0f) { b.x += ddx / dl * 20.0f * dt; b.y += ddy / dl * 20.0f * dt; }
+        continue;
+      }
       if (b.panic) { // il fonce au bouton pour signaler
         auBotWalk(b, dt, 54.0f);
         float ddx = AU_BTNX - b.x, ddy = AU_BTNY - b.y;
         if (ddx * ddx + ddy * ddy < 10 * 10) {
           if (b.witness && b.accuse >= 0) { // V5.22 : accusation nominative du temoin
-            if (b.accuse == 6) endScreen = 8; // c'est TOI le dernier vu sur la scene !
+            if (b.accuse == 6) { pGhost = true; gSus = false; } // V5.23 : vu sur la scene = EJECTE... en fantome
             else if (auB[b.accuse].imp) endScreen = 3; // l'imposteur est demasque
-            else auB[b.accuse].alive = false; // innocent ejete sur temoignage...
+            else auB[b.accuse].alive = false, auB[b.accuse].ghost = true; // innocent ejete sur temoignage (fantome)
             b.panic = false; b.witness = false; b.accuse = -1; b.state = 0; auNextTask(b);
           }
           else if (b.witness) endScreen = 3; // un TEMOIN direct : ejection !
@@ -6176,16 +6223,20 @@ static void amongUsGame() {
         if (victim) {
           if (vx == px && vy == py) { // V5.22 : il t'a eu... mais tu deviens FANTOME !
             pGhost = true;
-            auBodyX[auBodyN] = px; auBodyY[auBodyN] = py; auBodyC[auBodyN] = 0x38FEDC;
-            auBodySus[auBodyN] = i; auBodyN++; // ton corps designe l'imposteur
+            if (auBodyN < 8) {
+              auBodyX[auBodyN] = px; auBodyY[auBodyN] = py; auBodyC[auBodyN] = 0x38FEDC;
+              auBodySus[auBodyN] = i; auBodyN++; // ton corps designe l'imposteur
+            }
             impKillCd = 9.0f;
           }
           else {
             for (int v = 0; v < 6; v++)
               if (auB[v].alive && !auB[v].imp && auB[v].x == vx && auB[v].y == vy) {
-                auB[v].alive = false;
-                auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1];
-                auBodySus[auBodyN] = i; auBodyN++; // V5.22 : l'imposteur etait sur la scene
+                auB[v].alive = false; auB[v].ghost = true; // V5.23 : fantome
+                if (auBodyN < 8) {
+                  auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1];
+                  auBodySus[auBodyN] = i; auBodyN++; // V5.22 : l'imposteur etait sur la scene
+                }
                 for (int w = 0; w < 6; w++) { // temoins : ils accusent LE KILLEUR
                   if (w == i || w == v || !auB[w].alive || auB[w].imp) continue;
                   float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
@@ -6296,6 +6347,13 @@ static void amongUsGame() {
       if (auB[i].panic) drawText(rx + 6, ry - 16, "!", KDColor::RGB24(0xC51111));
       else if (auB[i].state == 1) drawText(rx + 6, ry - 16, "...", KDColor::RGB24(0xF5C518));
     }
+    if (pGhost) // V5.23 : les fantomes des bots morts — visibles UNIQUEMENT par un fantome
+      for (int i = 0; i < 6; i++) {
+        if (auB[i].alive || !auB[i].ghost) continue;
+        int rx = (int)((auB[i].x - camX) * z), ry = (int)((auB[i].y - camY) * z);
+        oCirc(rx, ry - 1, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0xE8F1F7), KDColor::RGB24(AU_COL[i + 1]));
+        fRect(rx - 2, ry - 2, 1, 2, KDColor::RGB24(0x1B1B25)); fRect(rx + 1, ry - 2, 1, 2, KDColor::RGB24(0x1B1B25));
+      }
     if (pGhost) { // V5.22 : toi en fantome — un voile blanc, personne ne te voit
       int gx = (int)((px - camX) * z), gy = (int)((py - camY) * z);
       oCirc(gx, gy - 1, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0xE8F1F7), KDColor::RGB24(0x9ACAD5));

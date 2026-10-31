@@ -6021,18 +6021,19 @@ static const char *AU_M6[AUH] = {
 // ---- V5.26 : metadata des 6 cartes (taches, ventilos, bouton, cameras, vitals, spawn, couleurs)
 static const char **AU_MAPS[6] = { AU_M1, AU_M2, AU_M3, AU_M4, AU_M5, AU_M6 };
 static const char *AU_MAPNAMES[6] = { "SKELD", "MIRA", "POLUS", "AIRSHIP", "SOUS-MARIN", "FUNGLE" };
-static const int AU_TXS[6][12] = { {5,24,34,49,56,48,36,23,14,4,42,29}, {27,14,49,12,47,32,13,48,11,46,27,12}, {7,30,43,8,27,46,9,32,47,10,27,46}, {7,30,53,6,31,46,17,42,7,30,53,10}, {29,16,43,24,39,32,31,16,43,24,39,32}, {7,32,49,10,37,52,9,34,49,18,39,52} };
-static const int AU_TYS[6][12] = { {6,4,12,4,25,40,34,40,33,22,21,18}, {20,8,8,33,33,21,10,10,35,35,23,12}, {6,6,7,19,21,20,34,34,38,9,7,7}, {6,6,6,23,21,24,37,37,9,9,9,25}, {6,18,19,31,32,40,8,21,18,30,31,40}, {8,6,11,29,25,32,10,8,14,30,27,35} };
-static const int AU_VXS[6][5] = { {5,13,55,56,34}, {12,49,14,43,28}, {28,43,10,23,46}, {28,53,8,27,52}, {14,43,20,43,32}, {30,49,12,33,52} };
-static const int AU_VYS[6][5] = { {13,26,33,19,26}, {8,8,33,34,22}, {6,7,19,22,21}, {6,6,23,22,24}, {18,19,32,32,40}, {6,11,29,26,33} };
-static const int AU_BTX[6] = {30,31,10,10,32,10};
-static const int AU_BTY[6] = {4,23,8,8,8,10};
-static const int AU_CAMX[6] = {39,42,42,46,42,48};
-static const int AU_CAMY[6] = {36,8,6,6,18,10};
-static const int AU_VITX[6] = {6,10,26,26,12,28};
-static const int AU_VITY[6] = {18,8,6,6,18,6};
-static const int AU_SPAWX[6] = {30,31,10,10,32,10};
-static const int AU_SPAWY[6] = {8,23,8,8,8,10};
+static const int AU_TXS[6][12] = { {5,24,34,49,56,48,36,23,14,4,42,29}, {27,14,49,12,47,32,13,48,11,46,27,12}, {7,30,43,8,27,46,9,32,47,10,27,46}, {7,30,53,6,31,46,17,42,7,30,53,10}, {29,16,43,24,39,36,31,16,43,24,39,36}, {7,32,49,10,37,52,9,34,49,18,39,52} };
+static const int AU_TYS[6][12] = { {6,4,12,4,25,40,34,40,33,22,21,18}, {20,8,8,33,33,21,10,10,35,35,23,12}, {6,6,7,19,21,20,34,34,38,9,7,7}, {6,6,6,23,21,24,37,37,9,9,9,25}, {6,18,19,31,32,35,8,21,18,30,31,35}, {8,6,11,29,25,32,10,8,14,30,27,35} };
+static const int AU_VXS[6][5] = { {5,13,55,56,34}, {12,49,14,43,28}, {28,43,10,23,46}, {28,53,8,27,52}, {14,43,20,43,36}, {30,49,12,33,52} };
+static const int AU_VYS[6][5] = { {13,26,33,19,26}, {8,8,33,34,22}, {6,7,19,22,21}, {6,6,23,22,24}, {18,19,32,32,35}, {6,11,29,26,33} };
+// V5.26b : POI recalcules par BFS (case praticable ET atteignable depuis le spawn)
+static const int AU_BTX[6] = {29,35,29,29,23,36};
+static const int AU_BTY[6] = {14,21,15,15,21,22};
+static const int AU_CAMX[6] = {48,48,48,48,42,48};
+static const int AU_CAMY[6] = {6,6,6,6,7,8};
+static const int AU_VITX[6] = {12,8,8,10,18,8};
+static const int AU_VITY[6] = {35,38,38,38,35,35};
+static const int AU_SPAWX[6] = {29,29,29,29,29,30};
+static const int AU_SPAWY[6] = {20,21,21,21,21,22};
 static const uint32_t AU_WALLC[6] = {0x2E3A4A, 0x3A4A5A, 0x8A5C3B, 0x4A4A55, 0x1E3A5A, 0x2E5A2E};
 static const uint32_t AU_FLOOC[6] = {0x8B94A3, 0xA8D8B0, 0xE8E4DA, 0x9BA3B0, 0x6E8FA8, 0xB0C98A};
 // la carte courante (pointeurs mis en place au lancement de la partie)
@@ -6099,7 +6100,7 @@ struct AuBot {
   int state;               // 0 marche, 1 tache, 3 panique
   float t;                 // timer de tache
   bool alive, panic, witness, imp;
-  float flee, stuck;
+  float flee, stuck, spdF;   // V5.26b : vitesse individuelle (0.85 a 1.15)
   int accuse;              // dernier vu sur la scene (-1, 0..13 bot, 14 joueur)
   int tasks[4], taskI;
   bool ghost;
@@ -6134,7 +6135,7 @@ static void auSetDest(AuBot &b, float tx, float ty) {
   auBFS(sx, sy);
   b.pn = 0; b.pi = 0;
   int c = gy * AUW + gx;
-  if (auPar[c] == -2) return; // inaccessible : il reste sur place
+  if (auPar[c] == -2) { b.pn = 0; b.pi = 0; b.dx = b.x; b.dy = b.y; return; } // V5.26b : injoignable -> arret propre (jamais gele)
   static int rev[AUW * AUH];
   int n = 0;
   while (c >= 0 && n < AUW * AUH) { rev[n++] = c; c = auPar[c]; }
@@ -6396,6 +6397,7 @@ static void amongUsGame() {
     AuBot &b = auB[i];
     b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.stuck = 0;
     b.accuse = -1; b.ghost = false; b.imp = false; b.taskI = 0; b.t = 0; b.pi = 0; b.pn = 0;
+    b.spdF = 0.85f + rnd(4) * 0.1f;
     b.x = px; b.y = py;
     for (int tries = 0; tries < 40; tries++) { // spawn sur une case atteignable
       int c = rnd(AUW * AUH);
@@ -6589,12 +6591,12 @@ static void amongUsGame() {
         if (b.stuck > 0) b.stuck -= dt;
         if (b.flee > 0) b.flee -= dt;
         if (b.panic) { // panique : fonce au bouton d'urgence
-          auSetDest(b, auBtnX, auBtnY);
+          if (b.pn == 0 || b.dx != auBtnX || b.dy != auBtnY) auSetDest(b, auBtnX, auBtnY);
           if (auBotArrived(b)) {
             b.panic = false;
             meetT = 12.0f; // REUNION declenchee par le bot
           }
-          auBotWalk(b, dt, 60.0f);
+          auBotWalk(b, dt, 60.0f * b.spdF);
           continue;
         }
         // decouverte d'un corps ?
@@ -6655,16 +6657,20 @@ static void amongUsGame() {
                   auBodyC[auBodyN] = AU_BOTC[vic]; auBodySus[auBodyN] = i; auBodyN++;
                 }
                 b.flee = 4.0f;
+                if (rnd(100) < 30) { // V5.26b IA : 30% de s'echapper par un VENT (comme un vrai imposteur)
+                  int v = rnd(5);
+                  b.x = AU_VX[v] * 8.0f + 4.0f; b.y = AU_VY[v] * 8.0f + 4.0f;
+                }
                 int rx = rnd(AUW), ry = rnd(AUH);
                 if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
                 b.t = 1.5f;
               } else if (bd < 300 * 300) { // approche
-                auSetDest(b, vx0, vy0);
+                if (b.pn == 0 || b.dx != vx0 || b.dy != vy0) auSetDest(b, vx0, vy0);
               }
             }
           } else { // fait SEMBLANT de faire ses taches
             float tx = AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, ty = AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f;
-            auSetDest(b, tx, ty);
+            if (b.pn == 0 || b.dx != tx || b.dy != ty) auSetDest(b, tx, ty);
             if (auBotArrived(b)) { b.taskI++; b.t = 2.0f + rnd(30) * 0.1f; }
           }
         } else if (!b.imp) { // CREW PNJ
@@ -6677,15 +6683,15 @@ static void amongUsGame() {
               if (wd < myd) { iGo = false; break; }
             }
             if (iGo) {
-              auSetDest(b, auVitXc * 8.0f + 4.0f, auVitYc * 8.0f + 4.0f);
+              if (b.pn == 0 || b.dx != auVitXc * 8.0f + 4.0f || b.dy != auVitYc * 8.0f + 4.0f) auSetDest(b, auVitXc * 8.0f + 4.0f, auVitYc * 8.0f + 4.0f);
               if (auBotArrived(b)) { lightT = 0; }
-              auBotWalk(b, dt, 55.0f);
+              auBotWalk(b, dt, 55.0f * b.spdF);
               continue;
             }
           }
           if (b.taskI < 4) {
             float tx = AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, ty = AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f;
-            auSetDest(b, tx, ty);
+            if (b.pn == 0 || b.dx != tx || b.dy != ty) auSetDest(b, tx, ty);
             if (auBotArrived(b)) {
               if (b.state == 1) { b.t -= dt; if (b.t <= 0) { b.taskI++; auTaskBar += 1.0f / totalTasks; } }
               else { b.state = 1; b.t = 4.0f; }
@@ -6697,7 +6703,7 @@ static void amongUsGame() {
             }
           }
         }
-        auBotWalk(b, dt, 55.0f);
+        auBotWalk(b, dt, 55.0f * b.spdF);
         auBotArrived(b);
       }
     }
@@ -6869,6 +6875,20 @@ static void amongUsGame() {
     for (int i = 0; i < auBotN; i++) if (auB[i].alive) aliveN++;
     drawText(8, SH - 24, "EQ:", C_WHT); drawNum(28, SH - 24, aliveN, C_WHT);
     drawNum(44, SH - 24, (int)gTime, C_GRE); drawText(76, SH - 24, "s", C_GRE);
+    // V5.26b : COMPAS DE TACHE — direction et distance de la prochaine tache
+    if (!meImp && pTaskI < 4) {
+      int tcx = AU_TX[pTasks[pTaskI]], tcy = AU_TY[pTasks[pTaskI]];
+      int dcx = tcx - (int)(px / 8.0f), dcy = tcy - (int)(py / 8.0f);
+      int dist = (int)sqrtf((float)(dcx * dcx + dcy * dcy));
+      const char *dir = "O";
+      if (dcy <= -abs(dcx) && abs(dcy) > 0) dir = "N";
+      else if (dcy >= abs(dcx)) dir = "S";
+      else if (dcx > 0) dir = "E";
+      drawText(200, SH - 24, "TACHE:", C_YEL);
+      drawNum(252, SH - 24, dist, C_YEL);
+      drawText(272, SH - 24, "CASES", C_GRE);
+      drawText(296, SH - 24, dir, C_YEL);
+    }
     if (gSus) drawTextC(4, "SUS!", KDColor::RGB24(0xC51111));
     if (meetT > 0) {
       drawTextC(16, "REUNION ! VOTE (+)", KDColor::RGB24(0xF07D0D));

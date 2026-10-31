@@ -2501,9 +2501,14 @@ static void doSuper(Ent &e, float ang) {
       }
       break;
     }
-    case SUP_PUSH: { // blizzard de Gale : repousse tout le monde (V5.21 : enfin VISIBLE)
+    case SUP_PUSH: { // blizzard de Gale : rafale de balles cote a cote (comme son attaque, mais 6) + poussee
       spawnParts(e.x, e.y, 1, 16);
-      for (int a = 0; a < 12; a++) fireProj(e, a * 0.5236f, true, mul * 0.45f, 0.75f, 0.55f); // vague de neige tout autour
+      for (int i = 0; i < 6; i++) { // V5.22 : 6 balles PARALLELES, comme l'attaque
+        float off = (i - 2.5f) * 13.0f;
+        gFireOffX = -fsinf(ang) * off; gFireOffY = fcosf(ang) * off;
+        fireProj(e, ang, true, mul * 0.6f, 0.85f, 0.7f);
+      }
+      gFireOffX = 0; gFireOffY = 0;
       for (int i = 0; i < entCount; i++) {
         Ent &o = ents[i];
         if (!o.alive || o.team == e.team || o.isPet) continue;
@@ -5860,10 +5865,12 @@ struct AuBot {
   float t;              // timer de tache
   bool alive, panic, witness, imp;
   float flee;           // V5.20 : l'imposteur PNJ s'ecarte des cadavres qu'il decouvre
+  int accuse;           // V5.22 : dernier vu sur la scene de crime (-1 personne, 0-5 bot, 6 joueur)
   int tasks[4], taskI;  // SES 4 taches personnelles
 };
 static AuBot auB[6];
 static float auBodyX[6], auBodyY[6]; static uint32_t auBodyC[6]; static int auBodyN = 0;
+static int auBodySus[6]; // V5.22 : qui trainait pres de chaque corps ? (0-5 bot, 6 joueur)
 static float auTaskBar = 0.0f; // 0..1 : progression de TOUTES les taches d'equipage
 
 static void auSetDest(AuBot &b, float tx, float ty) {
@@ -5880,7 +5887,13 @@ static void auBotWalk(AuBot &b, float dt, float spd) {
   float ty = (b.pi < b.pn) ? AU_NY[b.path[b.pi]] * 8.0f + 4.0f : b.dy;
   float ddx = tx - b.x, ddy = ty - b.y, dl = sqrtf(ddx * ddx + ddy * ddy);
   if (dl < 2.0f) { if (b.pi < b.pn) b.pi++; return; }
-  b.x += ddx / dl * spd * dt; b.y += ddy / dl * spd * dt;
+  // V5.22 : un mur sur la trajectoire ? on recalcule l'itineraire depuis ici
+  if (!auClearLine(b.x, b.y, tx, ty)) { auSetDest(b, b.dx, b.dy); return; }
+  float nx = b.x + ddx / dl * spd * dt, ny = b.y + ddy / dl * spd * dt;
+  if (auFree(nx, ny)) { b.x = nx; b.y = ny; return; }        // chemin libre
+  if (auFree(nx, b.y)) { b.x = nx; return; }                 // glisse le long du mur (x)
+  if (auFree(b.x, ny)) { b.y = ny; return; }                 // glisse le long du mur (y)
+  auSetDest(b, b.dx, b.dy);                                  // bloque : on repart par les couloirs
 }
 static bool auBotArrived(AuBot &b) {
   float ddx = b.dx - b.x, ddy = b.dy - b.y;
@@ -5907,6 +5920,7 @@ static void amongUsGame() {
   int playerDir = 1, pTasks[4], pTaskI = 0;
   float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 2.6f, impKillCd = 7.0f;
   bool gSus = false; // V5.20 : fausse accusation en attente — le prochain vote te condamne
+  bool pGhost = false; // V5.22 : tue ? tu deviens FANTOME : invisible, traverse les murs, finit ses taches
   float auZoom = 1.0f; // V5.21 : 1 = normal, 0.5 = zoom arriere (touche -)
   for (int i = 0; i < 4; i++) { // MES taches (si equipage)
     int t = rnd(12);
@@ -5918,7 +5932,7 @@ static void amongUsGame() {
     AuBot &b = auB[i];
     b.x = AU_NX[startNodes[i]] * 8.0f + 4.0f;
     b.y = AU_NY[startNodes[i]] * 8.0f + 4.0f;
-    b.alive = true; b.panic = false; b.witness = false; b.flee = 0;
+    b.alive = true; b.panic = false; b.witness = false; b.flee = 0; b.accuse = -1;
     b.imp = (!meImp && i == impBot);
     b.taskI = 0; b.t = 0;
     for (int k = 0; k < 4; k++) { // 4 taches personnelles par membre d'equipage
@@ -5928,7 +5942,7 @@ static void amongUsGame() {
     }
     auNextTask(b);
   }
-  float totalTasks = 24.0f; // 6 equipages x 4 taches (5 bots + toi si tu es equipage)
+  float totalTasks = meImp ? 20.0f : 24.0f; // V5.22 : 6 equipages x 4 taches (toi compte si equipage)
   bool pOK = false, pExp = false, pBack = false, pPlus = false, pMn = false;
   int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 temoin/signale, 4 abandon, 5 equip gagne, 6 tue
   float dt = 0.033f;
@@ -5969,8 +5983,14 @@ static void amongUsGame() {
       if (kLeft) dx -= spd; if (kRight) dx += spd;
       if (kUp) dy -= spd; if (kDown) dy += spd;
       if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
-      if (dx && auFree(px + dx, py)) px += dx;
-      if (dy && auFree(px, py + dy)) py += dy;
+      if (pGhost) { // V5.22 : le fantome traverse TOUT (mais pas la carte)
+        px += dx; py += dy;
+        if (px < 4) px = 4; if (px > AUW * 8 - 4) px = AUW * 8 - 4;
+        if (py < 4) py = 4; if (py > AUH * 8 - 4) py = AUH * 8 - 4;
+      } else {
+        if (dx && auFree(px + dx, py)) px += dx;
+        if (dy && auFree(px, py + dy)) py += dy;
+      }
       if (kMinus && !pMn) auZoom = (auZoom < 1.0f) ? 1.0f : 0.5f; // V5.21 : - = zoom arriere
       // ---- OK : TUER (imposteur) ou FAIRE UNE TACHE (equipage) ----
       if (keyOK) {
@@ -5986,12 +6006,13 @@ static void amongUsGame() {
             if (bi >= 0 && bd < 17 * 17) {
               auB[bi].alive = false;
               auBodyX[auBodyN] = auB[bi].x; auBodyY[auBodyN] = auB[bi].y;
-              auBodyC[auBodyN] = AU_COL[bi + 1]; auBodyN++;
+              auBodyC[auBodyN] = AU_COL[bi + 1];
+              auBodySus[auBodyN] = 6; auBodyN++; // V5.22 : c'est TOI le dernier vu sur la scene
               auKills++; killCd = 10.0f;
-              for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il va temoigner
+              for (int w = 0; w < 6; w++) { // TEMOIN a moins de 48 px : il accuse LE KILLEUR
                 if (!auB[w].alive) continue;
                 float wx = auB[w].x - px, wy = auB[w].y - py;
-                if (wx * wx + wy * wy < 48 * 48) { auB[w].witness = true; auPanicTo(auB[w]); }
+                if (wx * wx + wy * wy < 48 * 48) { auB[w].witness = true; auB[w].accuse = 6; auPanicTo(auB[w]); }
               }
               bool anyAlive = false;
               for (int i = 0; i < 6; i++) if (auB[i].alive) anyAlive = true;
@@ -6004,7 +6025,7 @@ static void amongUsGame() {
           if (ddx * ddx + ddy * ddy < 13 * 13) {
             pTaskProg += dt / 4.0f;
             if (pTaskProg >= 1.0f) { pTaskProg = 0; pTaskI++; auTaskBar += 1.0f / totalTasks; }
-            if (pTaskI >= 4) endScreen = 5;
+            // V5.22 : tes taches finies ne suffisent plus — l'EQUIPAGE doit tout finir (barre 100%)
           }
         }
       }
@@ -6022,7 +6043,7 @@ static void amongUsGame() {
       }
     }
     // ---- V5.21 : VOTE (+) : interface pour designer le suspect (fonctionne partout) ----
-    if (kPlus && !pPlus && !endScreen) {
+    if (kPlus && !pPlus && !endScreen && !pGhost) { // un fantome ne vote pas
       if (gSus) endScreen = 7; // tu avais deja fait ejecter un innocent : c'est TOI
       else {
         waitRelease();
@@ -6073,6 +6094,15 @@ static void amongUsGame() {
         Ion::Timing::msleep(40);
       }
     }
+    // ---- V5.22 : qui traine pres de chaque corps ? (dernier vu sur la scene de crime) ----
+    for (int c = 0; c < auBodyN; c++)
+      for (int v = 0; v < 7; v++) {
+        float vx0 = (v == 6) ? px : auB[v].x, vy0 = (v == 6) ? py : auB[v].y;
+        bool va = (v == 6) ? !pGhost : auB[v].alive;
+        if (!va) continue;
+        float ddx = auBodyX[c] - vx0, ddy = auBodyY[c] - vy0;
+        if (ddx * ddx + ddy * ddy < 40 * 40) auBodySus[c] = v;
+      }
     // ================== BOTS ==================
     for (int i = 0; i < 6 && !endScreen; i++) {
       AuBot &b = auB[i];
@@ -6081,7 +6111,13 @@ static void amongUsGame() {
         auBotWalk(b, dt, 54.0f);
         float ddx = AU_BTNX - b.x, ddy = AU_BTNY - b.y;
         if (ddx * ddx + ddy * ddy < 10 * 10) {
-          if (b.witness) endScreen = 3; // un TEMOIN : ejection !
+          if (b.witness && b.accuse >= 0) { // V5.22 : accusation nominative du temoin
+            if (b.accuse == 6) endScreen = 8; // c'est TOI le dernier vu sur la scene !
+            else if (auB[b.accuse].imp) endScreen = 3; // l'imposteur est demasque
+            else auB[b.accuse].alive = false; // innocent ejete sur temoignage...
+            b.panic = false; b.witness = false; b.accuse = -1; b.state = 0; auNextTask(b);
+          }
+          else if (b.witness) endScreen = 3; // un TEMOIN direct : ejection !
           else { meetT = 3.0f; b.panic = false; b.state = 0; auNextTask(b); } // corps signale : reunion sans coupable
         }
         continue;
@@ -6097,7 +6133,13 @@ static void amongUsGame() {
               auSetDest(b, AU_NX[n] * 8.0f + 4.0f, AU_NY[n] * 8.0f + 4.0f);
               b.state = 0; b.flee = 4.0f;
             }
-          } else { b.witness = false; auPanicTo(b); }
+          } else { // V5.22 : il signale ET designe le dernier vu sur la scene de crime
+            int s = auBodySus[c];
+            if (s == i) s = -1;                           // lui-meme : pas d'accusation
+            if (s >= 0 && s < 6 && !auB[s].alive) s = -1; // suspect deja mort
+            if (s == 6 && pGhost) s = -1;
+            b.witness = false; b.accuse = s; auPanicTo(b);
+          }
           break;
         }
       }
@@ -6116,11 +6158,11 @@ static void amongUsGame() {
               float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
               if (wx * wx + wy * wy < 70 * 70) { victim = false; break; }
             }
-            float wx = px - b.x, wy = py - b.y; // le joueur compte comme temoin
-            if (wx * wx + wy * wy < 70 * 70) victim = false;
+            float wx = px - b.x, wy = py - b.y; // le joueur compte comme temoin (pas le fantome)
+            if (!pGhost && wx * wx + wy * wy < 70 * 70) victim = false;
           }
         }
-        if (!victim) { // sinon... TOI, si personne ne regarde
+        if (!victim && !pGhost) { // sinon... TOI, si personne ne regarde (un fantome ne compte pas)
           float ddx = px - b.x, ddy = py - b.y;
           if (ddx * ddx + ddy * ddy < 14 * 14) {
             victim = true; vx = px; vy = py;
@@ -6132,16 +6174,22 @@ static void amongUsGame() {
           }
         }
         if (victim) {
-          if (vx == px && vy == py) endScreen = 6; // il t'a eu !
+          if (vx == px && vy == py) { // V5.22 : il t'a eu... mais tu deviens FANTOME !
+            pGhost = true;
+            auBodyX[auBodyN] = px; auBodyY[auBodyN] = py; auBodyC[auBodyN] = 0x38FEDC;
+            auBodySus[auBodyN] = i; auBodyN++; // ton corps designe l'imposteur
+            impKillCd = 9.0f;
+          }
           else {
             for (int v = 0; v < 6; v++)
               if (auB[v].alive && !auB[v].imp && auB[v].x == vx && auB[v].y == vy) {
                 auB[v].alive = false;
-                auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1]; auBodyN++;
-                for (int w = 0; w < 6; w++) { // temoins : ils courent temoigner
+                auBodyX[auBodyN] = vx; auBodyY[auBodyN] = vy; auBodyC[auBodyN] = AU_COL[v + 1];
+                auBodySus[auBodyN] = i; auBodyN++; // V5.22 : l'imposteur etait sur la scene
+                for (int w = 0; w < 6; w++) { // temoins : ils accusent LE KILLEUR
                   if (w == i || w == v || !auB[w].alive || auB[w].imp) continue;
                   float wx = auB[w].x - b.x, wy = auB[w].y - b.y;
-                  if (wx * wx + wy * wy < 60 * 60) { auB[w].witness = true; auPanicTo(auB[w]); }
+                  if (wx * wx + wy * wy < 60 * 60) { auB[w].witness = true; auB[w].accuse = i; auPanicTo(auB[w]); }
                 }
               }
             impKillCd = 9.0f;
@@ -6176,6 +6224,11 @@ static void amongUsGame() {
         else if (b.taskI < 4) { b.state = 1; b.t = 4.0f; }
         else auNextTask(b); // taches finies : il erre
       }
+    }
+    { // V5.22 : plus aucun equipage debout ? l'imposteur gagne
+      int crewN = (!meImp && !pGhost) ? 1 : 0;
+      for (int i = 0; i < 6; i++) if (auB[i].alive && !auB[i].imp) crewN++;
+      if (crewN == 0) endScreen = 1;
     }
     if (auTaskBar >= 1.0f) endScreen = meImp ? 2 : 5; // taches finies : l'equipage gagne
     pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus; pMn = kMinus;
@@ -6225,10 +6278,10 @@ static void amongUsGame() {
     int brx = (int)((AU_BTNX - camX) * z), bry = (int)((AU_BTNY - camY) * z);
     fCirc(brx, bry, (z < 1.0f) ? 3 : 5, KDColor::RGB24(0xC51111));
     fRing(brx, bry, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0x7A0A0A));
-    // vision limitee : ~100 px ET ligne de visee libre (V5.21 : pas de vision a travers les murs)
+    // vision limitee : ~100 px ET ligne de visee libre (un fantome voit TOUT)
     for (int c = 0; c < auBodyN; c++) {
       float ddx = auBodyX[c] - px, ddy = auBodyY[c] - py;
-      if (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auBodyX[c], auBodyY[c])) continue;
+      if (!pGhost && (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auBodyX[c], auBodyY[c]))) continue;
       int rx = (int)((auBodyX[c] - camX) * z), ry = (int)((auBodyY[c] - camY) * z);
       if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(auBodyC[c]));
       else drawCorpse(rx, ry, KDColor::RGB24(auBodyC[c]));
@@ -6236,25 +6289,23 @@ static void amongUsGame() {
     for (int i = 0; i < 6; i++) {
       if (!auB[i].alive) continue;
       float ddx = auB[i].x - px, ddy = auB[i].y - py;
-      if (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auB[i].x, auB[i].y)) continue;
+      if (!pGhost && (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auB[i].x, auB[i].y))) continue;
       int rx = (int)((auB[i].x - camX) * z), ry = (int)((auB[i].y - camY) * z);
       if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(AU_COL[i + 1]));
       else drawBean(rx, ry, KDColor::RGB24(AU_COL[i + 1]), auB[i].x > px);
       if (auB[i].panic) drawText(rx + 6, ry - 16, "!", KDColor::RGB24(0xC51111));
       else if (auB[i].state == 1) drawText(rx + 6, ry - 16, "...", KDColor::RGB24(0xF5C518));
     }
-    if (z < 1.0f) { // toi, en petit en zoom arriere
+    if (pGhost) { // V5.22 : toi en fantome — un voile blanc, personne ne te voit
+      int gx = (int)((px - camX) * z), gy = (int)((py - camY) * z);
+      oCirc(gx, gy - 1, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0xE8F1F7), KDColor::RGB24(0x9ACAD5));
+      fRect(gx - 2, gy - 2, 1, 2, KDColor::RGB24(0x1B1B25)); fRect(gx + 1, gy - 2, 1, 2, KDColor::RGB24(0x1B1B25)); // yeux
+    } else if (z < 1.0f) { // toi, en petit en zoom arriere
       fCirc((int)((px - camX) * z), (int)((py - camY) * z), 3, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
       fRect((int)((px - camX) * z), (int)((py - camY) * z) - 2, 2, 1, KDColor::RGB24(0xC6F0F7));
     } else drawBean((int)px - camX, (int)py - camY, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), playerDir == 0);
-    // ---- V5.21 : BROUILLARD — tout ce que tu ne vois pas (trop loin OU masque par un mur) est gris ----
-    for (int sy = 0; sy < SH; sy += ts)
-      for (int sx = 0; sx < SW; sx += ts) {
-        float wx = camX + (sx + ts / 2) / z, wy = camY + (sy + ts / 2) / z;
-        float ddx = wx - px, ddy = wy - py;
-        if (ddx * ddx + ddy * ddy < 100 * 100 && auClearLine(px, py, wx, wy)) continue; // visible
-        fRect(sx, sy, ts, ts, KDColor::RGB24(0x39404E));
-      }
+    // ---- V5.22 : plus de gris ! un rond jaune tres clair marque ta zone de vision ----
+    if (!pGhost) fRing((int)((px - camX) * z), (int)((py - camY) * z), (int)(100 * z), KDColor::RGB24(0xFFF3A8));
     // HUD haut : barre des taches d'equipage
     fRect(0, 0, SW, 13, KDColor::RGB24(0x1B1B25));
     fRect(4, 3, 190, 7, KDColor::RGB24(0x3A3A4A));
@@ -6264,12 +6315,15 @@ static void amongUsGame() {
     drawNum(224, 3, aliveN, KDColor::RGB24(0xD6E0F0));
     // HUD bas : selon le role
     fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
-    if (meImp) {
+    if (pGhost) { // V5.22 : HUD fantome
+      drawText(4, SH - 10, "FANTOME : OK:TACHE, MURS LIBRES", KDColor::RGB24(0x9ACAD5));
+    } else if (meImp) {
       drawText(4, SH - 10, "OK:TUER EXE:VENT +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
       fRect(192, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
       fRect(193, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
     } else {
-      drawText(4, SH - 10, "OK:TACHE +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
+      if (pTaskI < 4) drawText(4, SH - 10, "OK:TACHE +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
+      else drawText(4, SH - 10, "TACHES PERSO OK : AIDE L'EQUIPAGE", KDColor::RGB24(0xD6E0F0));
       if (pTaskI < 4) {
         fRect(236, SH - 9, 60, 7, KDColor::RGB24(0x3A3A4A));
         fRect(237, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));
@@ -6298,16 +6352,17 @@ static void amongUsGame() {
     saveAcc();
   }
   if (endScreen == 5) { auWins++; saveAcc(); }
-  if (endScreen == 6 || endScreen == 7) saveAcc();
+  if (endScreen >= 6 && endScreen <= 8) saveAcc();
   bgPanel();
-  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen == 6 || endScreen == 7) ? "ELIMINE..." : "PERDU !";
+  const char *t1 = won ? "VICTOIRE !" : (endScreen == 4) ? "ABANDON" : (endScreen >= 6 && endScreen <= 8) ? "ELIMINE..." : "PERDU !";
   const char *t2 = (endScreen == 1) ? "EQUIPAGE ELIMINE"
                  : (endScreen == 2 && meImp) ? "L'EQUIPAGE A FINI SES TACHES"
                  : (endScreen == 2 && !meImp) ? "TOUTES LES TACHES SONT FINIES"
                  : (endScreen == 3) ? (meImp ? "UN TEMOIN T'A SIGNALE !" : "L'IMPOSTEUR A ETE EJECTE")
-                 : (endScreen == 5) ? "TES 4 TACHES SONT FINIES"
+                 : (endScreen == 5) ? "TOUT L'EQUIPAGE A FINI SES TACHES"
                  : (endScreen == 6) ? "L'IMPOSTEUR T'A EU..."
-                 : (endScreen == 7) ? "FAUSSE ACCUSATION : EJECTE" : "";
+                 : (endScreen == 7) ? "FAUSSE ACCUSATION : EJECTE"
+                 : (endScreen == 8) ? "VU SUR LA SCENE : EJECTE" : "";
   drawTextC(60, t1, won ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xC51111));
   drawTextC(80, t2, C_WHT);
   drawTextC(130, "VICTOIRES AU TOTAL:", C_GRE); drawNum(SW / 2 + 100, 130, auWins, C_ORG);

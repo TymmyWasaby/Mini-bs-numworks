@@ -6565,7 +6565,7 @@ static void amongUsGame() {
           }
         }
       }
-      if (!meImp \&\& !pGhost \&\& kExp) { // V5.29 : plus de cameras, EXE = VITALS
+      if (!meImp && !pGhost && kExp) { // V5.29 : plus de cameras, EXE = VITALS
         float vdx = auVitXc * 8.0f + 4.0f - px, vdy = auVitYc * 8.0f + 4.0f - py;
         if (vdx * vdx + vdy * vdy < 14 * 14) auVitalsOverlay();
       }

@@ -6620,8 +6620,21 @@ static void amongUsGame() {
           }
         }
         if (b.panic) continue;
+        if (b.state == 2) { // V5.27 IA : PAUSE (il s'arrete, regarde autour : plus vivant)
+          if (b.t <= 0) b.state = 0;
+          else continue;
+        }
         if (b.imp && b.flee <= 0) { // IMPOSTEUR PNJ
           if (lightT <= 0 && rnd(2000) == 0) { lightT = 25.0f; } // sabotage spontane
+          if (b.state == 4) { // V5.27 IA : EMBUSCADE en couloir (jamais longtemps)
+            if (b.t <= 0) b.state = 0;
+            else continue; // immobile, il guette
+          }
+          if (rnd(1000) == 0 && b.state == 0) { // V5.27 IA : il se poste en embuscade 3-5 secondes
+            b.state = 4; b.t = 3.0f + rnd(20) * 0.1f;
+            b.pn = 0; b.dx = b.x; b.dy = b.y;
+            continue;
+          }
           if (b.taskI >= 4 || b.t > 0) { // taches finies ou "pause" : TRAQUE le plus proche
             float bd = 1e9; int vic = -1;
             bool vicIsPlayer = false;
@@ -6649,6 +6662,9 @@ static void amongUsGame() {
                 float wx = px - vx0, wy = py - vy0;
                 if (wx * wx + wy * wy < 70 * 70) isolated = false;
               }
+              // V5.27 IA : il evite la salle des CAMERAS (zone surveillee = temoin virtuel)
+              float camdx = vx0 - (auCamXc * 8.0f + 4.0f), camdy = vy0 - (auCamYc * 8.0f + 4.0f);
+              if (camdx * camdx + camdy * camdy < 80 * 80) isolated = false;
               if (isolated && bd < 26 * 26) { // KILL !
                 if (vicIsPlayer) { endScreen = 1; break; }
                 auB[vic].alive = false; auB[vic].ghost = true;
@@ -6664,6 +6680,8 @@ static void amongUsGame() {
                 int rx = rnd(AUW), ry = rnd(AUH);
                 if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
                 b.t = 1.5f;
+              } else if (isolated && lightT <= 0 && rnd(100) < 20) { // V5.27 IA : il coupe les LUMIERES avant de frapper
+                lightT = 25.0f;
               } else if (bd < 300 * 300) { // approche
                 if (b.pn == 0 || b.dx != vx0 || b.dy != vy0) auSetDest(b, vx0, vy0);
               }
@@ -6693,12 +6711,22 @@ static void amongUsGame() {
             float tx = AU_TX[b.tasks[b.taskI]] * 8.0f + 4.0f, ty = AU_TY[b.tasks[b.taskI]] * 8.0f + 4.0f;
             if (b.pn == 0 || b.dx != tx || b.dy != ty) auSetDest(b, tx, ty);
             if (auBotArrived(b)) {
-              if (b.state == 1) { b.t -= dt; if (b.t <= 0) { b.taskI++; auTaskBar += 1.0f / totalTasks; } }
+              if (b.state == 1) { b.t -= dt; if (b.t <= 0) { b.taskI++; auTaskBar += 1.0f / totalTasks;
+                if (rnd(100) < 25) { b.state = 2; b.t = 0.8f + rnd(15) * 0.1f; } // V5.27 : pause cafe parfois
+              } }
               else { b.state = 1; b.t = 4.0f; }
             } else b.state = 0;
           } else { // ses taches sont finies : erre tranquille
             if (auBotArrived(b) || b.pn == 0) {
               int rx = rnd(AUW), ry = rnd(AUH);
+              if (rnd(100) < 40) { // V5.27 IA : petite BALADE LOCALE (allers-retours) 40% du temps
+                int ccx = (int)(b.x / 8.0f), ccy = (int)(b.y / 8.0f);
+                rx = ccx + rnd(13) - 6; ry = ccy + rnd(13) - 6;
+                if (rx < 0) rx = 0;
+                if (ry < 0) ry = 0;
+                if (rx >= AUW) rx = AUW - 1;
+                if (ry >= AUH) ry = AUH - 1;
+              }
               if (auPar[ry * AUW + rx] != -2) auSetDest(b, rx * 8.0f + 4.0f, ry * 8.0f + 4.0f);
             }
           }
@@ -6731,6 +6759,7 @@ static void amongUsGame() {
         if (!b.alive || b.imp) continue;
         if (b.witness && b.accuse >= 0 && b.accuse <= auBotN) {
           if (b.accuse < auBotN && !auB[b.accuse].alive) continue;
+          if (rnd(100) < 20) continue; // V5.27 IA : temoin HESITANT (20% s'abstient : "pas sur...")
           votes[b.accuse]++;
           if (wVote < 0) wVote = b.accuse;
         }
@@ -6745,6 +6774,21 @@ static void amongUsGame() {
           int cand = rnd(auBotN);
           if (auB[cand].alive && !auB[cand].imp) votes[cand]++;
         }
+      }
+      // V5.27 IA : les imposteurs PNJ COUVRENT les leurs (deflection discrete, jamais suspects)
+      for (int i = 0; i < auBotN; i++) {
+        AuBot &b = auB[i];
+        if (!b.alive || !b.imp) continue;
+        int lead = -1, lv = 0;
+        for (int c = 0; c <= auBotN; c++) if (votes[c] > lv) { lv = votes[c]; lead = c; }
+        if (lead < 0 || lead == i || (lead < auBotN && !auB[lead].imp)) continue; // il n'agit QUE si un COMPLICE mene les votes
+        int cand = -1, cv = 0;
+        for (int c = 0; c <= auBotN; c++) { // l'innocent le plus accuse
+          if (c == i || c == lead) continue;
+          if (c < auBotN && (!auB[c].alive || auB[c].imp)) continue;
+          if (votes[c] > cv) { cv = votes[c]; cand = c; }
+        }
+        if (cand >= 0 && rnd(100) < 60) votes[cand]++; // 60% du temps seulement : discret
       }
       int best = -1, bestV = 0;
       for (int c = 0; c <= auBotN; c++) {

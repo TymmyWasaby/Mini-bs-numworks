@@ -2264,7 +2264,14 @@ static void doAttack(Ent &e, float ang) {
     e.ammo -= 1; e.regenT = 0; e.attackT = 200; gLobRangeMul = -1.0f;
     return;
   }
-  if (n > 1 && d.atk == ATK_SHOT && e.brawlerIdx != 25) { // Nani EXCLUE : ses 3 balles partent en eventail d'un coup
+  if (e.brawlerIdx == 28 && n > 1) { // V5.21 : GALE — ses balles partent COTE A COTE (paralleles)
+    for (int i = 0; i < n; i++) {
+      float off = (i - (n - 1) / 2.0f) * 11.0f; // decalage perpendiculaire a la visee
+      gFireOffX = -fsinf(ang) * off; gFireOffY = fcosf(ang) * off;
+      fireProj(e, ang, false, mul * hm, 1.0f, hrm);
+    }
+    gFireOffX = 0; gFireOffY = 0;
+  } else if (n > 1 && d.atk == ATK_SHOT && e.brawlerIdx != 25) { // Nani EXCLUE : ses 3 balles partent en eventail d'un coup
     // tir en rafale (Colt, Rico, Bo...) : les balles partent l'une apres l'autre,
     // pas toutes d'un coup en eventail. La premiere part maintenant.
     fireProj(e, ang, false, mul * hm, 1.0f, hrm);
@@ -2494,7 +2501,9 @@ static void doSuper(Ent &e, float ang) {
       }
       break;
     }
-    case SUP_PUSH: { // blizzard de Gale : repousse tout le monde
+    case SUP_PUSH: { // blizzard de Gale : repousse tout le monde (V5.21 : enfin VISIBLE)
+      spawnParts(e.x, e.y, 1, 16);
+      for (int a = 0; a < 12; a++) fireProj(e, a * 0.5236f, true, mul * 0.45f, 0.75f, 0.55f); // vague de neige tout autour
       for (int i = 0; i < entCount; i++) {
         Ent &o = ents[i];
         if (!o.alive || o.team == e.team || o.isPet) continue;
@@ -5762,6 +5771,16 @@ static char auCell(int cx, int cy) {
   return AU_MAP[cy][cx];
 }
 static bool auSolidPx(float x, float y) { return auCell((int)(x / 8.0f), (int)(y / 8.0f)) == '#'; }
+static bool auClearLine(float x0, float y0, float x1, float y1) { // V5.21 : ligne de visee libre ?
+  float dx = x1 - x0, dy = y1 - y0, dl = sqrtf(dx * dx + dy * dy);
+  if (dl < 1.0f) return true;
+  int steps = (int)(dl / 4.0f) + 1;
+  for (int i = 1; i < steps; i++) {
+    float t = (float)i / (float)steps;
+    if (auSolidPx(x0 + dx * t, y0 + dy * t)) return false;
+  }
+  return true;
+}
 static bool auFree(float x, float y) { // les 4 coins du bean
   if (auSolidPx(x - 3.5f, y - 3.5f) || auSolidPx(x + 3.5f, y - 3.5f)) return false;
   if (auSolidPx(x - 3.5f, y + 4.0f) || auSolidPx(x + 3.5f, y + 4.0f)) return false;
@@ -5794,13 +5813,20 @@ static void auRouteTo(int dest) { // BFS : prochain saut de chaque noeud pour re
   }
 }
 static int auNearestNode(float x, float y) {
-  int best = 0; float bd = 1e9;
+  // V5.21 : le plus proche noeud VISIBLE (pas a travers un mur) — sinon les bots clippingpent
+  int best = -1; float bd = 1e9;
+  for (int i = 0; i < AUN; i++) {
+    float nx = AU_NX[i] * 8.0f + 4.0f, ny = AU_NY[i] * 8.0f + 4.0f;
+    float d2 = (nx - x) * (nx - x) + (ny - y) * (ny - y);
+    if (d2 < bd && auClearLine(x, y, nx, ny)) { bd = d2; best = i; }
+  }
+  if (best >= 0) return best;
+  int fb = 0; float fd = 1e9; // secours : le plus proche tout court
   for (int i = 0; i < AUN; i++) {
     float dx = AU_NX[i] * 8.0f + 4.0f - x, dy = AU_NY[i] * 8.0f + 4.0f - y;
-    float d2 = dx * dx + dy * dy;
-    if (d2 < bd) { bd = d2; best = i; }
+    if (dx * dx + dy * dy < fd) { fd = dx * dx + dy * dy; fb = i; }
   }
-  return best;
+  return fb;
 }
 static const int AU_TX[12] = { 5, 24, 34, 49, 56, 48, 36, 23, 14,  4, 42, 29}; // taches
 static const int AU_TY[12] = { 6,  4, 12,  4, 25, 40, 34, 40, 33, 22, 21, 18};
@@ -5881,6 +5907,7 @@ static void amongUsGame() {
   int playerDir = 1, pTasks[4], pTaskI = 0;
   float pTaskProg = 0.0f, killCd = 6.0f, ventCd = 0.0f, gTime = 0.0f, meetT = 0.0f, introT = 2.6f, impKillCd = 7.0f;
   bool gSus = false; // V5.20 : fausse accusation en attente — le prochain vote te condamne
+  float auZoom = 1.0f; // V5.21 : 1 = normal, 0.5 = zoom arriere (touche -)
   for (int i = 0; i < 4; i++) { // MES taches (si equipage)
     int t = rnd(12);
     for (int j = 0; j < i; j++) if (pTasks[j] == t) { t = (t + 1 + rnd(11)) % 12; j = -1; }
@@ -5902,7 +5929,7 @@ static void amongUsGame() {
     auNextTask(b);
   }
   float totalTasks = 24.0f; // 6 equipages x 4 taches (5 bots + toi si tu es equipage)
-  bool pOK = false, pExp = false, pBack = false, pPlus = false;
+  bool pOK = false, pExp = false, pBack = false, pPlus = false, pMn = false;
   int endScreen = 0; // 1 imp gagne, 2 taches finies, 3 temoin/signale, 4 abandon, 5 equip gagne, 6 tue
   float dt = 0.033f;
   while (!endScreen) {
@@ -5944,6 +5971,7 @@ static void amongUsGame() {
       if (dx < 0) playerDir = 0; if (dx > 0) playerDir = 1;
       if (dx && auFree(px + dx, py)) px += dx;
       if (dy && auFree(px, py + dy)) py += dy;
+      if (kMinus && !pMn) auZoom = (auZoom < 1.0f) ? 1.0f : 0.5f; // V5.21 : - = zoom arriere
       // ---- OK : TUER (imposteur) ou FAIRE UNE TACHE (equipage) ----
       if (keyOK) {
         if (meImp) {
@@ -5992,23 +6020,45 @@ static void amongUsGame() {
           }
         }
       }
-      // ---- V5.20 : SIGNALER (+) : accuser le bot le plus proche d'etre l'imposteur ----
-      // Bonne pioche : il est ejete (victoire en equipage). Mauvaise pioche : il est ejete
-      // quand meme, mais tu restes SUSPICION — et au prochain vote/signal, c'est TOI.
-      if (kPlus && !pPlus) {
-        if (gSus) endScreen = 7; // tu avais deja accuse un innocent : ejete
-        else {
-          float bd = 1e9; int bi = -1;
-          for (int i = 0; i < 6; i++) {
-            if (!auB[i].alive) continue;
-            float ddx = auB[i].x - px, ddy = auB[i].y - py;
-            float d2 = ddx * ddx + ddy * ddy;
-            if (d2 < bd) { bd = d2; bi = i; }
+    }
+    // ---- V5.21 : VOTE (+) : interface pour designer le suspect (fonctionne partout) ----
+    if (kPlus && !pPlus && !endScreen) {
+      if (gSus) endScreen = 7; // tu avais deja fait ejecter un innocent : c'est TOI
+      else {
+        waitRelease();
+        static const char *AU_NAMES[6] = {"ROUGE", "BLEU", "VERT", "ROSE", "ORANGE", "BLANC"};
+        int alive[6], na = 0;
+        for (int i = 0; i < 6; i++) if (auB[i].alive) alive[na++] = i;
+        int sel = 0, res = -2; // -2 : encore en train de voter, -1 : passe/annule, sinon : bot vote
+        bool pU = false, pD = false, pO = false, pB2 = false;
+        while (res == -2) {
+          pollKeys();
+          if (kUp && !pU) sel = (sel + na) % (na + 1);
+          if (kDown && !pD) sel = (sel + 1) % (na + 1);
+          if (keyOK && !pO) res = (sel == na) ? -1 : alive[sel];
+          if (keyBack && !pB2) res = -1;
+          pU = kUp; pD = kDown; pO = keyOK; pB2 = keyBack;
+          // ---- ecran de vote ----
+          fRect(52, 34, 216, 148, KDColor::RGB24(0x1B1B25));
+          fRect(52, 34, 216, 2, KDColor::RGB24(0xC51111)); fRect(52, 180, 216, 2, KDColor::RGB24(0xC51111));
+          fRect(52, 34, 2, 148, KDColor::RGB24(0xC51111)); fRect(266, 34, 2, 148, KDColor::RGB24(0xC51111));
+          drawTextC(42, "QUI EST L'IMPOSTEUR ?", KDColor::RGB24(0xD6E0F0));
+          for (int i = 0; i < na; i++) {
+            int ry = 62 + i * 15;
+            fRect(76, ry, 10, 10, KDColor::RGB24(AU_COL[alive[i] + 1]));
+            drawText(92, ry, AU_NAMES[alive[i]], KDColor::RGB24(0xD6E0F0));
+            if (i == sel) drawText(62, ry, ">", KDColor::RGB24(0xF5C518));
           }
-          if (bi >= 0 && bd < 24 * 24) {
-            if (auB[bi].imp) endScreen = 3; // bien joue : l'imposteur est demasque !
-            else { auB[bi].alive = false; gSus = true; } // accuse a tort...
-          }
+          drawText(92, 62 + na * 15, "PASSER", KDColor::RGB24(0x8B94A3));
+          if (sel == na) drawText(62, 62 + na * 15, ">", KDColor::RGB24(0xF5C518));
+          drawText(60, 172, "OK:VOTER RETOUR:PASSER", KDColor::RGB24(0x8B94A3));
+          blit();
+          Ion::Timing::msleep(30);
+        }
+        waitRelease();
+        if (res >= 0) {
+          if (auB[res].imp) endScreen = 3; // bien joue : l'imposteur est demasque !
+          else { auB[res].alive = false; gSus = true; } // accuse a tort... tu restes SUS
         }
       }
     }
@@ -6128,60 +6178,83 @@ static void amongUsGame() {
       }
     }
     if (auTaskBar >= 1.0f) endScreen = meImp ? 2 : 5; // taches finies : l'equipage gagne
-    pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus;
+    pOK = keyOK; pExp = kExp; pBack = keyBack; pPlus = kPlus; pMn = kMinus;
 
     // ===================== RENDU =====================
-    int camX = (int)px - SW / 2; if (camX < 0) camX = 0; if (camX > AUW * 8 - SW) camX = AUW * 8 - SW;
-    int camY = (int)py - SH / 2; if (camY < 0) camY = 0; if (camY > AUH * 8 - SH) camY = AUH * 8 - SH;
-    int cX0 = camX / 8, cY0 = camY / 8;
-    for (int cy = cY0; cy < cY0 + SH / 8 + 1 && cy < AUH; cy++) { // carte en spans (perf)
+    float z = auZoom; // V5.21 : zoom (1 = normal, 0.5 = vue large)
+    int ts = (z < 1.0f) ? 4 : 8;  // taille d'une case a l'ecran
+    int vpW = (int)(SW / z), vpH = (int)(SH / z);
+    int camX = (int)px - vpW / 2; int mX = AUW * 8 - vpW; if (mX < 0) mX = 0;
+    if (camX < 0) camX = 0; if (camX > mX) camX = mX;
+    int camY = (int)py - vpH / 2; int mY = AUH * 8 - vpH; if (mY < 0) mY = 0;
+    if (camY < 0) camY = 0; if (camY > mY) camY = mY;
+    fRect(0, 0, SW, SH, KDColor::RGB24(0x232833)); // fond (hors carte en zoom arriere)
+    int cX0 = camX / 8, cY0 = camY / 8, cX1 = (camX + vpW) / 8, cY1 = (camY + vpH) / 8;
+    for (int cy = cY0; cy <= cY1 && cy < AUH; cy++) { // carte en spans (perf)
       int x0 = cX0;
-      while (x0 < cX0 + SW / 8 + 1 && x0 < AUW) {
+      while (x0 <= cX1 && x0 < AUW) {
         char c = auCell(x0, cy); int x1 = x0;
-        while (x1 + 1 < cX0 + SW / 8 + 1 && x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
-        int rx = x0 * 8 - camX, rw = (x1 - x0 + 1) * 8, ry = cy * 8 - camY;
-        if (rx + rw > SW) rw = SW - rx;
+        while (x1 + 1 <= cX1 && x1 + 1 < AUW && auCell(x1 + 1, cy) == c) x1++;
+        int rx = (int)((x0 * 8 - camX) * z), rw = (int)((x1 - x0 + 1) * 8 * z), ry = (int)((cy * 8 - camY) * z);
         if (rx < 0) { rw += rx; rx = 0; }
-        if (c == '#') fRect(rx, ry, rw, 8, KDColor::RGB24(0x2E3A4A));
-        else fRect(rx, ry, rw, 8, KDColor::RGB24(0x8B94A3));
+        if (rx + rw > SW) rw = SW - rx;
+        if (rw > 0) fRect(rx, ry, rw, ts, (c == '#') ? KDColor::RGB24(0x2E3A4A) : KDColor::RGB24(0x8B94A3));
         x0 = x1 + 1;
       }
     }
     for (int k = 0; k < 12; k++) { // taches
-      int rx = AU_TX[k] * 8 - camX + 1, ry = AU_TY[k] * 8 - camY + 1;
+      int rx = (int)((AU_TX[k] * 8 + 4 - camX) * z), ry = (int)((AU_TY[k] * 8 + 4 - camY) * z);
+      int qs = (z < 1.0f) ? 3 : 6;
       if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
-      fRect(rx, ry, 6, 6, KDColor::RGB24(0xF5C518));
-      fRect(rx + 1, ry + 1, 4, 4, KDColor::RGB24(0xB08A10));
+      fRect(rx - qs / 2, ry - qs / 2, qs, qs, KDColor::RGB24(0xF5C518));
+      fRect(rx - qs / 2 + 1, ry - qs / 2 + 1, qs - 2, qs - 2, KDColor::RGB24(0xB08A10));
     }
     if (!meImp && pTaskI < 4 && ((int)(gTime * 4) % 2)) { // MA tache courante clignote
-      int rx = AU_TX[pTasks[pTaskI]] * 8 - camX - 3, ry = AU_TY[pTasks[pTaskI]] * 8 - camY - 3;
-      fRect(rx, ry, 12, 12, KDColor::RGB24(0xF5C518));
+      int rx = (int)((AU_TX[pTasks[pTaskI]] * 8 + 4 - camX) * z), ry = (int)((AU_TY[pTasks[pTaskI]] * 8 + 4 - camY) * z);
+      int qs = (z < 1.0f) ? 5 : 12;
+      fRect(rx - qs / 2, ry - qs / 2, qs, qs, KDColor::RGB24(0xF5C518));
     }
     for (int i = 0; i < 5; i++) { // ventilos
-      int rx = AU_VX[i] * 8 - camX, ry = AU_VY[i] * 8 - camY;
+      int rx = (int)((AU_VX[i] * 8 - camX) * z), ry = (int)((AU_VY[i] * 8 - camY) * z);
       if (rx < -8 || rx > SW || ry < -8 || ry > SH) continue;
-      fRect(rx, ry, 8, 8, KDColor::RGB24(0x55606E));
-      fRect(rx + 1, ry + 2, 6, 1, KDColor::RGB24(0x2E3A4A));
-      fRect(rx + 1, ry + 5, 6, 1, KDColor::RGB24(0x2E3A4A));
+      int vs = (z < 1.0f) ? 4 : 8;
+      fRect(rx, ry, vs, vs, KDColor::RGB24(0x55606E));
+      fRect(rx + 1, ry + vs / 3, vs - 2, 1, KDColor::RGB24(0x2E3A4A));
+      fRect(rx + 1, ry + 2 * vs / 3, vs - 2, 1, KDColor::RGB24(0x2E3A4A));
     }
-    int brx = AU_BTNX - camX, bry = AU_BTNY - camY;
-    fCirc(brx, bry, 5, KDColor::RGB24(0xC51111));
-    fRing(brx, bry, 6, KDColor::RGB24(0x7A0A0A));
-    // vision limitee : on ne voit les gens et les corps qu'a ~100 px
+    int brx = (int)((AU_BTNX - camX) * z), bry = (int)((AU_BTNY - camY) * z);
+    fCirc(brx, bry, (z < 1.0f) ? 3 : 5, KDColor::RGB24(0xC51111));
+    fRing(brx, bry, (z < 1.0f) ? 4 : 6, KDColor::RGB24(0x7A0A0A));
+    // vision limitee : ~100 px ET ligne de visee libre (V5.21 : pas de vision a travers les murs)
     for (int c = 0; c < auBodyN; c++) {
       float ddx = auBodyX[c] - px, ddy = auBodyY[c] - py;
-      if (ddx * ddx + ddy * ddy < 100 * 100) drawCorpse((int)auBodyX[c] - camX, (int)auBodyY[c] - camY, KDColor::RGB24(auBodyC[c]));
+      if (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auBodyX[c], auBodyY[c])) continue;
+      int rx = (int)((auBodyX[c] - camX) * z), ry = (int)((auBodyY[c] - camY) * z);
+      if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(auBodyC[c]));
+      else drawCorpse(rx, ry, KDColor::RGB24(auBodyC[c]));
     }
     for (int i = 0; i < 6; i++) {
       if (!auB[i].alive) continue;
       float ddx = auB[i].x - px, ddy = auB[i].y - py;
-      if (ddx * ddx + ddy * ddy >= 100 * 100) continue; // hors de vue
-      int rx = (int)auB[i].x - camX, ry = (int)auB[i].y - camY;
-      drawBean(rx, ry, KDColor::RGB24(AU_COL[i + 1]), auB[i].x > px);
+      if (ddx * ddx + ddy * ddy >= 100 * 100 || !auClearLine(px, py, auB[i].x, auB[i].y)) continue;
+      int rx = (int)((auB[i].x - camX) * z), ry = (int)((auB[i].y - camY) * z);
+      if (z < 1.0f) fCirc(rx, ry, 3, KDColor::RGB24(AU_COL[i + 1]));
+      else drawBean(rx, ry, KDColor::RGB24(AU_COL[i + 1]), auB[i].x > px);
       if (auB[i].panic) drawText(rx + 6, ry - 16, "!", KDColor::RGB24(0xC51111));
       else if (auB[i].state == 1) drawText(rx + 6, ry - 16, "...", KDColor::RGB24(0xF5C518));
     }
-    drawBean((int)px - camX, (int)py - camY, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), playerDir == 0);
+    if (z < 1.0f) { // toi, en petit en zoom arriere
+      fCirc((int)((px - camX) * z), (int)((py - camY) * z), 3, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC));
+      fRect((int)((px - camX) * z), (int)((py - camY) * z) - 2, 2, 1, KDColor::RGB24(0xC6F0F7));
+    } else drawBean((int)px - camX, (int)py - camY, meImp ? KDColor::RGB24(0xC51111) : KDColor::RGB24(0x38FEDC), playerDir == 0);
+    // ---- V5.21 : BROUILLARD — tout ce que tu ne vois pas (trop loin OU masque par un mur) est gris ----
+    for (int sy = 0; sy < SH; sy += ts)
+      for (int sx = 0; sx < SW; sx += ts) {
+        float wx = camX + (sx + ts / 2) / z, wy = camY + (sy + ts / 2) / z;
+        float ddx = wx - px, ddy = wy - py;
+        if (ddx * ddx + ddy * ddy < 100 * 100 && auClearLine(px, py, wx, wy)) continue; // visible
+        fRect(sx, sy, ts, ts, KDColor::RGB24(0x39404E));
+      }
     // HUD haut : barre des taches d'equipage
     fRect(0, 0, SW, 13, KDColor::RGB24(0x1B1B25));
     fRect(4, 3, 190, 7, KDColor::RGB24(0x3A3A4A));
@@ -6192,11 +6265,11 @@ static void amongUsGame() {
     // HUD bas : selon le role
     fRect(0, SH - 13, SW, 13, KDColor::RGB24(0x1B1B25));
     if (meImp) {
-      drawText(4, SH - 10, "OK:TUER EXE:VENT +:SIGN", KDColor::RGB24(0xD6E0F0));
-      fRect(160, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
-      fRect(161, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
+      drawText(4, SH - 10, "OK:TUER EXE:VENT +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
+      fRect(192, SH - 9, 80, 7, KDColor::RGB24(0x3A3A4A));
+      fRect(193, SH - 8, (int)(78 * (1.0f - killCd / 10.0f)), 5, killCd <= 0 ? KDColor::RGB24(0x38E05C) : KDColor::RGB24(0xF07D0D));
     } else {
-      drawText(4, SH - 10, "OK:TACHE +:SIGNALER", KDColor::RGB24(0xD6E0F0));
+      drawText(4, SH - 10, "OK:TACHE +:VOTE -:ZOOM", KDColor::RGB24(0xD6E0F0));
       if (pTaskI < 4) {
         fRect(236, SH - 9, 60, 7, KDColor::RGB24(0x3A3A4A));
         fRect(237, SH - 8, (int)(58 * pTaskProg), 5, KDColor::RGB24(0x38E05C));

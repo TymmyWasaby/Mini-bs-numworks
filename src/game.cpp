@@ -6086,32 +6086,44 @@ static void amongUsGame() {
       }
       else {
         waitRelease();
-        static const char *AU_NAMES[6] = {"ROUGE", "BLEU", "VERT", "ROSE", "ORANGE", "BLANC"};
-        int alive[6], na = 0;
-        for (int i = 0; i < 6; i++) if (auB[i].alive) alive[na++] = i;
-        int sel = 0, res = -2; // -2 : encore en train de voter, -1 : passe/annule, sinon : bot vote
-        bool pU = false, pD = false, pO = false, pB2 = false;
+        // V5.24 : interface de vote STYLE SELECTION DE BRAWLER — les crewmates en grille
+        static const char *AU_NAMES[6] = {"BLEU", "VERT", "ROSE", "ORANGE", "BLANC", "CYAN"};
+        static const int VSX[7] = {48, 136, 224, 48, 136, 224, 136}; // coins des cases
+        static const int VSY[7] = {52, 52, 52, 108, 108, 108, 164};   // slot 6 = PASSER
+        int sel = 0, res = -2; // res : -2 vote en cours, -1 passe, sinon : bot vote
+        bool pU = false, pD = false, pL2 = false, pR2 = false, pO = false, pB2 = false;
         while (res == -2) {
           pollKeys();
-          if (kUp && !pU) sel = (sel + na) % (na + 1);
-          if (kDown && !pD) sel = (sel + 1) % (na + 1);
-          if (keyOK && !pO) res = (sel == na) ? -1 : alive[sel];
+          // navigation en grille : gauche/droite en cycle, haut/bas par saut de ligne
+          if (kLeft && !pL2) { int s = sel; do { s = (s + 6) % 7; } while (s != 6 && !auB[s].alive); sel = s; }
+          if (kRight && !pR2) { int s = sel; do { s = (s + 1) % 7; } while (s != 6 && !auB[s].alive); sel = s; }
+          if (kUp && !pU && sel >= 3) { int s = sel - 3; if (s == 6 || auB[s].alive) sel = s; }
+          if (kDown && !pD && sel + 3 <= 6) { int s = sel + 3; if (s == 6 || auB[s].alive) sel = s; }
+          if (keyOK && !pO) res = (sel == 6) ? -1 : sel;
           if (keyBack && !pB2) res = -1;
-          pU = kUp; pD = kDown; pO = keyOK; pB2 = keyBack;
-          // ---- ecran de vote ----
-          fRect(52, 34, 216, 148, KDColor::RGB24(0x1B1B25));
-          fRect(52, 34, 216, 2, KDColor::RGB24(0xC51111)); fRect(52, 180, 216, 2, KDColor::RGB24(0xC51111));
-          fRect(52, 34, 2, 148, KDColor::RGB24(0xC51111)); fRect(266, 34, 2, 148, KDColor::RGB24(0xC51111));
-          drawTextC(42, "QUI EST L'IMPOSTEUR ?", KDColor::RGB24(0xD6E0F0));
-          for (int i = 0; i < na; i++) {
-            int ry = 62 + i * 15;
-            fRect(76, ry, 10, 10, KDColor::RGB24(AU_COL[alive[i] + 1]));
-            drawText(92, ry, AU_NAMES[alive[i]], KDColor::RGB24(0xD6E0F0));
-            if (i == sel) drawText(62, ry, ">", KDColor::RGB24(0xF5C518));
+          pU = kUp; pD = kDown; pL2 = kLeft; pR2 = kRight; pO = keyOK; pB2 = keyBack;
+          // ---- ecran de vote : une case par crewmate (son cadavre s'il est mort) ----
+          fRect(0, 0, SW, SH, KDColor::RGB24(0x1B1B25));
+          fRect(0, 0, SW, 22, KDColor::RGB24(0x2E3A4A));
+          fRect(0, 20, SW, 2, KDColor::RGB24(0xC51111));
+          drawTextC(8, "QUI EST L'IMPOSTEUR ?", KDColor::RGB24(0xF5C518));
+          for (int i = 0; i < 7; i++) {
+            int bx = VSX[i], by = VSY[i];
+            rRect(bx, by, 48, 52, 6, (i == sel) ? C_YEL : KDColor::RGB24(0x252C3A));
+            if (i == 6) { // PASSER
+              drawText(bx + 8, by + 22, "PASSER", (i == sel) ? C_YEL : KDColor::RGB24(0x8B94A3));
+              continue;
+            }
+            int cx = bx + 24, cy = by + 22;
+            if (auB[i].alive) { // le crewmate, bien visible
+              drawBean(cx, cy, KDColor::RGB24(AU_COL[i + 1]), false);
+              drawText(bx + 6, by + 42, AU_NAMES[i], (i == sel) ? C_YEL : KDColor::RGB24(0xD6E0F0));
+            } else { // mort : son cadavre, grise et non selectionnable
+              drawCorpse(cx, cy, KDColor::RGB24(AU_COL[i + 1]));
+              drawText(bx + 10, by + 42, "MORT", C_GRE);
+            }
           }
-          drawText(92, 62 + na * 15, "PASSER", KDColor::RGB24(0x8B94A3));
-          if (sel == na) drawText(62, 62 + na * 15, ">", KDColor::RGB24(0xF5C518));
-          drawText(60, 172, "OK:VOTER RETOUR:PASSER", KDColor::RGB24(0x8B94A3));
+          drawTextC(202, "OK:VOTER   RETOUR:PASSER", C_GRE);
           blit();
           Ion::Timing::msleep(30);
         }
